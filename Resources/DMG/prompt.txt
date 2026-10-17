@@ -1,0 +1,19 @@
+Use case: ads-marketing.
+Asset type: a single production-quality FLAT background image for Fralo's macOS DMG installer, not a mockup of a window.
+Create ONE simple, restrained, elegant light background that briefly explains the real app. Fralo is a native local macOS tool that batch-wraps existing screenshots in iPhone device frames and exports transparent PNG files. It requires no account and does not upload screenshots.
+Landscape canvas, aspect ratio exactly 1.65:1, ideally 1584 x 960 pixels. All layout coordinates below are in logical points on a 660 x 400 canvas; multiply proportionally for the full-resolution image.
+
+Design: near-white cool neutral background. Clean native macOS editorial typography, dark graphite text, generous negative space. Extremely faint soft cyan and magenta illumination only at the outer top corners, and just a couple of barely visible thin-line rounded screenshot/phone outlines along the far outer edges, lower than 5% contrast. The background must feel quiet and functional, not a poster or glossy marketing campaign.
+
+Exact Chinese and English copy, with no other text:
+At top center, y=30 to 60: "Fralo" in a clean semibold sans serif, about 26 pt.
+Centered below at y=70 to 95: "批量截图套框" in about 18 pt.
+Centered at y=105: "本地处理 · 透明 PNG 导出" in about 12.5 pt, muted gray.
+At bottom center, y=316 to 338: "拖入 Applications 文件夹即可安装" in about 14 pt, medium gray.
+The exact spelling is F-r-a-l-o, A-p-p-l-i-c-a-t-i-o-n-s, P-N-G. Chinese text must be accurately and clearly typeset.
+
+Functional layout constraints:
+The real Finder will overlay the actual Fralo app icon and Applications folder. Therefore leave the two icon regions absolutely EMPTY: left rectangle x=108..252, y=120..275, and right rectangle x=408..552, y=120..275. No drawn app icon, no folder, no label, no placeholder circle or box in these regions.
+A single fine neutral-gray right-pointing arrow occupies x=291..369, centered at y=185, between the two empty regions.
+All text and all illustration must avoid the icon regions. Allow whitespace beneath the icon regions for Finder's own native labels.
+Render only the background, edge-to-edge. No window frame, no title bar, no traffic lights, no cursor, no desktop, no mock device hero, no watermark, no logos except the exact Fralo wordmark above. Opaque background.

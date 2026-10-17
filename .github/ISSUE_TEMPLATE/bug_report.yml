@@ -1,0 +1,22 @@
+name: Bug report / 问题反馈
+description: Report an import, preview, export, CLI, or installation problem.
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment / 环境
+      description: Fralo version, macOS version, Apple Silicon or Intel, App or CLI.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps and result / 复现步骤与结果
+      description: Include expected behavior, actual behavior, model, orientation, and padding.
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Sample or log / 样例或日志
+      description: Use generated or redacted images. Remove personal paths, names, and secrets from logs.

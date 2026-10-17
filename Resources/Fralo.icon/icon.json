@@ -1,0 +1,114 @@
+{
+  "features": [
+    "refractivity"
+  ],
+  "color-space-for-untagged-svg-colors": "display-p3",
+  "fill": {
+    "automatic-gradient": "extended-srgb:0.97255,0.96471,0.94118,1.00000"
+  },
+  "groups": [
+    {
+      "name": "Cyan glass",
+      "blend-mode": "darken",
+      "specular-highlight-placement": "inside",
+      "layers": [
+        {
+          "name": "Cyan glass",
+          "image-name": "cyan.svg"
+        }
+      ],
+      "translucency": {
+        "enabled": true,
+        "value": 0.18
+      },
+      "refractivity": {
+        "enabled": true,
+        "depth": 0.012,
+        "strength": 0.12
+      },
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.03
+      }
+    },
+    {
+      "name": "Magenta glass",
+      "blend-mode": "darken",
+      "specular-highlight-placement": "inside",
+      "layers": [
+        {
+          "name": "Magenta glass",
+          "image-name": "magenta.svg"
+        }
+      ],
+      "translucency": {
+        "enabled": true,
+        "value": 0.18
+      },
+      "refractivity": {
+        "enabled": true,
+        "depth": 0.012,
+        "strength": 0.12
+      },
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.03
+      }
+    },
+    {
+      "name": "Amber glass",
+      "blend-mode": "darken",
+      "specular-highlight-placement": "inside",
+      "layers": [
+        {
+          "name": "Amber glass",
+          "image-name": "amber.svg"
+        }
+      ],
+      "translucency": {
+        "enabled": true,
+        "value": 0.18
+      },
+      "refractivity": {
+        "enabled": true,
+        "depth": 0.012,
+        "strength": 0.12
+      },
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.03
+      }
+    },
+    {
+      "name": "Dark optical backing",
+      "hidden-specializations": [
+        {
+          "value": true
+        },
+        {
+          "appearance": "dark",
+          "value": false
+        }
+      ],
+      "layers": [
+        {
+          "name": "Optical backing",
+          "image-name": "dark-backing.svg",
+          "glass": false,
+          "fill": {
+            "solid": "srgb:1.0,1.0,1.0,1.0"
+          }
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.0
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": [
+      "macOS"
+    ]
+  }
+}

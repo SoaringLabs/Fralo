@@ -1,0 +1,14 @@
+name: Feature request / 功能建议
+description: Describe a concrete screenshot workflow that Fralo could improve.
+body:
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow and problem / 使用场景与问题
+      description: What are you trying to produce, and which repeated steps cost time?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior / 期望行为
