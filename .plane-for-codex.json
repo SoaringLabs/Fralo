@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "states": {},
+  "status_sync": {
+    "enabled": false
+  },
+  "plane": {
+    "api_url": "https://api.plane.so",
+    "app_url": "https://app.plane.so",
+    "workspace": "soaring-labs",
+    "project_id": "dc099353-1e7c-4c10-8890-20ee27eb40b1",
+    "project_identifier": "FRALO"
+  },
+  "github": {
+    "repository": "SoaringLabs/Fralo",
+    "base_branch": "main",
+    "branch_prefix": "codex"
+  },
+  "completion": {
+    "policy": "manual",
+    "manual_label": "manual-acceptance"
+  },
+  "sync": {
+    "provider": "actions",
+    "api_version": "v1"
+  }
+}
