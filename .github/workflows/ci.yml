@@ -21,6 +21,8 @@ jobs:
         run: swift --version
       - name: Unit tests
         run: swift test
+      - name: Update feed validation tests
+        run: python3 scripts/test_prepare_update.py
       - name: Build App and CLI
         run: swift build -c release
       - name: CLI integration checks
