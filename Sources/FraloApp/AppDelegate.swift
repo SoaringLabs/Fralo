@@ -4,11 +4,13 @@ import FraloCore
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainController: MainWindowController?
+    private var updateController: UpdateController?
     private var pendingURLs: [URL] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let controller = MainWindowController()
         mainController = controller
+        updateController = UpdateController(mainController: controller)
         installMenus(controller)
         controller.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -42,6 +44,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let app = NSMenu(); let appItem = NSMenuItem(); appItem.submenu = app; bar.addItem(appItem)
         let about = app.addItem(withTitle: "关于 Fralo", action: #selector(showAbout(_:)), keyEquivalent: "")
         about.target = self
+        let check = app.addItem(withTitle: "检查更新…", action: #selector(UpdateController.checkForUpdates(_:)), keyEquivalent: "")
+        check.target = updateController
+        let automatic = app.addItem(withTitle: "自动检查更新（每天）", action: #selector(UpdateController.toggleAutomaticChecks(_:)), keyEquivalent: "")
+        automatic.target = updateController
         app.addItem(.separator())
         app.addItem(withTitle: "隐藏 Fralo", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         app.addItem(.separator())

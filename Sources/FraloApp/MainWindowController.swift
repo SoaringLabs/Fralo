@@ -41,6 +41,9 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
     private var pastedCount = 0
     private var cancellation: CancellationToken?
     private var progressPanel: NSPanel?
+    private var updateNotice: NSTextField?
+    /// Returns true when a pending update consumes successful export completion.
+    var onExportFinished: (() -> Bool)?
     private var quitAfterExport = false
     private var initialWarning: String?
     var isExporting: Bool { cancellation != nil }
@@ -412,7 +415,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
     private func startExport(_ inputs: [ImageInput], directory: URL, overwrite: Bool, names: [String]? = nil) {
         let snapshot = settings, token = CancellationToken()
         cancellation = token; updateActions()
-        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 470, height: 210), styleMask: [.titled], backing: .buffered, defer: false)
+        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 470, height: 240), styleMask: [.titled], backing: .buffered, defer: false)
         panel.titleVisibility = .hidden
         let count = label("已完成 0 / \(inputs.count)")
         let current = label("正在准备…", size: 12, secondary: true); current.lineBreakMode = .byTruncatingMiddle
@@ -420,7 +423,8 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
         bar.widthAnchor.constraint(equalToConstant: 414).isActive = true
         let cancel = NSButton(title: "取消", target: nil, action: nil)
         cancel.target = self; cancel.action = #selector(cancelExportAction(_:)); cancel.keyEquivalent = "\u{1b}"
-        let content = stack([label("正在导出图片", size: 16, weight: .semibold), count, bar, current, cancel], spacing: 12)
+        let notice = label("", size: 12, secondary: true); updateNotice = notice
+        let content = stack([label("正在导出图片", size: 16, weight: .semibold), count, bar, current, notice, cancel], spacing: 12)
         content.alignment = .centerX; content.translatesAutoresizingMaskIntoConstraints = false; panel.contentView?.addSubview(content)
         NSLayoutConstraint.activate([content.centerXAnchor.constraint(equalTo: panel.contentView!.centerXAnchor), content.centerYAnchor.constraint(equalTo: panel.contentView!.centerYAnchor)])
         progressPanel = panel; window?.beginSheet(panel)
@@ -433,9 +437,15 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.window?.endSheet(panel); self.progressPanel = nil; self.cancellation = nil; self.updateActions()
+                self.updateNotice = nil
                 if self.quitAfterExport { NSApp.reply(toApplicationShouldTerminate: true); return }
                 switch result {
-                case .success(let report): self.showReport(report, directory: directory)
+                case .success(let report):
+                    // Keep cancellation/failure/skip summaries visible before installing.
+                    // A wholly successful export can hand off directly without a blocking sheet.
+                    if report.failed == 0 && report.skipped == 0 && !report.cancelled,
+                       self.onExportFinished?() == true { return }
+                    self.showReport(report, directory: directory)
                 case .failure(let error): self.showError(error.localizedDescription)
                 }
             }
@@ -444,6 +454,8 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
     @objc private func cancelExportAction(_ sender: NSButton) { cancelExport(); sender.isEnabled = false; sender.title = "正在停止…" }
     func cancelExport() { cancellation?.cancel() }
     func requestQuitAfterExport() { quitAfterExport = true; cancelExport() }
+    func showPendingUpdate() { updateNotice?.stringValue = "导出结束后将安装更新并重启 Fralo" }
+    func clearPendingUpdate() { updateNotice?.stringValue = "" }
     private func showReport(_ report: ExportReport, directory: URL) {
         let alert = NSAlert(); alert.messageText = report.cancelled ? "导出已取消" : "导出完成"
         alert.informativeText = "成功 \(report.succeeded) 张 · 跳过 \(report.skipped) 张 · 失败 \(report.failed) 张\n未处理 \(report.unprocessed) 张 · 用时 \(String(format: "%.2f", report.durationSeconds)) 秒"

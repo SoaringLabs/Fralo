@@ -69,11 +69,27 @@ def main():
         assert digest(dist / "fralo") == digest(app / "Contents/MacOS/fralo")
         for name in ("INSTALL.md", "AUTHORS.md", "LICENSE"):
             assert digest(app / "Contents/Resources" / name) == digest(ROOT / name)
+        assert digest(app / "Contents/Resources/Sparkle-LICENSE") == digest(
+            ROOT / ".build/artifacts/sparkle/Sparkle/LICENSE")
         assert (volume / "Applications").is_symlink()
         assert (volume / "Applications").readlink() == Path("/Applications")
         info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
         assert info["CFBundleShortVersionString"] == version
         assert info["CFBundleVersion"] == identity["build"]
+        assert info["SUFeedURL"] == identity["updateFeed"]
+        assert info["SUPublicEDKey"] == identity["updatePublicKey"]
+        assert info["SUEnableAutomaticChecks"] is True
+        assert info["SUAutomaticallyUpdate"] is False
+        assert info["SUAllowsAutomaticUpdates"] is False
+        assert info["SUVerifyUpdateBeforeExtraction"] is True
+        sparkle = app / "Contents/Frameworks/Sparkle.framework"
+        assert (sparkle / "Versions/Current").is_symlink(), "Framework symlinks must be preserved"
+        assert (sparkle / "Versions/B/Updater.app").is_dir()
+        for code in (sparkle / "Versions/B/Autoupdate", sparkle / "Versions/B/Updater.app", sparkle):
+            run("codesign", "--verify", "--strict", str(code))
+        app_binary = app / "Contents/MacOS/FraloApp"
+        assert b"@rpath/Sparkle.framework/" in run("otool", "-L", str(app_binary))
+        assert b"@executable_path/../Frameworks" in run("otool", "-l", str(app_binary))
         assert info["NSHumanReadableCopyright"] == identity["copyright"]
         for name in ("Assets.car", "Fralo.icns"):
             assert (app / "Contents/Resources" / name).stat().st_size > 0
@@ -89,7 +105,8 @@ def main():
             assert developer_id or "Signature=adhoc" in signing
         if developer_id:
             team = re.search(r"^TeamIdentifier=(\w+)$", signing, re.MULTILINE).group(1)
-            for code in (app, app / "Contents/MacOS/fralo", dist / "fralo"):
+            for code in (app, app / "Contents/MacOS/fralo", dist / "fralo", sparkle,
+                         sparkle / "Versions/B/Autoupdate", sparkle / "Versions/B/Updater.app"):
                 run("codesign", "--verify", "--strict", str(code))
                 details = subprocess.run(["codesign", "-dv", "--verbose=2", str(code)],
                                          check=True, capture_output=True, text=True).stderr

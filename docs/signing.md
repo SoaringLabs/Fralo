@@ -25,7 +25,7 @@ Apple 账号、Team ID 和 App 专用密码（或选择 App Store Connect API �
 
     .venv/bin/python scripts/package.py --dmg --sign "CERTIFICATE_SHA1"
 
-脚本先签名内置 CLI，再签名 App，使用 Hardened Runtime 和安全时间戳；
+脚本先签名 Sparkle 更新助手和框架、内置 CLI，再签名 App，使用 Hardened Runtime 和安全时间戳；
 随后制作并签名 DMG。dist/fralo 与 App 内置 CLI 保持一致。
 不能使用 Apple Development 或 Apple Distribution 证书代替 Developer ID Application。
 
@@ -53,6 +53,7 @@ Hardened Runtime 和安全时间戳；DMG 公证凭证有效；App 与 DMG 均�
 最终用户分发容器为已附公证凭证的 DMG。不要把未附凭证的 App 另行打成 ZIP 分发。
 
 公证后不要改动 App 内容或重建 DMG；变更后必须重新签名、公证并生成校验值。
+最终 DMG 可按 [更新分发说明](updates.md)生成 `appcast.xml`，之后仍不允许修改 DMG。
 浏览器真实下载后的首次安装与启动仍需要单独验收。
 
 参考：[Apple 证书说明](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/)、

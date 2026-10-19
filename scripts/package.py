@@ -65,6 +65,13 @@ def main():
         resources.mkdir(parents=True)
         shutil.copy2(binary_dir / "FraloApp", executables / "FraloApp")
         shutil.copy2(binary_dir / "fralo", executables / "fralo")
+        frameworks = list((ROOT / ".build/artifacts").rglob("Sparkle.framework"))
+        if len(frameworks) != 1:
+            raise RuntimeError("Expected one resolved Sparkle.framework in .build/artifacts")
+        sparkle = staged / "Contents/Frameworks/Sparkle.framework"
+        shutil.copytree(frameworks[0], sparkle, symlinks=True)
+        # Fralo is not sandboxed; Sparkle's optional XPC services are unnecessary.
+        shutil.rmtree(sparkle / "Versions/B/XPCServices")
         # Compile the layered Icon Composer document, including the .icns fallback.
         icon_info = Path(temporary) / "icon-info.plist"
         run("xcrun", "actool", str(ROOT / "Resources/Fralo.icon"),
@@ -86,6 +93,14 @@ def main():
             "NSHumanReadableCopyright": identity("copyright"),
             "CFBundleDevelopmentRegion": "zh_CN",
             "CFBundleLocalizations": ["zh_CN"],
+            "SUFeedURL": identity("updateFeed"),
+            "SUPublicEDKey": identity("updatePublicKey"),
+            "SUEnableAutomaticChecks": True,
+            "SUScheduledCheckInterval": 86400,
+            "SUAutomaticallyUpdate": False,
+            "SUAllowsAutomaticUpdates": False,
+            "SUEnableSystemProfiling": False,
+            "SUVerifyUpdateBeforeExtraction": True,
             "CFBundleDocumentTypes": [{
                 "CFBundleTypeName": "Screenshot Image",
                 "CFBundleTypeRole": "Viewer",
@@ -97,14 +112,18 @@ def main():
         (staged / "Contents/Info.plist").write_bytes(plistlib.dumps(info))
         for filename in ("LICENSE", "INSTALL.md", "AUTHORS.md"):
             shutil.copy2(ROOT / filename, resources / filename)
+        shutil.copy2(ROOT / ".build/artifacts/sparkle/Sparkle/LICENSE", resources / "Sparkle-LICENSE")
         signing_options = ["--options", "runtime", "--timestamp"] if args.sign else []
+        # Sign the update helper before its enclosing framework and application.
+        for code in (sparkle / "Versions/B/Autoupdate", sparkle / "Versions/B/Updater.app", sparkle):
+            run("codesign", "--force", "--sign", signing_identity, *signing_options, str(code))
         # Sign nested code first; the bundle signing pass covers FraloApp.
         run("codesign", "--force", "--sign", signing_identity, *signing_options,
             str(executables / "fralo"))
         run("codesign", "--force", "--sign", signing_identity, *signing_options, str(staged))
         if app.exists():
             shutil.rmtree(app)
-        shutil.copytree(staged, app)
+        shutil.copytree(staged, app, symlinks=True)
     # The App signing pass can update the embedded executable's signature.
     # Ship exactly that signed CLI in both locations.
     shutil.copy2(app / "Contents/MacOS/fralo", dist / "fralo")
