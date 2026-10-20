@@ -28,3 +28,8 @@ __pycache__/
 *.key
 *.certSigningRequest
 /AGENTS.md
+
+# Plane workflow response snapshots and local-only artifacts (including historical names).
+/.plane-devflow.local/
+/.plane-for-codex.local/
+/.github/plane-devflow/__pycache__/
