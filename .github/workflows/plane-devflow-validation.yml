@@ -1,0 +1,23 @@
+name: Validate Plane DevFlow migration
+on:
+  pull_request:
+    paths:
+      - '.plane-devflow.json'
+      - '.plane-for-codex.json'
+      - '.github/plane-devflow/**'
+      - '.github/plane-for-codex/**'
+      - '.github/workflows/plane-devflow*.yml'
+      - '.github/workflows/plane-for-codex.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate the vendored synchronization bundle without credentials
+        run: python3 .github/plane-devflow/test_sync.py -v
