@@ -1,6 +1,6 @@
 # Plane DevFlow migration for Fralo
 
-This bundle is copied from Plane DevFlow **0.10.0** (`103a7177fc78c1b3a3d021e362f800e76a06bd0a`). The repository mapping is renamed to [`.plane-devflow.json`](../../.plane-devflow.json) with its contents unchanged. The existing Plane project, repository/base branch, completion preferences, MCP connection and `PLANE_API_KEY` Secret are retained.
+This bundle is copied from Plane DevFlow **0.10.1** (`3cf150da1c842f50533d57f09a3493d8335bd40c`). The repository mapping is renamed to [`.plane-devflow.json`](../../.plane-devflow.json) with its contents unchanged. The existing Plane project, repository/base branch, completion preferences, MCP connection and `PLANE_API_KEY` Secret are retained.
 
 Schema 2, empty state targets and disabled state synchronization remain unchanged. PR activity can be recorded without changing the Plane task state.
 
