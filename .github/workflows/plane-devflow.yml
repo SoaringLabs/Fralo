@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: SoaringLabs/plane-devflow@bc30810c5fdf465e8c6933d47235d56a695460ab # Plane DevFlow 0.14.0
+      - uses: SoaringLabs/plane-devflow@618123449e0c9d069cb2d71530fd8fa1e6e98c5d # Plane DevFlow 0.14.1
         with:
           github-token: ${{ github.token }}
           plane-api-key: ${{ secrets.PLANE_API_KEY }}
