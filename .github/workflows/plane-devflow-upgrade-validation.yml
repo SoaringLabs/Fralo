@@ -1,0 +1,68 @@
+name: Verify Plane DevFlow upgrade
+on:
+  push:
+    branches: [codex/plane-devflow-upgrade-0.14.1-validation]
+permissions:
+  contents: read
+jobs:
+  verify-upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE_SHA: 6a8a352ee7fa57c2a62043f81715d9ae4f46dd1e
+      CANDIDATE_SHA: a3c110dfe9e7fcaea010186c24c89ebc5e5fe29f
+      PRODUCT_SHA: 618123449e0c9d069cb2d71530fd8fa1e6e98c5d
+      PRODUCT_SOURCE: ${{ github.workspace }}/product-source
+      PROJECT_IDENTIFIER: FRALO
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Check out exact upgrade candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: a3c110dfe9e7fcaea010186c24c89ebc5e5fe29f
+          path: candidate
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Check out pinned formal product source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: SoaringLabs/plane-devflow
+          ref: 618123449e0c9d069cb2d71530fd8fa1e6e98c5d
+          path: product-source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Install development validation dependency
+        run: python3 -m pip install -r product-source/requirements-dev.txt
+      - name: Verify exact candidate and synchronization regressions
+        working-directory: candidate
+        run: |
+          python3 -B - <<'PY'
+          from pathlib import Path
+          import os,json,subprocess,sys
+          root=Path.cwd();source=Path(os.environ['PRODUCT_SOURCE']).resolve()
+          base=os.environ['BASE_SHA'];candidate=os.environ['CANDIDATE_SHA'];target=os.environ['PRODUCT_SHA']
+          def git(*args):return subprocess.check_output(['git',*args],text=True).strip()
+          assert git('rev-parse','HEAD')==candidate and git('rev-parse','HEAD^')==base
+          assert git('diff','--name-status',base,candidate)=='M\t.github/workflows/plane-devflow.yml'
+          assert (root/'.plane-devflow.json').read_bytes()==subprocess.check_output(['git','show',base+':.plane-devflow.json'])
+          config=json.loads((root/'.plane-devflow.json').read_text())
+          assert config['completion']['policy']=='manual'
+          assert config['plane']['project_identifier']==os.environ['PROJECT_IDENTIFIER']
+          if config['version']==2: assert config['status_sync']['enabled'] is False and config['states']=={}
+          else: assert config['version']==1 and all(config['states'].get(n) for n in ['in_progress','in_review','done'])
+          assert subprocess.check_output(['git','-C',str(source),'rev-parse','HEAD'],text=True).strip()==target
+          assert (source/'VERSION').read_text().strip()=='0.14.1'
+          sys.path.insert(0,str(source/'plugins/plane-devflow/scripts'))
+          from shared_sync import workflow
+          actual=(root/'.github/workflows/plane-devflow.yml').read_text()
+          assert actual==workflow(target,'0.14.1')
+          old=subprocess.check_output(['git','show',base+':.github/workflows/plane-devflow.yml'],text=True)
+          assert actual==old.replace('bc30810c5fdf465e8c6933d47235d56a695460ab # Plane DevFlow 0.14.0',target+' # Plane DevFlow 0.14.1')
+          subprocess.run(['git','diff','--check',base,candidate],check=True)
+          print('VERIFIED_CANDIDATE_SHA='+candidate,flush=True)
+          print('Exact one-line upgrade; formal template, mapping, state rules and manual acceptance verified.',flush=True)
+          code="import sys,unittest;sys.path.insert(0,'tests');suite=unittest.defaultTestLoader.loadTestsFromNames(['test_workflow','test_github_setup','test_sync_modes','test_review_sync_protection']);r=unittest.TextTestRunner(verbosity=2).run(suite);print('PRODUCT_SYNC_TESTS_RUN='+str(r.testsRun),flush=True);sys.exit(0 if r.wasSuccessful() else 1)"
+          subprocess.run([sys.executable,'-B','-c',code],cwd=source,check=True)
+          assert git('status','--porcelain')==''
+          print('UPGRADE_VALIDATION_PASSED='+candidate,flush=True)
+          PY
