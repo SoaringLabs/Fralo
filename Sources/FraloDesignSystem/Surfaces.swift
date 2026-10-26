@@ -165,8 +165,19 @@ public final class ThumbnailRow: NSTableCellView {
 }
 
 @MainActor
+private final class BatchNavigationTable: NSTableView {
+    var onDelete: (() -> Void)?
+    override func keyDown(with event: NSEvent) {
+        if (event.keyCode == 51 || event.keyCode == 117), let onDelete { onDelete() }
+        else { super.keyDown(with: event) }
+    }
+}
+
+@MainActor
 public final class BatchList: NSScrollView, NSTableViewDataSource, NSTableViewDelegate {
-    private let table = NSTableView()
+    private let table = BatchNavigationTable()
+    private var updating = false
+    public var onDelete: (() -> Void)?
     public private(set) var entries: [BatchEntry] = []
     public var onSelection: ((Int) -> Void)?
     public var selectedIndex: Int? { entries.indices.contains(table.selectedRow) ? table.selectedRow : nil }
@@ -177,12 +188,14 @@ public final class BatchList: NSScrollView, NSTableViewDataSource, NSTableViewDe
         let column = NSTableColumn(identifier: .init("source")); table.addTableColumn(column)
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.dataSource = self; table.delegate = self
+        table.onDelete = { [weak self] in self?.onDelete?() }
         table.setAccessibilityLabel("原始图片列表")
         documentView = table; ScrollContent.configure(self)
         update(entries)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     public func update(_ entries: [BatchEntry]) {
+        updating = true; defer { updating = false }
         let oldID = selectedIndex.map { self.entries[$0].id }
         self.entries = entries; table.reloadData()
         if !entries.isEmpty { select(entries.firstIndex { $0.id == oldID } ?? 0) }
@@ -198,7 +211,7 @@ public final class BatchList: NSScrollView, NSTableViewDataSource, NSTableViewDe
     }
     public func numberOfRows(in tableView: NSTableView) -> Int { entries.count }
     public func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? { ThumbnailRow(entry: entries[row]) }
-    public func tableViewSelectionDidChange(_ notification: Notification) { if let selectedIndex { onSelection?(selectedIndex) } }
+    public func tableViewSelectionDidChange(_ notification: Notification) { if !updating, let selectedIndex { onSelection?(selectedIndex) } }
 }
 
 @MainActor

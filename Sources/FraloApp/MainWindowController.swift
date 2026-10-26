@@ -1,35 +1,37 @@
 import AppKit
 import UniformTypeIdentifiers
 import FraloCore
+import FraloDesignSystem
 
 @MainActor
-final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTableViewDataSource, NSTableViewDelegate, NSMenuItemValidation, NSTextFieldDelegate {
+final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuItemValidation, NSTextFieldDelegate {
     struct Item { let input: ImageInput; var thumbnail: NSImage?; var error: String? }
     private var items: [Item] = []
     private var settings: RenderSettings
-    private let store = SettingsStore()
-    private let split = NSSplitViewController()
-    private var sidebarItem: NSSplitViewItem!
-    private let sidebar = NSViewController(), center = NSViewController(), inspector = NSViewController()
-    private let table = BatchTableView()
+    private let store: SettingsStore
+    private let preferences: UserDefaults
+    private var workbench: WorkbenchView!
+    private let center = NSViewController()
+    private let list = BatchList()
+    private let viewing = ViewToolbar()
+    private let batchScope = FraloStyle.text("样式应用于全部 0 张", role: .caption, secondary: true)
+    private let exportAction = ExportAction(count: 0)
     private let batchCount = label("批次 · 0 张", weight: .semibold)
     private let filename = label("", weight: .semibold), position = label("", size: 12, secondary: true)
     private let previewScroll = PreviewScrollView()
-    private let canvas = PreviewCanvas()
+    private let canvas = CanvasSurface(frame: .zero)
     private let empty = NSView()
     private let emptyMessage = label("拖入截图，开始套框", size: 22, weight: .semibold)
     private let emptyDetail = label("PNG / JPEG · 支持批量导入", secondary: true)
     private let previewSpinner = NSProgressIndicator()
     private let footer = NSView()
-    private let fitMenu = NSPopUpButton(frame: .zero, pullsDown: false)
+    private var fitMenu: NSPopUpButton { viewing.zoom }
     private let modelMenu = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let orientation = NSSegmentedControl(labels: ["竖屏", "横屏"], trackingMode: .selectOne, target: nil, action: nil)
+    private let orientation = ValuePicker(["竖屏", "横屏"], label: "设备方向")
     private let padding = NSTextField(string: "0")
     private let paddingStepper = NSStepper()
     private let dimensions = label("按设备与边距确定", secondary: true)
-    private let copyButton = NSButton(title: "复制当前图片", target: nil, action: nil)
-    private let exportButton = NSButton(title: "导出全部（0）", target: nil, action: nil)
-    private let exportArrow = NSButton(image: NSImage(systemSymbolName: "chevron.down", accessibilityDescription: "更多导出操作")!, target: nil, action: nil)
+    private let copyButton = ActionButton("复制当前图片", size: .compact, symbol: "doc.on.doc")
     private var rendered: RenderedFrame?
     private var renderedID: String?
     private var previewRequest = 0, thumbnailRequest = 0
@@ -47,9 +49,10 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
     private var quitAfterExport = false
     private var initialWarning: String?
     var isExporting: Bool { cancellation != nil }
-    private var selectedIndex: Int? { items.indices.contains(table.selectedRow) ? table.selectedRow : nil }
+    private var selectedIndex: Int? { list.selectedIndex }
 
-    init() {
+    init(store: SettingsStore = SettingsStore(), preferences: UserDefaults = .standard, restoreWindow: Bool = true) {
+        self.store = store; self.preferences = preferences
         do { settings = try store.load() } catch { settings = RenderSettings(); initialWarning = error.localizedDescription }
         let area = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 1000)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: min(1400, area.width - 80), height: min(950, area.height - 80)), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
@@ -57,84 +60,74 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
         window.title = "Fralo"; window.titleVisibility = .hidden; window.toolbarStyle = .unified
         window.contentMinSize = NSSize(width: 1030, height: 640)
         buildInterface()
-        window.setFrameAutosaveName("FraloMainWindow"); window.center()
+        if restoreWindow { window.setFrameAutosaveName("FraloMainWindow") }; window.center()
         if let warning = initialWarning { DispatchQueue.main.async { [weak self] in self?.showError(warning) } }
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     private func buildInterface() {
-        sidebar.view = NSView(); center.view = DropContainer(); inspector.view = NSView()
-        split.view.frame = window!.contentView!.bounds
-        split.splitView.isVertical = true
-        sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebar)
-        sidebarItem.minimumThickness = 230; sidebarItem.maximumThickness = 300; sidebarItem.preferredThicknessFraction = 0.19; sidebarItem.canCollapse = true
-        sidebarItem.isCollapsed = UserDefaults.standard.bool(forKey: "sidebarCollapsed")
-        let main = NSSplitViewItem(viewController: center); main.minimumThickness = 420
-        let right = NSSplitViewItem(inspectorWithViewController: inspector)
-        right.minimumThickness = 300; right.maximumThickness = 350; right.preferredThicknessFraction = 0.23; right.canCollapse = false
-        split.addSplitViewItem(sidebarItem); split.addSplitViewItem(main); split.addSplitViewItem(right)
-        window?.contentViewController = split
+        center.view = DropContainer()
         (center.view as? DropContainer)?.onDrop = { [weak self] in self?.importURLs($0) }
-        buildSidebar(); buildPreview(); buildInspector()
+        let collapse = IconButton("sidebar.left", label: "收起图片列表") { [weak self] in self?.toggleSidebar(nil) }
+        let more = IconButton("ellipsis", label: "批次操作")
+        more.onPress = { [weak self, weak more] in if let more { self?.batchMenu(more) } }
+        let heading = FraloStyle.stack([batchCount, NSView(), more, collapse], axis: .horizontal, spacing: 4)
+        let add = ActionButton("添加图片", symbol: "plus") { [weak self] in self?.addImages(nil) }
+        let leftFooter = FraloStyle.stack([add, FraloStyle.text("↑ ↓ 切换图片", role: .caption, secondary: true)], spacing: 8)
+        let left = FloatingPanel(header: heading, body: list, footer: leftFooter)
+        list.onSelection = { [weak self] _ in self?.selectionChanged() }
+        list.onDelete = { [weak self] in self?.removeSelected(nil) }
+        let menu = NSMenu(); menu.addItem(actionItem("移除当前图片", #selector(removeSelected(_:))))
+        menu.addItem(actionItem("清空批次", #selector(newBatch(_:)))); list.documentView?.menu = menu
+        exportAction.onExportAll = { [weak self] in self?.exportAll(nil) }
+        exportAction.onExportCurrent = { [weak self] in self?.exportCurrent(nil) }
+        let inspectorBody = buildInspector()
+        let right = FloatingPanel(header: FraloStyle.stack([FraloStyle.text("批次设置", role: .heading), batchScope], spacing: 8),
+                                  body: ScrollContent.make(inspectorBody, inset: 0),
+                                  footer: FraloStyle.stack([dimensions, exportAction], spacing: 10))
+        workbench = WorkbenchView(left: left, right: right, content: center.view)
+        workbench.collapsed = preferences.bool(forKey: "sidebarCollapsed")
+        workbench.rail.expand.onPress = { [weak self] in self?.toggleSidebar(nil) }
+        workbench.rail.add.onPress = { [weak self] in self?.addImages(nil) }
+        workbench.rail.previous.onPress = { [weak self] in self?.moveSelection(-1) }
+        workbench.rail.next.onPress = { [weak self] in self?.moveSelection(1) }
+        workbench.onGeometryChange = { [weak self] in self?.layoutPreview() }
+        window?.contentView = workbench
+        buildPreview()
         let toolbar = NSToolbar(identifier: "FraloToolbar")
         toolbar.delegate = self; toolbar.displayMode = .iconOnly; toolbar.allowsUserCustomization = false
         window?.toolbar = toolbar
-        updateActions()
-    }
-
-    private func buildSidebar() {
-        let more = NSButton(image: NSImage(systemSymbolName: "ellipsis", accessibilityDescription: "批次操作")!, target: self, action: #selector(batchMenu(_:)))
-        more.bezelStyle = .inline
-        let heading = stack([batchCount, NSView(), more], orientation: .horizontal)
-        heading.translatesAutoresizingMaskIntoConstraints = false
-        sidebar.view.addSubview(heading)
-        table.headerView = nil; table.rowHeight = 96; table.intercellSpacing = NSSize(width: 0, height: 4)
-        table.style = .sourceList
-        table.allowsMultipleSelection = false; table.allowsEmptySelection = false
-        let column = NSTableColumn(identifier: .init("image")); column.resizingMask = .autoresizingMask
-        table.addTableColumn(column); table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
-        table.dataSource = self; table.delegate = self
-        table.onDelete = { [weak self] in self?.removeSelected(nil) }
-        let menu = NSMenu()
-        menu.addItem(actionItem("移除当前图片", #selector(removeSelected(_:))))
-        menu.addItem(actionItem("清空批次", #selector(newBatch(_:))))
-        table.menu = menu
-        let scroll = NSScrollView(); scroll.documentView = table; scroll.hasVerticalScroller = true; scroll.drawsBackground = false
-        scroll.translatesAutoresizingMaskIntoConstraints = false; sidebar.view.addSubview(scroll)
-        NSLayoutConstraint.activate([
-            heading.topAnchor.constraint(equalTo: sidebar.view.topAnchor, constant: 16), heading.leadingAnchor.constraint(equalTo: sidebar.view.leadingAnchor, constant: 16), heading.trailingAnchor.constraint(equalTo: sidebar.view.trailingAnchor, constant: -12),
-            scroll.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 10), scroll.leadingAnchor.constraint(equalTo: sidebar.view.leadingAnchor), scroll.trailingAnchor.constraint(equalTo: sidebar.view.trailingAnchor), scroll.bottomAnchor.constraint(equalTo: sidebar.view.bottomAnchor)
-        ])
+        updateActions(); window?.recalculateKeyViewLoop()
     }
 
     private func buildPreview() {
         let heading = stack([filename, position], spacing: 4); heading.translatesAutoresizingMaskIntoConstraints = false
         center.view.addSubview(heading)
         previewScroll.documentView = canvas; previewScroll.hasVerticalScroller = true; previewScroll.hasHorizontalScroller = true
-        previewScroll.autohidesScrollers = true; previewScroll.drawsBackground = false
+        previewScroll.autohidesScrollers = true; previewScroll.scrollerStyle = .overlay; previewScroll.drawsBackground = false
         previewScroll.translatesAutoresizingMaskIntoConstraints = false
         previewScroll.onResize = { [weak self] in self?.layoutPreview() }
         center.view.addSubview(previewScroll)
         footer.translatesAutoresizingMaskIntoConstraints = false; center.view.addSubview(footer)
-        let minus = NSButton(image: NSImage(systemSymbolName: "minus", accessibilityDescription: "缩小")!, target: self, action: #selector(zoomOut(_:)))
-        let plus = NSButton(image: NSImage(systemSymbolName: "plus", accessibilityDescription: "放大")!, target: self, action: #selector(zoomIn(_:)))
-        fitMenu.addItems(withTitles: ["适应窗口", "25%", "50%", "100%", "200%"])
+        fitMenu.removeAllItems(); fitMenu.addItems(withTitles: ["适应窗口", "25%", "50%", "100%", "200%"])
         fitMenu.target = self; fitMenu.action = #selector(zoomMenuChanged(_:))
-        let actual = NSButton(title: "100%", target: self, action: #selector(actualPixels(_:)))
-        let controls = stack([minus, fitMenu, plus, actual], orientation: .horizontal, spacing: 8)
-        controls.translatesAutoresizingMaskIntoConstraints = false; footer.addSubview(controls)
+        viewing.preview.onPress = { [weak self] in self?.togglePreview() }
+        viewing.translatesAutoresizingMaskIntoConstraints = false; footer.addSubview(viewing)
+        canvas.onPrevious = { [weak self] in self?.moveSelection(-1) }
+        canvas.onNext = { [weak self] in self?.moveSelection(1) }
+        canvas.onEscape = { [weak self] in if self?.workbench.previewing == true { self?.togglePreview() } }
         NSLayoutConstraint.activate([
             heading.leadingAnchor.constraint(equalTo: center.view.leadingAnchor, constant: 22), heading.topAnchor.constraint(equalTo: center.view.topAnchor, constant: 16),
             previewScroll.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 8), previewScroll.leadingAnchor.constraint(equalTo: center.view.leadingAnchor), previewScroll.trailingAnchor.constraint(equalTo: center.view.trailingAnchor), previewScroll.bottomAnchor.constraint(equalTo: footer.topAnchor),
             footer.leadingAnchor.constraint(equalTo: center.view.leadingAnchor), footer.trailingAnchor.constraint(equalTo: center.view.trailingAnchor), footer.bottomAnchor.constraint(equalTo: center.view.bottomAnchor), footer.heightAnchor.constraint(equalToConstant: 58),
-            controls.centerXAnchor.constraint(equalTo: footer.centerXAnchor), controls.centerYAnchor.constraint(equalTo: footer.centerYAnchor)
+            viewing.centerXAnchor.constraint(equalTo: footer.centerXAnchor), viewing.centerYAnchor.constraint(equalTo: footer.centerYAnchor), viewing.widthAnchor.constraint(lessThanOrEqualTo: footer.widthAnchor), viewing.heightAnchor.constraint(equalToConstant: 38)
         ])
         empty.translatesAutoresizingMaskIntoConstraints = false; center.view.addSubview(empty)
         let icon = NSImageView(image: NSImage(systemSymbolName: "photo.badge.plus", accessibilityDescription: nil)!)
         icon.imageScaling = .scaleProportionallyUpOrDown
         icon.contentTintColor = .tertiaryLabelColor
         icon.widthAnchor.constraint(equalToConstant: 52).isActive = true; icon.heightAnchor.constraint(equalToConstant: 52).isActive = true
-        let add = NSButton(title: "添加图片", target: self, action: #selector(addImages(_:))); add.bezelStyle = .rounded
+        let add = ActionButton("添加图片", role: .primary, symbol: "plus") { [weak self] in self?.addImages(nil) }
         emptyDetail.lineBreakMode = .byWordWrapping; emptyDetail.maximumNumberOfLines = 3
         emptyDetail.alignment = .center
         emptyDetail.widthAnchor.constraint(lessThanOrEqualToConstant: 340).isActive = true
@@ -149,11 +142,8 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
         NSLayoutConstraint.activate([previewSpinner.trailingAnchor.constraint(equalTo: center.view.trailingAnchor, constant: -22), previewSpinner.topAnchor.constraint(equalTo: center.view.topAnchor, constant: 18)])
     }
 
-    private func buildInspector() {
-        let body = stack([], spacing: 20); body.translatesAutoresizingMaskIntoConstraints = false
-        inspector.view.addSubview(body)
-        NSLayoutConstraint.activate([body.leadingAnchor.constraint(equalTo: inspector.view.leadingAnchor, constant: 20), body.trailingAnchor.constraint(equalTo: inspector.view.trailingAnchor, constant: -20), body.topAnchor.constraint(equalTo: inspector.view.topAnchor, constant: 20)])
-        body.addArrangedSubview(label("批次设置", size: 15, weight: .semibold))
+    private func buildInspector() -> NSView {
+        let body = FraloStyle.stack([], spacing: 20)
         func section(_ title: String, _ rows: [NSView]) {
             let line = separator(); body.addArrangedSubview(line); line.widthAnchor.constraint(equalTo: body.widthAnchor).isActive = true
             let group = stack([label(title, weight: .semibold)] + rows, spacing: 14)
@@ -167,8 +157,8 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
         modelMenu.selectItem(at: DeviceModel.allCases.firstIndex(of: settings.model)!)
         modelMenu.target = self; modelMenu.action = #selector(configurationChanged(_:))
         modelMenu.widthAnchor.constraint(equalToConstant: 190).isActive = true
-        orientation.selectedSegment = settings.orientation == .portrait ? 0 : 1
-        orientation.target = self; orientation.action = #selector(configurationChanged(_:))
+        orientation.selectedIndex = settings.orientation == .portrait ? 0 : 1
+        orientation.onChange = { [weak self] _ in self?.configurationChanged(nil) }
         orientation.widthAnchor.constraint(equalToConstant: 190).isActive = true
         section("设备外框", [row("机型", modelMenu), row("方向", orientation)])
         let number = NumberFormatter(); number.numberStyle = .decimal; number.allowsFloats = false; number.minimum = 0; number.maximum = 2048; number.usesGroupingSeparator = false
@@ -179,19 +169,20 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
         paddingStepper.target = self; paddingStepper.action = #selector(stepPadding(_:)); paddingStepper.setAccessibilityLabel("调整透明边距")
         section("透明边距", [row("四周", stack([padding, paddingStepper, label("px", secondary: true)], orientation: .horizontal, spacing: 6))])
         dimensions.lineBreakMode = .byWordWrapping; dimensions.maximumNumberOfLines = 2
-        section("输出", [row("格式", label("PNG")), row("背景", label("透明")), row("尺寸", dimensions)])
+        section("输出", [row("格式", label("PNG")), row("背景", label("透明"))])
+        return body
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(toolbar) }
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.init("sidebar"), .init("add"), .flexibleSpace, .init("copy"), .init("export")]
+        [.init("sidebar"), .init("add"), .flexibleSpace, .init("copy")]
     }
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         let item = NSToolbarItem(itemIdentifier: identifier)
         switch identifier.rawValue {
         case "sidebar":
-            let button = NSButton(image: NSImage(systemSymbolName: "sidebar.left", accessibilityDescription: "显示或隐藏侧边栏")!, target: self, action: #selector(toggleSidebar(_:)))
-            button.bezelStyle = .texturedRounded; item.view = button; item.label = "侧边栏"
+            let button = IconButton("sidebar.left", label: "显示或隐藏图片列表") { [weak self] in self?.toggleSidebar(nil) }
+            item.view = button; item.label = "图片列表"
         case "add":
             let menu = NSMenu(); menu.addItem(actionItem("添加图片", #selector(addImages(_:))))
             menu.addItem(actionItem("选择图片…", #selector(addImages(_:))))
@@ -200,14 +191,8 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
             let button = NSPopUpButton(frame: .zero, pullsDown: true); button.menu = menu; button.bezelStyle = .texturedRounded
             button.sizeToFit(); item.view = button; item.label = "添加图片"
         case "copy":
-            copyButton.target = self; copyButton.action = #selector(copyCurrent(_:)); copyButton.bezelStyle = .texturedRounded
-            copyButton.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil); copyButton.imagePosition = .imageLeading
+            copyButton.onPress = { [weak self] in self?.copyCurrent(nil) }
             item.view = copyButton; item.label = "复制当前图片"
-        case "export":
-            exportButton.target = self; exportButton.action = #selector(exportAll(_:)); exportButton.bezelStyle = .texturedRounded
-            exportArrow.target = self; exportArrow.action = #selector(exportMenu(_:)); exportArrow.bezelStyle = .texturedRounded
-            let group = stack([exportButton, exportArrow], orientation: .horizontal, spacing: 0)
-            item.view = group; item.label = "导出全部"
         default: return nil
         }
         return item
@@ -217,16 +202,23 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
         let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; return item
     }
     @objc func toggleSidebar(_ sender: Any?) {
-        sidebarItem.animator().isCollapsed.toggle()
-        UserDefaults.standard.set(sidebarItem.isCollapsed, forKey: "sidebarCollapsed")
+        workbench.setCollapsed(!workbench.collapsed, animated: true)
+        preferences.set(workbench.collapsed, forKey: "sidebarCollapsed")
+    }
+    private func togglePreview() {
+        workbench.previewing.toggle()
+        viewing.preview.title = workbench.previewing ? "返回编辑 · Esc" : "成品预览"
+        window?.makeFirstResponder(canvas); layoutPreview()
+    }
+    private func moveSelection(_ delta: Int) { list.moveSelection(by: delta) }
+    private func selectionChanged() { zoom = nil; fitMenu.selectItem(at: 0); updateActions(); requestPreview() }
+    private func refreshList() {
+        list.update(items.map { BatchEntry(id: $0.input.id, title: $0.input.name, detail: $0.error == nil ? "" : "无法读取", image: $0.thumbnail, failed: $0.error != nil) })
+        workbench.rail.update(index: selectedIndex, count: items.count)
     }
     @objc private func batchMenu(_ sender: NSButton) {
         let menu = NSMenu(); menu.addItem(actionItem("移除当前图片", #selector(removeSelected(_:))))
         menu.addItem(actionItem("清空批次", #selector(newBatch(_:))))
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 2), in: sender)
-    }
-    @objc private func exportMenu(_ sender: NSButton) {
-        let menu = NSMenu(); menu.addItem(actionItem("导出当前图片…", #selector(exportCurrent(_:))))
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 2), in: sender)
     }
     @objc func addImages(_ sender: Any?) {
@@ -249,8 +241,8 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
             let accepted = inputs.filter { !existing.contains($0.id) }
             guard !accepted.isEmpty else { return }
             items += accepted.map { Item(input: $0) }
-            table.reloadData(); updateActions()
-            if selectedIndex == nil { table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false) }
+            refreshList(); updateActions()
+            if selectedIndex == nil { list.select(0) }
             scheduleThumbnails(); requestPreview()
         } catch { showError(error.localizedDescription) }
     }
@@ -266,47 +258,34 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
         guard let data else { showError("剪贴板中没有可导入的图片。"); return }
         pastedCount += 1
         items.append(Item(input: ImageInput(data: data, name: String(format: "粘贴图片-%03d.png", pastedCount))))
-        table.reloadData(); table.selectRowIndexes(IndexSet(integer: items.count - 1), byExtendingSelection: false)
+        refreshList(); list.select(items.count - 1)
         updateActions(); scheduleThumbnails(); requestPreview()
     }
     @objc func removeSelected(_ sender: Any?) {
         guard !isExporting, let selectedIndex else { return }
-        items.remove(at: selectedIndex); table.reloadData()
-        if !items.isEmpty { table.selectRowIndexes(IndexSet(integer: min(selectedIndex, items.count - 1)), byExtendingSelection: false) }
+        items.remove(at: selectedIndex); refreshList()
+        if !items.isEmpty { list.select(min(selectedIndex, items.count - 1)) }
         updateActions(); requestPreview()
     }
     @objc func newBatch(_ sender: Any?) {
         guard !isExporting else { return }
         items.removeAll(); previewRequest += 1; thumbnailRequest += 1; rendered = nil; renderedID = nil
-        table.reloadData(); updateActions(); requestPreview()
+        refreshList(); updateActions(); requestPreview()
     }
-
-    func numberOfRows(in tableView: NSTableView) -> Int { items.count }
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        let identifier = NSUserInterfaceItemIdentifier("ThumbnailCell")
-        let cell = tableView.makeView(withIdentifier: identifier, owner: self) as? ThumbnailCell ?? ThumbnailCell()
-        cell.identifier = identifier; cell.title.stringValue = items[row].input.name
-        cell.thumbnail.image = items[row].thumbnail
-        cell.detail.stringValue = items[row].error == nil ? "" : "无法读取"
-        cell.detail.textColor = items[row].error == nil ? .secondaryLabelColor : .systemRed
-        cell.toolTip = items[row].error ?? items[row].input.url?.path
-        return cell
-    }
-    func tableViewSelectionDidChange(_ notification: Notification) { zoom = nil; fitMenu.selectItem(at: 0); requestPreview() }
 
     private func scheduleThumbnails() {
         thumbnailRequest += 1
-        let generation = thumbnailRequest, snapshot = settings, inputs = items.map(\.input)
+        let generation = thumbnailRequest, inputs = items.map(\.input)
         for input in inputs {
             thumbnailQueue.async { [weak self] in
-                let result: Result<CGImage, Error> = autoreleasepool { Result { try FrameRenderer.render(input, settings: snapshot, maxDimension: 180).image } }
+                let result: Result<CGImage, Error> = autoreleasepool { Result { try input.decode(maxDimension: 180) } }
                 DispatchQueue.main.async {
                     guard let self, self.thumbnailRequest == generation, let index = self.items.firstIndex(where: { $0.input.id == input.id }) else { return }
                     switch result {
                     case .success(let image): self.items[index].thumbnail = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height)); self.items[index].error = nil
                     case .failure(let error): self.items[index].error = error.localizedDescription
                     }
-                    self.table.reloadData(forRowIndexes: IndexSet(integer: index), columnIndexes: IndexSet(integer: 0))
+                    self.refreshList()
                 }
             }
         }
@@ -330,14 +309,14 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
                 self.previewSpinner.stopAnimation(nil)
                 switch result {
                 case .success(let frame):
-                    self.rendered = frame; self.renderedID = input.id; self.canvas.image = frame.image
+                    self.rendered = frame; self.renderedID = input.id; self.canvas.image = NSImage(cgImage: frame.image, size: frame.plan.pixelSize)
                     self.dimensions.stringValue = "\(Int(frame.plan.pixelSize.width)) × \(Int(frame.plan.pixelSize.height)) px"
                     self.empty.isHidden = true; self.layoutPreview()
                 case .failure(let error):
                     self.canvas.image = nil; self.empty.isHidden = false; self.emptyMessage.stringValue = "这张图片无法预览"
                     self.emptyDetail.stringValue = error.localizedDescription
                     self.previewScroll.isHidden = true; self.footer.isHidden = true; self.dimensions.stringValue = "无法确定"
-                    if let i = self.items.firstIndex(where: { $0.input.id == input.id }) { self.items[i].error = error.localizedDescription; self.table.reloadData(forRowIndexes: IndexSet(integer: i), columnIndexes: IndexSet(integer: 0)) }
+                    if let i = self.items.firstIndex(where: { $0.input.id == input.id }) { self.items[i].error = error.localizedDescription; self.refreshList() }
                 }
                 self.updateActions()
             }
@@ -348,7 +327,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
     @objc private func configurationChanged(_ sender: Any?) {
         guard !isExporting else { return }
         settings.model = DeviceModel.allCases[modelMenu.indexOfSelectedItem]
-        settings.orientation = orientation.selectedSegment == 0 ? .portrait : .landscape
+        settings.orientation = orientation.selectedIndex == 0 ? .portrait : .landscape
         settings.padding = min(2048, max(0, padding.integerValue))
         padding.integerValue = settings.padding; paddingStepper.integerValue = settings.padding
         do { try store.save(settings) } catch { showError(error.localizedDescription) }
@@ -368,7 +347,8 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
         let factor = zoom.map { $0 / backing } ?? min(max(10, available.width - 64) / pixels.width, max(10, available.height - 32) / pixels.height)
         let size = NSSize(width: pixels.width * factor, height: pixels.height * factor)
         let document = NSSize(width: max(available.width, size.width + 64), height: max(available.height, size.height + 32))
-        canvas.setFrameSize(document); canvas.imageRect = NSRect(x: (document.width - size.width) / 2, y: (document.height - size.height) / 2, width: size.width, height: size.height)
+        canvas.setFrameSize(document); canvas.zoom = factor
+        viewing.dimensions.stringValue = "\(Int(pixels.width)) × \(Int(pixels.height))"
     }
     @objc func fitPreview(_ sender: Any?) { zoom = nil; fitMenu.selectItem(at: 0); layoutPreview() }
     @objc func actualPixels(_ sender: Any?) { zoom = 1; fitMenu.selectItem(at: 3); layoutPreview() }
@@ -421,7 +401,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
         let current = label("正在准备…", size: 12, secondary: true); current.lineBreakMode = .byTruncatingMiddle
         let bar = NSProgressIndicator(); bar.isIndeterminate = false; bar.minValue = 0; bar.maxValue = Double(inputs.count); bar.style = .bar
         bar.widthAnchor.constraint(equalToConstant: 414).isActive = true
-        let cancel = NSButton(title: "取消", target: nil, action: nil)
+        let cancel = ActionButton("取消")
         cancel.target = self; cancel.action = #selector(cancelExportAction(_:)); cancel.keyEquivalent = "\u{1b}"
         let notice = label("", size: 12, secondary: true); updateNotice = notice
         let content = stack([label("正在导出图片", size: 16, weight: .semibold), count, bar, current, notice, cancel], spacing: 12)
@@ -464,14 +444,15 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSTable
         if !issues.isEmpty {
             let text = NSTextView(frame: NSRect(x: 0, y: 0, width: 430, height: 140)); text.isEditable = false; text.isSelectable = true; text.font = .systemFont(ofSize: 12)
             text.string = issues.map { "\($0.input)：\($0.reason ?? $0.status.rawValue)" }.joined(separator: "\n")
-            let scroll = NSScrollView(frame: text.frame); scroll.documentView = text; scroll.hasVerticalScroller = true; alert.accessoryView = scroll
+            let scroll = NSScrollView(frame: text.frame); scroll.documentView = text; ScrollContent.configure(scroll); alert.accessoryView = scroll
         }
         alert.beginSheetModal(for: window!) { response in if response == .alertSecondButtonReturn { NSWorkspace.shared.open(directory) } }
     }
     private func updateActions() {
         batchCount.stringValue = "批次 · \(items.count) 张"
-        exportButton.title = "导出全部（\(items.count)）"; exportButton.isEnabled = !items.isEmpty && !isExporting
-        exportArrow.isEnabled = selectedIndex != nil && !isExporting
+        batchScope.stringValue = "样式应用于全部 \(items.count) 张"
+        exportAction.count = items.count; exportAction.isEnabled = !isExporting
+        workbench.rail.update(index: selectedIndex, count: items.count)
         copyButton.isEnabled = rendered != nil && !isExporting
         if items.isEmpty { empty.isHidden = false; footer.isHidden = true; previewScroll.isHidden = true }
     }
