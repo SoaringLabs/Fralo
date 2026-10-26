@@ -32,7 +32,7 @@ final class DesignLabController: NSWindowController {
         window.title = "Fralo · 设计实验室"
         window.identifier = .init("FraloDesignLab")
         window.contentMinSize = NSSize(width: 1040, height: 680)
-        window.isReleasedWhenClosed = false; window.center()
+        window.isReleasedWhenClosed = false; window.autorecalculatesKeyViewLoop = true; window.center()
         rebuild()
         observer = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
                                                                       object: nil, queue: .main) { [weak self] _ in
@@ -82,6 +82,7 @@ final class DesignLabController: NSWindowController {
             systemStatus.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -24), systemStatus.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -10)
         ])
         window.contentView = root
+        window.recalculateKeyViewLoop()
         if state.scenario.preview {
             if state.selectedPage == 4 { window.makeFirstResponder(scenarioView.canvas) }
             else if state.selectedPage == 3 { window.makeFirstResponder(motionView.workbench.canvas) }

@@ -192,13 +192,24 @@ public final class BatchList: NSScrollView, NSTableViewDataSource, NSTableViewDe
 
 @MainActor
 public final class CanvasSurface: NSView {
-    public var image: NSImage? { didSet { needsDisplay = true } }
+    public var image: NSImage? {
+        didSet {
+            needsDisplay = true
+            setAccessibilityValue(image.map { "\(Int($0.size.width)) × \(Int($0.size.height))" } ?? "暂无成品")
+        }
+    }
     public var zoom: CGFloat? { didSet { needsDisplay = true } }
     public override var isFlipped: Bool { true }
     public override var acceptsFirstResponder: Bool { true }
     public var onPrevious: (() -> Void)?
     public var onNext: (() -> Void)?
     public var onEscape: (() -> Void)?
+    public override init(frame: NSRect) {
+        super.init(frame: frame)
+        setAccessibilityElement(true); setAccessibilityRole(.image); setAccessibilityLabel("成品画布")
+        setAccessibilityHelp("上下键切换图片，Tab 切换焦点，Esc 返回编辑。")
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     public var imageRect: NSRect {
         guard let image, image.size.width > 0, image.size.height > 0 else { return .zero }
         let fit = max(0, min((bounds.width - 32) / image.size.width, (bounds.height - 32) / image.size.height))
@@ -228,6 +239,9 @@ public final class CanvasSurface: NSView {
     }
     public override func keyDown(with event: NSEvent) {
         switch event.keyCode {
+        case 48:
+            if event.modifierFlags.contains(.shift) { window?.selectKeyView(preceding: self) }
+            else { window?.selectKeyView(following: self) }
         case 126: onPrevious?()
         case 125: onNext?()
         case 53: onEscape?()

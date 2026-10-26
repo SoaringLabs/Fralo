@@ -61,6 +61,31 @@ final class DesignSystemTests: XCTestCase {
         window.close()
     }
 
+    @MainActor func testTabAndBackTabLeaveCustomKeyboardControls() async {
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 300), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.autorecalculatesKeyViewLoop = false
+        let picker = ValuePicker(["A", "B"], label: "参数")
+        picker.frame = NSRect(x: 0, y: 220, width: 200, height: 30)
+        let field = NSTextField(frame: NSRect(x: 220, y: 220, width: 150, height: 24))
+        let canvas = CanvasSurface(frame: NSRect(x: 0, y: 0, width: 300, height: 200))
+        for view in [picker, field, canvas] { window.contentView?.addSubview(view) }
+        picker.nextKeyView = field; field.nextKeyView = canvas; canvas.nextKeyView = picker
+        func tab(_ view: NSView, shift: Bool = false) {
+            window.makeFirstResponder(view)
+            let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: shift ? .shift : [], timestamp: 0,
+                                         windowNumber: window.windowNumber, context: nil, characters: "\t", charactersIgnoringModifiers: "\t", isARepeat: false, keyCode: 48)!
+            view.keyDown(with: event)
+        }
+        tab(picker)
+        XCTAssertTrue(window.firstResponder === field.currentEditor())
+        tab(picker, shift: true); XCTAssertTrue(window.firstResponder === canvas)
+        // AppKit may skip non-text controls when system keyboard navigation is off.
+        tab(canvas); XCTAssertFalse(window.firstResponder === canvas)
+        tab(canvas, shift: true); XCTAssertTrue(window.firstResponder === field.currentEditor())
+        window.close()
+    }
+
     @MainActor func testNumberFieldRejectsInvalidEditsAndPreservesLastValidValue() async {
         var edits: [Double] = []
         let field = ValueField(label: "质量", value: 90, range: 1...100) { edits.append($0) }

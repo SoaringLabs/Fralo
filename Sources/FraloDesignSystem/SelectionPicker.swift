@@ -96,6 +96,9 @@ public final class ValuePicker: NSControl {
     }
     public override func keyDown(with event: NSEvent) {
         switch event.keyCode {
+        case 48:
+            if event.modifierFlags.contains(.shift) { window?.selectKeyView(preceding: self) }
+            else { window?.selectKeyView(following: self) }
         case 123, 126: choose(max(0, selection - 1))
         case 124, 125: choose(min(buttons.count - 1, selection + 1))
         case 115: choose(0)

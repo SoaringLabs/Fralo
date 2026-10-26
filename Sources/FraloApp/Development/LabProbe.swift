@@ -39,6 +39,10 @@ enum LabProbe {
             let picker = ValuePicker(["A", "B"], label: "键盘测试")
             picker.keyDown(with: key(124, in: controller.window!))
             checks["parameter_arrows_stay_in_control"] = picker.selectedIndex == 1 && scene.list.selectedIndex == 1
+            controller.window?.recalculateKeyViewLoop()
+            controller.window?.makeFirstResponder(scene.modePicker)
+            scene.modePicker.keyDown(with: key(48, in: controller.window!))
+            checks["tab_leaves_live_parameter"] = controller.window?.firstResponder !== scene.modePicker
             scene.modePicker.choose(0); scene.layoutSubtreeIfNeeded()
             checks["transparent_mode_has_image"] = scene.canvas.image != nil && controller.state.scenario.transparent
             for device in 0...2 {

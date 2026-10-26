@@ -71,7 +71,7 @@ def verify(debug, release, probe=None, release_app=None):
         required = {
             'developer_menu', 'lab_menu_has_no_product_import_or_export', 'fixtures_available', 'five_live_pages',
             'collapse_preserves_artwork_size', 'collapsed_panel_alignment', 'preview_hides_tools', 'preview_focus',
-            'escape_restores_editing', 'canvas_arrow_changes_selection', 'parameter_arrows_stay_in_control',
+            'escape_restores_editing', 'canvas_arrow_changes_selection', 'parameter_arrows_stay_in_control', 'tab_leaves_live_parameter',
             'transparent_mode_has_image', 'opaque_accessibility_fallback', 'reduced_motion',
             'minimum_window_has_canvas', 'minimum_window_panels_align',
         }

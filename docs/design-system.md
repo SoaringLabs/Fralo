@@ -30,6 +30,8 @@ This phase supplies reusable controls and experiments before the product workben
 | Viewing | `CanvasSurface`, `ViewToolbar` |
 | Feedback | `StateView` with empty/loading/failure/progress states and relevant actions |
 
+Custom keyboard controls route Tab/Shift-Tab through the window key-view loop, respecting macOS keyboard-navigation eligibility. The lab recalculates the loop after rebuilding its content. The canvas exposes an image role, name, size and keyboard help.
+
 Parameter choices use radio-group semantics and one shared selected indicator. Tabs use actual content-navigation semantics. Restoring a value does not emit an edit. Disabled controls do not emit edits; invalid or nonfinite numeric values do not propagate. Primary export always means the whole batch; the dropdown's current-image action does not change it.
 
 ## States and accessibility
