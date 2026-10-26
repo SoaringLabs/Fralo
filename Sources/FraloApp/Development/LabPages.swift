@@ -89,6 +89,7 @@ enum LabPages {
         let statesRow = FraloStyle.stack(states, axis: .horizontal, spacing: 16); statesRow.distribution = .fillEqually
         statesRow.heightAnchor.constraint(equalToConstant: 200).isActive = true
         let sections: [NSView] = [
+            SoftButtonGallery.make(state: state),
             FormSection("按钮与反馈", detail: "可直接点击，并用 Tab / Shift-Tab 检查焦点；这是共享组件的真实行为。", views: [FraloStyle.stack([primary, secondary, quiet, destructive, icon], axis: .horizontal), FraloStyle.stack([disabled, busy, export], axis: .horizontal), feedback]),
             FormSection("参数选择与内容导航", views: [sample(picker, width: 320), sample(orientation, width: 240), sample(disabledPicker, width: 300), sample(navigation)]),
             FormSection("表单、颜色与数值", views: [sample(FormRow("窗口样式", content: popup)), sample(FormRow("透明填底", content: color)), sample(FormRow("质量数值", content: number)), sample(slider), sample(opacity), sample(unavailable), sample(InfoRow("实际尺寸", value: "2400 × 1800 px"))]),

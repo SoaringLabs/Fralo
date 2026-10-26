@@ -8,11 +8,11 @@ Verified locally on 2026-10-26 on Apple Silicon. The minimum supported target re
 
 | Check | Observed result |
 | --- | --- |
-| Debug build and `swift test` | Passed: 32 tests — 12 shared-control tests, 12 core tests, 4 development-isolation tests, 4 updater tests |
+| Debug build and `swift test` | Passed: 34 tests — 12 shared-control tests, 12 core tests, 6 development tests, 4 updater tests |
 | Release build and local package | Passed; ad-hoc packaging only, no publication |
 | `scripts/verify_cli.py` | Passed all 10 checks, including isolated settings, partial failure, cancellation and source preservation |
 | `scripts/verify_design_system.py` | Debug contains Dev symbols; Release excludes them; shared module compiles for Release; packaged binary matches verified Release code; no Dev fixture resources |
-| Runtime probe | All 17 observations passed, with 10 view-cache captures; report bound to the current Debug executable |
+| Runtime probe | All 20 observations passed, with 12 view-cache captures; report bound to the current Debug executable |
 | Native window inspection | Five pages reachable; real radio/tab accessibility roles; scenario sliders use full form width; aligned panel edges; local appearance changes and opaque fallback visible; native Tab moves from a parameter to the numeric field and Shift-Tab leaves it; canvas name/size/help exposed |
 | Source checks | `git diff --check` and `scripts/check_public_source.py` passed |
 
@@ -23,6 +23,16 @@ The runtime probe covers the developer menu, absence of product import/export ac
 The follow-up keyboard fix was verified in the real gallery: forward Tab selects the numeric field and reverse Tab reaches the list under the current system key-view policy. The lab recalculates its focus chain after rebuilding pages. No global keyboard-navigation preference was changed.
 
 Native screenshots and process/build provenance are retained outside the source tree with the task's local verification evidence. View-cache captures are layout evidence only: macOS compositing can omit material layers from those images.
+
+## Soft-button follow-up
+
+The user selected an additional soft custom style for comparison. Components now contains native and soft rows, applicable roles, disabled/busy states, a processing replay, focus check and a material-panel example. The candidate remains entirely Debug-only; the existing shared and product button style is unchanged.
+
+- Added behavior tests for callback suppression, stable busy width, requested enabled-state restoration, accessibility role/label and forward/reverse Tab. All 34 tests passed.
+- The native probe now also checks candidate presence, button semantics and busy-width preservation. It captures default/pressed rendering through the real button, and the two rendered outputs differ.
+- Actual native-window inspection confirmed the light appearance, visible system focus ring, Space activation, Tab leaving the control and simulated processing recovery. This is targeted input coverage, not full keyboard or screen-reader acceptance.
+- Release build, package and symbol/resource verification passed including exclusion of `SoftButton` and `SoftButtonGallery`. The earlier CLI checks remain applicable: no Core/CLI, saved-settings, package-manifest or CLI-verifier source changed in this follow-up.
+- Dark candidate appearance, hover feel and accessibility preview perception remain part of human review. The automation capture was stopped when concurrent user interaction changed the window, preserving the user's current preview state.
 
 ## Remaining manual acceptance
 

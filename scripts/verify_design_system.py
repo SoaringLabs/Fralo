@@ -8,7 +8,7 @@ import subprocess
 import struct
 
 ROOT = Path(__file__).resolve().parents[1]
-DEV_SYMBOLS = ('DesignLabController', 'DevelopmentEntry', 'LabProbe', 'LabSamples', 'ScenarioWorkbench')
+DEV_SYMBOLS = ('DesignLabController', 'DevelopmentEntry', 'LabProbe', 'LabSamples', 'ScenarioWorkbench', 'SoftButton', 'SoftButtonGallery')
 
 
 def code_identity(binary):
@@ -74,6 +74,7 @@ def verify(debug, release, probe=None, release_app=None):
             'escape_restores_editing', 'canvas_arrow_changes_selection', 'parameter_arrows_stay_in_control', 'tab_leaves_live_parameter',
             'transparent_mode_has_image', 'opaque_accessibility_fallback', 'reduced_motion',
             'minimum_window_has_canvas', 'minimum_window_panels_align',
+            'soft_candidate_controls', 'soft_busy_preserves_width', 'soft_accessibility_roles',
         }
         observed = report.get('checks', {})
         checks['runtime_probe'] = report.get('passed') is True and all(observed.get(name) is True for name in required)

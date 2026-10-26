@@ -19,12 +19,20 @@ This builds Debug, creates a separate `Fralo Design Lab.app` with bundle identif
 | Area | Purpose |
 | --- | --- |
 | Foundations | Stable typography, surface roles, spacing and motion rules |
-| Components | Shared controls, variants, disabled/busy states, long names and status views |
+| Components | Shared controls, native/soft-button comparison, disabled/busy states, long names and status views |
 | Materials | Live native material candidates and blending modes around an independent image |
 | Motion | Replay choice, list collapse and clean preview; compare reduced motion |
 | Scenarios | Phone/iPad/browser layouts, transparent/background modes, inspector pages, 0/3/100 inputs, long names and loading/failure cases |
 
 The appearance selector changes this window only. Preview checkboxes strengthen accessibility behavior locally; the footer separately reports actual OS settings. System-setting changes also refresh the lab. Reset restores local experiment values, not user product settings.
+
+## Soft-button candidate
+
+Components starts with **按钮外观对照 · 柔和定制候选**. The native row remains available. The soft row supplies primary, secondary, quiet, destructive and icon buttons, followed by disabled/busy examples, a short simulated processing action and a keyboard-focus check. A separate example shows the candidate on a material panel.
+
+The candidate is a real `NSButton` with custom drawing, not a screenshot. It supports native activation, keyboard focus/Tab, hover/press feedback and accessibility button semantics. Busy state preserves width and prevents duplicate activation. Reduced motion replaces its decorative spinning indicator with a static hourglass; increased contrast strengthens borders. Fill and text colors resolve against the current appearance and system accent.
+
+`SoftButton` and its gallery are **Debug-only experiments**, not shared stable defaults. Review the candidate before promoting it into `FraloDesignSystem`. Scenario and production buttons continue using the existing shared implementation.
 
 ## Isolation
 
@@ -51,7 +59,7 @@ scripts/run-design-lab.sh --design-lab-probe=/absolute/temporary/directory/probe
 python3 scripts/verify_design_system.py --probe-report /absolute/temporary/directory/probe.json
 ```
 
-The probe exercises its live process, writes a report and view-cache images, then exits. Add `--design-lab-keep-open` to retain the preview. Evidence binds to the running executable's checksum; the verifier compares its Mach-O sections and UUID with the current build, allowing packaging signatures to differ. Rerun after rebuilding.
+The probe exercises its live process, writes a report and view-cache images, then exits. Add `--design-lab-keep-open` to restore default experiment settings and retain Components at the normal window size for review. Evidence binds to the running executable's checksum; the verifier compares its Mach-O sections and UUID with the current build, allowing packaging signatures to differ. Rerun after rebuilding.
 
 The verifier checks actual Debug/Release Mach-O symbols, the Release shared module, required runtime observations and snapshot presence. `--release-app dist/Fralo.app` also checks the packaged binary and exclusion of development fixtures.
 

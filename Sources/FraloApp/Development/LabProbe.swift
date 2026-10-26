@@ -20,6 +20,24 @@ enum LabProbe {
                 let name = "\(page.rawValue.lowercased())-light.png"
                 try snapshot(controller.window!.contentView!, to: output.deletingLastPathComponent().appendingPathComponent(name))
                 snapshots.append(name)
+                if page == .components, let view = controller.tabs.selectedTabViewItem?.view {
+                    let buttons = descendants(view).compactMap { $0 as? SoftButton }
+                    checks["soft_candidate_controls"] = buttons.count >= 9
+                    checks["soft_accessibility_roles"] = !buttons.isEmpty && buttons.allSatisfy { $0.accessibilityRole() == .button }
+                    if let primary = buttons.first(where: { $0.role == .primary && $0.isEnabled }) {
+                        let size = primary.intrinsicContentSize
+                        primary.isBusy = true
+                        checks["soft_busy_preserves_width"] = primary.intrinsicContentSize == size && !primary.isEnabled
+                        primary.isBusy = false
+                        for pressed in [false, true] {
+                            primary.highlight(pressed)
+                            let file = pressed ? "soft-button-pressed.png" : "soft-button-default.png"
+                            try snapshot(primary, to: output.deletingLastPathComponent().appendingPathComponent(file))
+                            snapshots.append(file)
+                        }
+                        primary.highlight(false)
+                    }
+                }
             }
             controller.selectPage(4)
             let scene = controller.scenarioView!
@@ -75,6 +93,10 @@ enum LabProbe {
             try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]).write(to: output, options: .atomic)
         }
         if !CommandLine.arguments.contains("--design-lab-keep-open") { NSApp.terminate(nil) }
+        else {
+            controller.state.preferences = .init(); controller.state.appearance = 0; controller.state.scenario = .init()
+            controller.window?.setContentSize(NSSize(width: 1380, height: 900)); controller.rebuild(); controller.selectPage(1)
+        }
     }
     private static func key(_ code: UInt16, in window: NSWindow) -> NSEvent {
         NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
@@ -86,6 +108,9 @@ enum LabProbe {
         view.cacheDisplay(in: view.bounds, to: rep)
         guard let data = rep.representation(using: .png, properties: [:]) else { throw CocoaError(.fileWriteUnknown) }
         try data.write(to: url, options: .atomic)
+    }
+    private static func descendants(_ view: NSView) -> [NSView] {
+        [view] + view.subviews.flatMap { descendants($0) }
     }
     private static func allMenuTitles(_ menu: NSMenu?) -> [String] {
         menu?.items.flatMap { [$0.title] + allMenuTitles($0.submenu) } ?? []

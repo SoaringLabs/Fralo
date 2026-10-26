@@ -54,6 +54,12 @@ Existing FRALO-4 style and orientation-choice work was inspected for reuse. The 
 
 See [the development lab](development-lab.md) for running and [acceptance evidence](design-system-acceptance.md) for verification limits.
 
+## Experimental button skin
+
+The Debug lab offers a **soft-button candidate** next to the current native styles. Its `NSButton` implementation and gallery live in `Development`, guarded by `FRALO_DEV`, while the default `ActionButton` remains unchanged. Candidate drawing uses a restrained accent fill, rounded neutral surfaces, light highlights and semantic action roles. These geometry/color treatments are Fralo design choices.
+
+This separation keeps an unaccepted experiment out of production dependencies. Human visual approval is required before promoting the skin into a shared stable variant. See [the lab](development-lab.md#soft-button-candidate) for the working comparison and state examples.
+
 ## Apple references
 
 - [Materials](https://developer.apple.com/design/human-interface-guidelines/materials)
