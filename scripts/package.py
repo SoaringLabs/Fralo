@@ -65,6 +65,7 @@ def main():
         resources.mkdir(parents=True)
         shutil.copy2(binary_dir / "FraloApp", executables / "FraloApp")
         shutil.copy2(binary_dir / "fralo", executables / "fralo")
+        shutil.copytree(binary_dir / "Fralo_FraloCore.bundle", resources / "Fralo_FraloCore.bundle")
         frameworks = list((ROOT / ".build/artifacts").rglob("Sparkle.framework"))
         if len(frameworks) != 1:
             raise RuntimeError("Expected one resolved Sparkle.framework in .build/artifacts")

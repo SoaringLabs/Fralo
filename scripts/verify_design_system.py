@@ -65,7 +65,8 @@ def verify(debug, release, probe=None, release_app=None):
         packaged = release_app / 'Contents/MacOS/FraloApp'
         checks['package_matches_verified_release'] = code_identity(packaged) == code_identity(release)
         names = [p.name for p in (release_app / 'Contents/Resources').rglob('*')]
-        checks['no_packaged_dev_fixtures'] = not any(name in names for name in ['DesignLabFixtures', 'warm-gray.png', 'mist-blue.png', 'sage-gray.png', '01-today.png'])
+        checks['packaged_backgrounds'] = all(any(hashlib.sha256(p.read_bytes()).hexdigest() == hashlib.sha256((ROOT / 'Sources/FraloCore/Resources/Backgrounds' / name).read_bytes()).hexdigest() for p in (release_app / 'Contents/Resources/Fralo_FraloCore.bundle').rglob(name)) for name in ['warm-gray.png', 'mist-blue.png', 'sage-gray.png'])
+        checks['no_packaged_dev_fixtures'] = not any(name in names for name in ['DesignLabFixtures', '01-today.png', '02-collection.png', '03-journal.png'])
     if probe:
         report = json.loads(probe.read_text())
         required = {

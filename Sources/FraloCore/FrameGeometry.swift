@@ -46,14 +46,14 @@ public struct RenderPlan {
         let r = geometry.oriented(geometry.screen, settings.orientation)
         return CGRect(x: r.minX * scale + CGFloat(settings.padding), y: r.minY * scale + CGFloat(settings.padding), width: r.width * scale, height: r.height * scale)
     }
-    public init(sourceSize: CGSize, settings: RenderSettings) throws {
+    public init(sourceSize: CGSize, settings: RenderSettings, containSource: Bool = false) throws {
         self.settings = try settings.validated(); self.sourceSize = sourceSize
         geometry = FrameGeometry(model: settings.model)
         let screen = geometry.oriented(geometry.screen, settings.orientation)
         let sourceRatio = sourceSize.width / sourceSize.height
         let screenRatio = screen.width / screen.height
         let cropFraction = 1 - min(sourceRatio, screenRatio) / max(sourceRatio, screenRatio)
-        guard cropFraction <= 0.03 else {
+        guard containSource || cropFraction <= 0.03 else {
             throw FraloError.message("截图比例与所选设备不匹配，裁切将超过 3%。请调整原图或设备设置。")
         }
         // Use the source's pixel density rather than downscaling to a fixed template size.

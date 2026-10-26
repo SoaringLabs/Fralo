@@ -34,13 +34,13 @@ Components starts with **按钮规范 · 柔和定制**. The user-selected soft 
 
 The same style appears in Scenarios, Motion, preview tools, export actions and status/retry actions. Regular and compact metrics are centralized in `FraloStyle.Button`. Try both light/dark appearance and the local accessibility previews. Busy state preserves width and prevents duplicate activation; default labels/tooltips follow title updates.
 
-The gallery is Debug-only. The selected reusable button is available to Debug and Release consumers. The normal product workbench will adopt these controls in its later rewrite; this step does not change the production screen layout.
+The gallery is Debug-only. The selected reusable button is available to Debug and Release consumers. FRALO-6 now uses these controls in the real production workbench; see [migration evidence](workbench-migration.md).
 
 ## Isolation
 
 The entire `Sources/FraloApp/Development` implementation is guarded by Debug-only `FRALO_DEV`. Release has no registered development menu, flags, lab window, probe or fixture loader. `Development/Fixtures` is excluded from SwiftPM resources and copied only by the Debug launcher. Normal packaging does not copy it.
 
-The shared `FraloDesignSystem` remains a Release-compilable library. Production adoption is the next stage.
+The shared `FraloDesignSystem` remains a Release-compilable library. The production workbench now imports the same module. The gallery remains an independent Debug consumer.
 
 While the lab is key, it uses a separate menu bar with standard responder-chain editing and no product import/export actions. The product menu returns when its window becomes key. This prevents lab actions from changing the user's batch. Standalone preview skips update-check initialization and isolates its settings file.
 
@@ -48,7 +48,7 @@ While the lab is key, it uses a separate menu bar with standard responder-chain 
 
 Phone samples use the existing core renderer and fictional example inputs. Selecting a different source changes sample content. iPad/browser outputs are deliberately labelled **layout fixtures**, not new production renderers. Background compositing studies layer isolation and layout only.
 
-Scenario export buttons report their action without writing product output. JPEG settings demonstrate conditional controls, not implemented production JPEG export. Those business capabilities belong to the later workbench task.
+Scenario export buttons report their action without writing product output. JPEG settings demonstrate conditional controls, not implemented production JPEG export. Those capabilities are now implemented in the FRALO-6 production workbench; the lab deliberately remains an isolated demonstration.
 
 The background fixtures were generated for the approved exploration; see [fixture sources](../Sources/FraloApp/Development/Fixtures/README.md). No private screenshots are bundled.
 

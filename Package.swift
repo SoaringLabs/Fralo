@@ -14,7 +14,7 @@ let package = Package(
         .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0")
     ],
     targets: [
-        .target(name: "FraloCore"),
+        .target(name: "FraloCore", resources: [.copy("Resources")]),
         .target(name: "FraloDesignSystem"),
         .executableTarget(name: "FraloApp", dependencies: ["FraloCore", "FraloDesignSystem", .product(name: "Sparkle", package: "Sparkle")],
                           exclude: ["Development/Fixtures"],

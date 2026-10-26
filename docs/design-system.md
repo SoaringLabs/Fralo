@@ -1,10 +1,10 @@
 # Fralo Design System
 
-The shared AppKit module `FraloDesignSystem` defines the application chrome used by the development lab and future workbench. It compiles in Debug and Release. The development gallery is a separate, Debug-only consumer.
+The shared AppKit module `FraloDesignSystem` defines the application chrome used by the development lab and production workbench. It compiles in Debug and Release. The development gallery is a separate, Debug-only consumer.
 
 ## Scope and roles
 
-This phase supplies reusable controls and experiments before the product workbench is rebuilt. It does not replace the current window or add production iPad/browser/background rendering.
+This phase supplies reusable controls and experiments before the product workbench is rebuilt. The original FRALO-5 stage provided the foundation. FRALO-6 now applies it to the production workbench and composition inspector; see [migration evidence](workbench-migration.md).
 
 | Role | Meaning |
 | --- | --- |
@@ -58,7 +58,7 @@ See [the development lab](development-lab.md) for running and [acceptance eviden
 
 ## Default action buttons
 
-The selected soft style is the shared `ActionButton` default in Debug and Release. Its implementation lives in `Sources/FraloDesignSystem/ActionButton.swift`; there is no separate Dev copy. `IconButton`, `ExportAction`, state actions, preview tools and the lab reuse it. The existing product workbench is adopted in the later UI-rewrite phase.
+The selected soft style is the shared `ActionButton` default in Debug and Release. Its implementation lives in `Sources/FraloDesignSystem/ActionButton.swift`; there is no separate Dev copy. `IconButton`, `ExportAction`, state actions, preview tools and the lab reuse it. The production workbench now consumes these shared implementations directly.
 
 `FraloStyle.Button` owns regular/compact heights (34/28 pt), corner radii (9/7 pt), content insets and symbol sizes. These are Fralo choices. Use regular buttons for panel actions and compact controls for toolbars. Keep an icon-only button's explicit accessibility label.
 

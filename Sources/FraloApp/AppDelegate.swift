@@ -14,7 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = MainWindowController()
         mainController = controller
         #if FRALO_DEV
-        if !DevelopmentEntry.labOnly { updateController = UpdateController(mainController: controller) }
+        if !DevelopmentEntry.labOnly && !CommandLine.arguments.contains("--workbench-preview") { updateController = UpdateController(mainController: controller) }
         #else
         updateController = UpdateController(mainController: controller)
         #endif

@@ -225,6 +225,20 @@ public final class CanvasSurface: NSView {
     public var zoom: CGFloat? { didSet { needsDisplay = true } }
     public override var isFlipped: Bool { true }
     public override var acceptsFirstResponder: Bool { true }
+    public var onDrag: ((CGPoint) -> Void)?
+    public var onDragEnd: (() -> Void)?
+    public var centerGuideX = false { didSet { needsDisplay = true } }
+    public var centerGuideY = false { didSet { needsDisplay = true } }
+    private var dragPoint: CGPoint?
+    public override func mouseDown(with event: NSEvent) { window?.makeFirstResponder(self); dragPoint = convert(event.locationInWindow, from: nil) }
+    public override func mouseDragged(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        if let previous = dragPoint, imageRect.width > 0, imageRect.height > 0 {
+            onDrag?(CGPoint(x: (point.x - previous.x) / imageRect.width, y: (point.y - previous.y) / imageRect.height))
+        }
+        dragPoint = point
+    }
+    public override func mouseUp(with event: NSEvent) { dragPoint = nil; onDragEnd?() }
     public var onPrevious: (() -> Void)?
     public var onNext: (() -> Void)?
     public var onEscape: (() -> Void)?
@@ -260,6 +274,13 @@ public final class CanvasSurface: NSView {
         image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true,
                    hints: [.interpolation: NSImageInterpolation.high])
         NSGraphicsContext.restoreGraphicsState()
+        if centerGuideX || centerGuideY {
+            NSColor.controlAccentColor.withAlphaComponent(0.6).setStroke()
+            let path = NSBezierPath(); path.lineWidth = 1
+            if centerGuideX { path.move(to: NSPoint(x: rect.midX, y: rect.minY)); path.line(to: NSPoint(x: rect.midX, y: rect.maxY)) }
+            if centerGuideY { path.move(to: NSPoint(x: rect.minX, y: rect.midY)); path.line(to: NSPoint(x: rect.maxX, y: rect.midY)) }
+            path.stroke()
+        }
     }
     public override func keyDown(with event: NSEvent) {
         switch event.keyCode {

@@ -4,41 +4,44 @@ import FraloCore
 import FraloDesignSystem
 
 @MainActor
-final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuItemValidation, NSTextFieldDelegate {
+final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuItemValidation {
     struct Item { let input: ImageInput; var thumbnail: NSImage?; var error: String? }
     private var items: [Item] = []
-    private var settings: RenderSettings
-    private let store: SettingsStore
+    private var settings: CompositionSettings
+    private let store: CompositionStore
+    private var inspectorUI: CompositionInspector!
     private let preferences: UserDefaults
+    private let pasteboard: NSPasteboard
     private var workbench: WorkbenchView!
     private let center = NSViewController()
     private let list = BatchList()
     private let viewing = ViewToolbar()
     private let batchScope = FraloStyle.text("样式应用于全部 0 张", role: .caption, secondary: true)
     private let exportAction = ExportAction(count: 0)
-    private let batchCount = label("批次 · 0 张", weight: .semibold)
-    private let filename = label("", weight: .semibold), position = label("", size: 12, secondary: true)
+    private let batchCount = FraloStyle.text("批次 · 0 张", role: .heading)
+    private let filename = FraloStyle.text("", role: .heading), position = FraloStyle.text("", role: .caption, secondary: true)
     private let previewScroll = PreviewScrollView()
     private let canvas = CanvasSurface(frame: .zero)
     private let empty = NSView()
+    private let emptyAction = ActionButton("添加图片", role: .primary, symbol: "plus")
     private let emptyMessage = label("拖入截图，开始套框", size: 22, weight: .semibold)
     private let emptyDetail = label("PNG / JPEG · 支持批量导入", secondary: true)
     private let previewSpinner = NSProgressIndicator()
     private let footer = NSView()
     private var fitMenu: NSPopUpButton { viewing.zoom }
-    private let modelMenu = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let orientation = ValuePicker(["竖屏", "横屏"], label: "设备方向")
-    private let padding = NSTextField(string: "0")
-    private let paddingStepper = NSStepper()
-    private let dimensions = label("按设备与边距确定", secondary: true)
+    private let dimensions = FraloStyle.text("尚无成品", role: .detail, secondary: true)
     private let copyButton = ActionButton("复制当前图片", size: .compact, symbol: "doc.on.doc")
-    private var rendered: RenderedFrame?
+    private var rendered: RenderedComposition?
     private var renderedID: String?
     private var previewRequest = 0, thumbnailRequest = 0
     private var renderWork: DispatchWorkItem?
     private let renderQueue = DispatchQueue(label: "app.fralo.preview", qos: .userInitiated)
     private let thumbnailQueue = DispatchQueue(label: "app.fralo.thumbnails", qos: .utility)
     private var zoom: CGFloat? = nil
+    private var backgroundImageSize: CGSize?
+    private var dragDevicePosition: CGPoint?
+    private var artworkDragChanged = false
+    private weak var previewRestoreFocus: NSResponder?
     private var layingOutPreview = false
     private var pastedCount = 0
     private var cancellation: CancellationToken?
@@ -51,13 +54,13 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     var isExporting: Bool { cancellation != nil }
     private var selectedIndex: Int? { list.selectedIndex }
 
-    init(store: SettingsStore = SettingsStore(), preferences: UserDefaults = .standard, restoreWindow: Bool = true) {
-        self.store = store; self.preferences = preferences
-        do { settings = try store.load() } catch { settings = RenderSettings(); initialWarning = error.localizedDescription }
+    init(store: SettingsStore = SettingsStore(), preferences: UserDefaults = .standard, pasteboard: NSPasteboard = .general, restoreWindow: Bool = true) {
+        self.store = CompositionStore(legacy: store); self.preferences = preferences; self.pasteboard = pasteboard
+        do { settings = try self.store.load() } catch { settings = CompositionSettings(); initialWarning = error.localizedDescription }
         let area = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 1000)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: min(1400, area.width - 80), height: min(950, area.height - 80)), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         super.init(window: window)
-        window.title = "Fralo"; window.titleVisibility = .hidden; window.toolbarStyle = .unified
+        window.title = "Fralo"; window.titleVisibility = .visible; window.toolbarStyle = .unified
         window.contentMinSize = NSSize(width: 1030, height: 640)
         buildInterface()
         if restoreWindow { window.setFrameAutosaveName("FraloMainWindow") }; window.center()
@@ -82,8 +85,8 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         exportAction.onExportAll = { [weak self] in self?.exportAll(nil) }
         exportAction.onExportCurrent = { [weak self] in self?.exportCurrent(nil) }
         let inspectorBody = buildInspector()
-        let right = FloatingPanel(header: FraloStyle.stack([FraloStyle.text("批次设置", role: .heading), batchScope], spacing: 8),
-                                  body: ScrollContent.make(inspectorBody, inset: 0),
+        let right = FloatingPanel(header: FraloStyle.stack([inspectorUI.mode, batchScope], spacing: 8),
+                                  body: inspectorBody,
                                   footer: FraloStyle.stack([dimensions, exportAction], spacing: 10))
         workbench = WorkbenchView(left: left, right: right, content: center.view)
         workbench.collapsed = preferences.bool(forKey: "sidebarCollapsed")
@@ -127,7 +130,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         icon.imageScaling = .scaleProportionallyUpOrDown
         icon.contentTintColor = .tertiaryLabelColor
         icon.widthAnchor.constraint(equalToConstant: 52).isActive = true; icon.heightAnchor.constraint(equalToConstant: 52).isActive = true
-        let add = ActionButton("添加图片", role: .primary, symbol: "plus") { [weak self] in self?.addImages(nil) }
+        let add = emptyAction; add.onPress = { [weak self] in self?.addImages(nil) }
         emptyDetail.lineBreakMode = .byWordWrapping; emptyDetail.maximumNumberOfLines = 3
         emptyDetail.alignment = .center
         emptyDetail.widthAnchor.constraint(lessThanOrEqualToConstant: 340).isActive = true
@@ -143,34 +146,37 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     }
 
     private func buildInspector() -> NSView {
-        let body = FraloStyle.stack([], spacing: 20)
-        func section(_ title: String, _ rows: [NSView]) {
-            let line = separator(); body.addArrangedSubview(line); line.widthAnchor.constraint(equalTo: body.widthAnchor).isActive = true
-            let group = stack([label(title, weight: .semibold)] + rows, spacing: 14)
-            body.addArrangedSubview(group); group.widthAnchor.constraint(equalTo: body.widthAnchor).isActive = true
+        inspectorUI = CompositionInspector(settings: settings)
+        inspectorUI.onChange = { [weak self] value in
+            guard let self, !self.isExporting else { return }
+            self.settings = value
+            do { try self.store.save(value) } catch { self.showError(error.localizedDescription) }
+            self.requestPreview()
         }
-        func row(_ title: String, _ control: NSView) -> NSView {
-            let caption = label(title, secondary: true); caption.widthAnchor.constraint(equalToConstant: 48).isActive = true
-            return stack([caption, control], orientation: .horizontal, spacing: 10)
+        canvas.onDrag = { [weak self] delta in self?.dragArtwork(delta) }
+        canvas.onDragEnd = { [weak self] in
+            guard let self else { return }
+            self.canvas.centerGuideX = false; self.canvas.centerGuideY = false; self.dragDevicePosition = nil
+            guard self.artworkDragChanged else { return }; self.artworkDragChanged = false
+            do { try self.store.save(self.settings) } catch { self.showError(error.localizedDescription) }
         }
-        modelMenu.addItems(withTitles: DeviceModel.allCases.map(\.title))
-        modelMenu.selectItem(at: DeviceModel.allCases.firstIndex(of: settings.model)!)
-        modelMenu.target = self; modelMenu.action = #selector(configurationChanged(_:))
-        modelMenu.widthAnchor.constraint(equalToConstant: 190).isActive = true
-        orientation.selectedIndex = settings.orientation == .portrait ? 0 : 1
-        orientation.onChange = { [weak self] _ in self?.configurationChanged(nil) }
-        orientation.widthAnchor.constraint(equalToConstant: 190).isActive = true
-        section("设备外框", [row("机型", modelMenu), row("方向", orientation)])
-        let number = NumberFormatter(); number.numberStyle = .decimal; number.allowsFloats = false; number.minimum = 0; number.maximum = 2048; number.usesGroupingSeparator = false
-        padding.formatter = number; padding.integerValue = settings.padding; padding.delegate = self
-        padding.target = self; padding.action = #selector(configurationChanged(_:)); padding.widthAnchor.constraint(equalToConstant: 64).isActive = true
-        padding.setAccessibilityLabel("四周透明边距，像素")
-        paddingStepper.minValue = 0; paddingStepper.maxValue = 2048; paddingStepper.increment = 1; paddingStepper.integerValue = settings.padding
-        paddingStepper.target = self; paddingStepper.action = #selector(stepPadding(_:)); paddingStepper.setAccessibilityLabel("调整透明边距")
-        section("透明边距", [row("四周", stack([padding, paddingStepper, label("px", secondary: true)], orientation: .horizontal, spacing: 6))])
-        dimensions.lineBreakMode = .byWordWrapping; dimensions.maximumNumberOfLines = 2
-        section("输出", [row("格式", label("PNG")), row("背景", label("透明"))])
-        return body
+        return inspectorUI
+    }
+    private func dragArtwork(_ delta: CGPoint) {
+        guard settings.mode == .background, !isExporting else { return }
+        artworkDragChanged = true
+        if inspectorUI.dragBackground {
+            if let backgroundImageSize { CompositionRenderer.panBackground(&settings, delta: delta, imageSize: backgroundImageSize) }
+        } else {
+            let previous = dragDevicePosition ?? CGPoint(x: settings.deviceX, y: settings.deviceY)
+            let next = CGPoint(x: min(1, max(-1, previous.x + delta.x)), y: min(1, max(-1, previous.y + delta.y)))
+            dragDevicePosition = next; settings.deviceX = next.x; settings.deviceY = next.y
+            if abs(settings.deviceX) < 0.012 { settings.deviceX = 0 }
+            if abs(settings.deviceY) < 0.012 { settings.deviceY = 0 }
+            canvas.centerGuideX = settings.deviceX == 0; canvas.centerGuideY = settings.deviceY == 0
+        }
+        inspectorUI.set(settings)
+        requestPreview()
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(toolbar) }
@@ -206,9 +212,10 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         preferences.set(workbench.collapsed, forKey: "sidebarCollapsed")
     }
     private func togglePreview() {
+        if !workbench.previewing { previewRestoreFocus = window?.firstResponder }
         workbench.previewing.toggle()
         viewing.preview.title = workbench.previewing ? "返回编辑 · Esc" : "成品预览"
-        window?.makeFirstResponder(canvas); layoutPreview()
+        window?.makeFirstResponder(workbench.previewing ? canvas : previewRestoreFocus ?? canvas); layoutPreview()
     }
     private func moveSelection(_ delta: Int) { list.moveSelection(by: delta) }
     private func selectionChanged() { zoom = nil; fitMenu.selectItem(at: 0); updateActions(); requestPreview() }
@@ -249,7 +256,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     @objc func pasteImage(_ sender: Any?) {
         if let editor = window?.firstResponder as? NSTextView, editor.isEditable { editor.paste(sender); return }
         guard !isExporting else { return }
-        let pasteboard = NSPasteboard.general
+        let pasteboard = self.pasteboard
         if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty { importURLs(urls); return }
         let data: Data?
         if let png = pasteboard.data(forType: .png) { data = png }
@@ -294,26 +301,37 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         previewRequest += 1; renderWork?.cancel(); rendered = nil; renderedID = nil
         guard let index = selectedIndex else {
             canvas.image = nil; empty.isHidden = false; emptyMessage.stringValue = "拖入截图，开始套框"
+            emptyAction.title = "添加图片"; emptyAction.onPress = { [weak self] in self?.addImages(nil) }
             emptyDetail.stringValue = "PNG / JPEG · 支持批量导入"
             previewScroll.isHidden = true; footer.isHidden = true; filename.stringValue = ""; position.stringValue = ""
-            dimensions.stringValue = "按设备与边距确定"; previewSpinner.stopAnimation(nil); updateActions(); return
+            window?.title = "Fralo"; dimensions.stringValue = "尚无成品"; inspectorUI.sourceInfo.stringValue = "尚未选择图片"; inspectorUI.outputInfo.stringValue = "—"; previewSpinner.stopAnimation(nil); updateActions(); return
         }
         let input = items[index].input, snapshot = settings, generation = previewRequest
-        filename.stringValue = input.name; position.stringValue = "\(index + 1) / \(items.count)"
+        window?.title = input.name; filename.stringValue = input.name; position.stringValue = "\(index + 1) / \(items.count)"
         empty.isHidden = true; previewScroll.isHidden = false; footer.isHidden = false
         previewSpinner.startAnimation(nil); updateActions()
         let work = DispatchWorkItem { [weak self] in
-            let result = autoreleasepool { Result { try FrameRenderer.render(input, settings: snapshot) } }
+            let result = autoreleasepool { Result { () -> (RenderedComposition, CGImage, CGSize, CGSize?) in
+                let backdrop = try CompositionRenderer.backgroundData(snapshot)
+                let frame = try CompositionRenderer.render(input, settings: snapshot, backgroundData: backdrop)
+                let display = snapshot.format == .jpeg ? try ImageInput(data: CompositionRenderer.data(frame.image, settings: snapshot), name: "preview.jpg").decode() : frame.image
+                return (frame, display, try input.dimensions(), try backdrop.map { try ImageInput(data: $0, name: "background.png").dimensions() })
+            } }
             DispatchQueue.main.async {
                 guard let self, self.previewRequest == generation else { return }
                 self.previewSpinner.stopAnimation(nil)
                 switch result {
-                case .success(let frame):
-                    self.rendered = frame; self.renderedID = input.id; self.canvas.image = NSImage(cgImage: frame.image, size: frame.plan.pixelSize)
-                    self.dimensions.stringValue = "\(Int(frame.plan.pixelSize.width)) × \(Int(frame.plan.pixelSize.height)) px"
+                case .success(let (frame, display, sourceSize, backgroundSize)):
+                    self.backgroundImageSize = backgroundSize
+                    if let row = self.items.firstIndex(where: { $0.input.id == input.id }), self.items[row].error != nil { self.items[row].error = nil; self.refreshList() }
+                    self.inspectorUI.sourceInfo.stringValue = "\(input.name)\n\(Int(sourceSize.width)) × \(Int(sourceSize.height))"
+                    self.inspectorUI.outputInfo.stringValue = "\(snapshot.format == .png ? "PNG" : "JPEG") · \(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height))"
+                    self.rendered = frame; self.renderedID = input.id; self.canvas.image = NSImage(cgImage: display, size: frame.pixelSize)
+                    self.dimensions.stringValue = "\(snapshot.format == .png ? "PNG" : "JPEG") · \(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height))"
                     self.empty.isHidden = true; self.layoutPreview()
                 case .failure(let error):
-                    self.canvas.image = nil; self.empty.isHidden = false; self.emptyMessage.stringValue = "这张图片无法预览"
+                    self.canvas.image = nil; self.empty.isHidden = false; self.emptyMessage.stringValue = "无法生成成品"
+                    self.emptyAction.title = "重试预览"; self.emptyAction.onPress = { [weak self] in self?.scheduleThumbnails(); self?.requestPreview() }
                     self.emptyDetail.stringValue = error.localizedDescription
                     self.previewScroll.isHidden = true; self.footer.isHidden = true; self.dimensions.stringValue = "无法确定"
                     if let i = self.items.firstIndex(where: { $0.input.id == input.id }) { self.items[i].error = error.localizedDescription; self.refreshList() }
@@ -324,26 +342,12 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         renderWork = work; renderQueue.async(execute: work)
     }
 
-    @objc private func configurationChanged(_ sender: Any?) {
-        guard !isExporting else { return }
-        settings.model = DeviceModel.allCases[modelMenu.indexOfSelectedItem]
-        settings.orientation = orientation.selectedIndex == 0 ? .portrait : .landscape
-        settings.padding = min(2048, max(0, padding.integerValue))
-        padding.integerValue = settings.padding; paddingStepper.integerValue = settings.padding
-        do { try store.save(settings) } catch { showError(error.localizedDescription) }
-        scheduleThumbnails(); requestPreview()
-    }
-    @objc private func stepPadding(_ sender: Any?) { padding.integerValue = paddingStepper.integerValue; configurationChanged(sender) }
-    func controlTextDidChange(_ obj: Notification) {
-        guard let value = Int(padding.stringValue), (0...2048).contains(value) else { return }
-        configurationChanged(padding)
-    }
     private func layoutPreview() {
         guard !layingOutPreview, let rendered else { return }
         layingOutPreview = true; defer { layingOutPreview = false }
         let available = previewScroll.contentView.bounds.size
         guard available.width > 0, available.height > 0 else { return }
-        let pixels = rendered.plan.pixelSize, backing = window?.backingScaleFactor ?? 2
+        let pixels = rendered.pixelSize, backing = window?.backingScaleFactor ?? 2
         let factor = zoom.map { $0 / backing } ?? min(max(10, available.width - 64) / pixels.width, max(10, available.height - 32) / pixels.height)
         let size = NSSize(width: pixels.width * factor, height: pixels.height * factor)
         let document = NSSize(width: max(available.width, size.width + 64), height: max(available.height, size.height + 32))
@@ -355,7 +359,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     @objc private func zoomIn(_ sender: Any?) { setZoom(by: 1.25) }
     @objc private func zoomOut(_ sender: Any?) { setZoom(by: 0.8) }
     private func setZoom(by multiplier: CGFloat) {
-        let current = zoom ?? ((canvas.imageRect.width / max(1, rendered?.plan.pixelSize.width ?? 1)) * (window?.backingScaleFactor ?? 2))
+        let current = zoom ?? ((canvas.imageRect.width / max(1, rendered?.pixelSize.width ?? 1)) * (window?.backingScaleFactor ?? 2))
         zoom = min(8, max(0.05, current * multiplier)); layoutPreview()
     }
     @objc private func zoomMenuChanged(_ sender: Any?) {
@@ -367,7 +371,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         guard let rendered, let index = selectedIndex, renderedID == items[index].input.id else { return }
         do {
             let data = try FrameRenderer.pngData(rendered.image)
-            NSPasteboard.general.clearContents(); NSPasteboard.general.setData(data, forType: .png)
+            pasteboard.clearContents(); pasteboard.setData(data, forType: .png)
         } catch { showError(error.localizedDescription) }
     }
     @objc func exportAll(_ sender: Any?) {
@@ -385,8 +389,8 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         guard let index = selectedIndex, !isExporting else { return }
         window?.makeFirstResponder(nil)
         let input = items[index].input
-        let panel = NSSavePanel(); panel.allowedContentTypes = [.png]; panel.canCreateDirectories = true
-        panel.nameFieldStringValue = BatchExporter.outputNames(for: [input])[0]
+        let panel = NSSavePanel(); panel.allowedContentTypes = [settings.format == .png ? .png : .jpeg]; panel.canCreateDirectories = true
+        panel.nameFieldStringValue = BatchExporter.outputNames(for: [input], format: settings.format)[0]
         panel.beginSheetModal(for: window!) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             self?.startExport([input], directory: url.deletingLastPathComponent(), overwrite: true, names: [url.lastPathComponent])
@@ -394,6 +398,8 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     }
     private func startExport(_ inputs: [ImageInput], directory: URL, overwrite: Bool, names: [String]? = nil) {
         let snapshot = settings, token = CancellationToken()
+        let backdrop: Data?
+        do { backdrop = try CompositionRenderer.backgroundData(snapshot) } catch { showError(error.localizedDescription); return }
         cancellation = token; updateActions()
         let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 470, height: 240), styleMask: [.titled], backing: .buffered, defer: false)
         panel.titleVisibility = .hidden
@@ -410,7 +416,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         progressPanel = panel; window?.beginSheet(panel)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let result = Result {
-                try BatchExporter.run(inputs: inputs, settings: snapshot, directory: directory, overwrite: overwrite, cancellation: token, outputNames: names) { progress in
+                try BatchExporter.run(inputs: inputs, settings: RenderSettings(), directory: directory, overwrite: overwrite, cancellation: token, outputNames: names, composition: snapshot, backgroundData: backdrop) { progress in
                     DispatchQueue.main.async { count.stringValue = "已完成 \(progress.completed) / \(progress.total)"; current.stringValue = "正在处理：\(progress.currentName)"; bar.doubleValue = Double(progress.completed) }
                 }
             }
@@ -449,6 +455,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         alert.beginSheetModal(for: window!) { response in if response == .alertSecondButtonReturn { NSWorkspace.shared.open(directory) } }
     }
     private func updateActions() {
+        inspectorUI?.setEditingEnabled(!isExporting)
         batchCount.stringValue = "批次 · \(items.count) 张"
         batchScope.stringValue = "样式应用于全部 \(items.count) 张"
         exportAction.count = items.count; exportAction.isEnabled = !isExporting
