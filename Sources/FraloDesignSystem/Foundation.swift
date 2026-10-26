@@ -3,6 +3,17 @@ import AppKit
 /// Stable application roles. Artwork colors belong to the renderer, not this palette.
 @MainActor
 public enum FraloStyle {
+    public enum Button {
+        public static let height: CGFloat = 34
+        public static let compactHeight: CGFloat = 28
+        public static let radius: CGFloat = 9
+        public static let compactRadius: CGFloat = 7
+        public static let inset: CGFloat = 16
+        public static let compactInset: CGFloat = 12
+        public static let icon: CGFloat = 14
+        public static let compactIcon: CGFloat = 12
+    }
+
     public enum Space {
         public static let small: CGFloat = 4
         public static let control: CGFloat = 8

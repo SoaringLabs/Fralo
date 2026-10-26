@@ -255,7 +255,7 @@ public final class ViewToolbar: NSView {
     public let surface = MaterialSurface(.panel, radius: 18)
     public let zoom = ChoiceMenu(["适应窗口", "100%", "50%"], label: "查看倍率")
     public let dimensions = FraloStyle.text("2400 × 1800", role: .detail, secondary: true)
-    public let preview = ActionButton("成品预览", role: .quiet)
+    public let preview = ActionButton("成品预览", role: .quiet, size: .compact)
     public init() {
         super.init(frame: .zero)
         surface.translatesAutoresizingMaskIntoConstraints = false; addSubview(surface)
@@ -265,7 +265,7 @@ public final class ViewToolbar: NSView {
             surface.leadingAnchor.constraint(equalTo: leadingAnchor), surface.trailingAnchor.constraint(equalTo: trailingAnchor),
             surface.topAnchor.constraint(equalTo: topAnchor), surface.bottomAnchor.constraint(equalTo: bottomAnchor),
             row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12), row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
-            row.topAnchor.constraint(equalTo: topAnchor, constant: 6), row.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -6)
+            row.topAnchor.constraint(equalTo: topAnchor, constant: 4), row.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4)
         ])
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }

@@ -5,42 +5,6 @@ import FraloCore
 @testable import FraloApp
 
 final class DevelopmentTests: XCTestCase {
-    @MainActor func testSoftButtonBusyPreservesWidthAndRequestedAvailability() async {
-        _ = NSApplication.shared
-        var presses = 0
-        let button = SoftButton("导出全部", role: .primary, symbol: "square.and.arrow.up") { presses += 1 }
-        let size = button.intrinsicContentSize
-        button.performClick(nil); XCTAssertEqual(presses, 1)
-        button.isBusy = true; button.performClick(nil)
-        XCTAssertEqual(presses, 1); XCTAssertFalse(button.isEnabled)
-        XCTAssertEqual(button.intrinsicContentSize, size)
-        XCTAssertEqual(button.accessibilityLabel(), "导出全部，正在处理")
-        button.isEnabled = false; button.isBusy = false
-        XCTAssertFalse(button.isEnabled)
-        button.isEnabled = true; button.performClick(nil)
-        XCTAssertEqual(presses, 2)
-        XCTAssertEqual(button.accessibilityRole(), .button)
-        XCTAssertEqual(button.accessibilityLabel(), "导出全部")
-    }
-
-    @MainActor func testSoftButtonTabLeavesTheControlInBothDirections() async {
-        _ = NSApplication.shared
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 300), styleMask: [.titled], backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false; window.autorecalculatesKeyViewLoop = false
-        let button = SoftButton("添加图片", symbol: "plus")
-        button.frame = NSRect(x: 0, y: 0, width: 120, height: 34)
-        let field = NSTextField(frame: NSRect(x: 150, y: 0, width: 120, height: 24))
-        window.contentView?.addSubview(button); window.contentView?.addSubview(field)
-        button.nextKeyView = field; field.nextKeyView = button
-        for modifiers: NSEvent.ModifierFlags in [[], .shift] {
-            window.makeFirstResponder(button)
-            button.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0,
-                windowNumber: window.windowNumber, context: nil, characters: "\t", charactersIgnoringModifiers: "\t", isARepeat: false, keyCode: 48)!)
-            XCTAssertTrue(window.firstResponder === field.currentEditor())
-        }
-        window.close()
-    }
-
     @MainActor func testExperimentsDoNotChangeConfiguredProductSettings() async throws {
         _ = NSApplication.shared
         let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")

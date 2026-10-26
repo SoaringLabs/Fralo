@@ -21,8 +21,8 @@ enum LabProbe {
                 try snapshot(controller.window!.contentView!, to: output.deletingLastPathComponent().appendingPathComponent(name))
                 snapshots.append(name)
                 if page == .components, let view = controller.tabs.selectedTabViewItem?.view {
-                    let buttons = descendants(view).compactMap { $0 as? SoftButton }
-                    checks["soft_candidate_controls"] = buttons.count >= 9
+                    let buttons = descendants(view).compactMap { $0 as? ActionButton }
+                    checks["shared_action_controls"] = buttons.count >= 9
                     checks["soft_accessibility_roles"] = !buttons.isEmpty && buttons.allSatisfy { $0.accessibilityRole() == .button }
                     if let primary = buttons.first(where: { $0.role == .primary && $0.isEnabled }) {
                         let size = primary.intrinsicContentSize

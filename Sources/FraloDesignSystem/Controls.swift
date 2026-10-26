@@ -1,8 +1,8 @@
 import AppKit
 
 @MainActor
-public class ActionButton: NSButton {
-    public enum Role { case primary, secondary, quiet, destructive }
+public class NativeActionButton: NSButton {
+    public typealias Role = ActionButton.Role
     public var onPress: (() -> Void)?
     private var available = true
     private var normalTitle: String
@@ -30,12 +30,8 @@ public class ActionButton: NSButton {
 @MainActor
 public final class IconButton: ActionButton {
     public init(_ symbol: String, label: String, onPress: (() -> Void)? = nil) {
-        super.init("", onPress: onPress)
-        image = NSImage(systemSymbolName: symbol, accessibilityDescription: label)
-        imagePosition = .imageOnly; bezelStyle = .accessoryBarAction
-        setAccessibilityLabel(label); toolTip = label
-        widthAnchor.constraint(equalToConstant: 28).isActive = true
-        heightAnchor.constraint(equalToConstant: 28).isActive = true
+        super.init("", role: .quiet, size: .compact, symbol: symbol, label: label, onPress: onPress)
+        toolTip = label
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
 }
@@ -133,7 +129,7 @@ public final class ColorChoice: NSColorWell {
 }
 
 @MainActor
-public final class BackgroundSwatch: ActionButton {
+public final class BackgroundSwatch: NativeActionButton {
     public var isSelected = false { didSet { state = isSelected ? .on : .off; setAccessibilityValue(isSelected ? 1 : 0) } }
     public init(_ title: String, image: NSImage? = nil, onSelect: (() -> Void)? = nil) {
         super.init(title, onPress: onSelect)
@@ -185,7 +181,7 @@ public final class ToggleControl: NSButton {
 
 @MainActor
 public final class ExportAction: NSStackView {
-    public let primary = ActionButton("导出全部 · 0 张", role: .primary)
+    public let primary = ActionButton("导出全部 · 0 张", role: .primary, symbol: "square.and.arrow.up")
     public let disclosure = IconButton("chevron.down", label: "更多导出操作")
     public var onExportAll: (() -> Void)?
     public var onExportCurrent: (() -> Void)?

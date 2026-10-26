@@ -8,8 +8,8 @@ Verified locally on 2026-10-26 on Apple Silicon. The minimum supported target re
 
 | Check | Observed result |
 | --- | --- |
-| Debug build and `swift test` | Passed: 34 tests — 12 shared-control tests, 12 core tests, 6 development tests, 4 updater tests |
-| Release build and local package | Passed; ad-hoc packaging only, no publication |
+| Debug build and `swift test` | Passed: 34 tests — 14 shared-control tests, 12 core tests, 4 development tests, 4 updater tests |
+| Release shared-control tests and local package | All 14 shared-control tests passed in Release; ad-hoc packaging passed, no publication |
 | `scripts/verify_cli.py` | Passed all 10 checks, including isolated settings, partial failure, cancellation and source preservation |
 | `scripts/verify_design_system.py` | Debug contains Dev symbols; Release excludes them; shared module compiles for Release; packaged binary matches verified Release code; no Dev fixture resources |
 | Runtime probe | All 20 observations passed, with 12 view-cache captures; report bound to the current Debug executable |
@@ -24,15 +24,15 @@ The follow-up keyboard fix was verified in the real gallery: forward Tab selects
 
 Native screenshots and process/build provenance are retained outside the source tree with the task's local verification evidence. View-cache captures are layout evidence only: macOS compositing can omit material layers from those images.
 
-## Soft-button follow-up
+## Selected button style adopted
 
-The user selected an additional soft custom style for comparison. Components now contains native and soft rows, applicable roles, disabled/busy states, a processing replay, focus check and a material-panel example. The candidate remains entirely Debug-only; the existing shared and product button style is unchanged.
+The user selected the soft style and authorized its promotion. The implementation now lives in the shared module as the default `ActionButton`, with centralized regular/compact metrics. `IconButton`, export/status actions and the entire lab use it. The Dev-only duplicate was removed; the native row remains an explicitly labelled comparison. The production workbench rewrite remains a later phase.
 
-- Added behavior tests for callback suppression, stable busy width, requested enabled-state restoration, accessibility role/label and forward/reverse Tab. All 34 tests passed.
-- The native probe now also checks candidate presence, button semantics and busy-width preservation. It captures default/pressed rendering through the real button, and the two rendered outputs differ.
-- Actual native-window inspection confirmed the light appearance, visible system focus ring, Space activation, Tab leaving the control and simulated processing recovery. This is targeted input coverage, not full keyboard or screen-reader acceptance.
-- Release build, package and symbol/resource verification passed including exclusion of `SoftButton` and `SoftButtonGallery`. The earlier CLI checks remain applicable: no Core/CLI, saved-settings, package-manifest or CLI-verifier source changed in this follow-up.
-- Dark candidate appearance, hover feel and accessibility preview perception remain part of human review. The automation capture was stopped when concurrent user interaction changed the window, preserving the user's current preview state.
+- All 34 Debug tests and all 14 shared-control tests in Release passed. Button tests now belong to the shared test target. They cover busy width/callback suppression/availability restoration, dynamic labels/tooltips, role and Tab navigation.
+- The native probe checks shared controls, button semantics and busy-width preservation, alongside existing five-page/minimum-window/focus/image-isolation checks. Default and pressed captures exercise the actual shared button.
+- Native Scenarios inspection covered light/dark appearances, regular export/add actions and compact preview/sidebar controls. No layout-constraint diagnostics appeared in the probe run. A stale export-count tooltip found during inspection was corrected and covered by the shared export-action test.
+- Release packaging excludes the lab/gallery/fixtures while retaining a Release-compilable and tested shared design system. The earlier CLI checks remain applicable: no Core/CLI, saved-settings, package-manifest or CLI-verifier source changed.
+- Button visual direction is selected. A complete keyboard traversal, VoiceOver speech, diverse-desktop material perception and final full-stage human review remain separate.
 
 ## Remaining manual acceptance
 
@@ -42,7 +42,7 @@ The user selected an additional soft custom style for comparison. Components now
 - VoiceOver speech and a complete keyboard traversal have not been accepted. Native roles, canvas name/size/help and selected/disabled values were inspected. Targeted arrow routing plus real forward/reverse Tab navigation were exercised; these do not establish a complete keyboard traversal.
 - Actual OS accessibility setting changes and macOS 14 runtime behavior remain untested on this machine. Local stronger-setting previews are not proof of those system transitions.
 
-The implementation is ready for manual review. User acceptance of appearance/motion is still pending; no acceptance, merge, release or subsequent workbench-rewrite authorization is inferred from automated checks.
+The implementation is ready for full-stage manual review. The soft-button direction is selected; final acceptance of the complete lab appearance/motion is still pending; no acceptance, merge, release or subsequent workbench-rewrite authorization is inferred from automated checks.
 
 ## How to review
 

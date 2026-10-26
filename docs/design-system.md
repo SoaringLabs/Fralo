@@ -54,11 +54,15 @@ Existing FRALO-4 style and orientation-choice work was inspected for reuse. The 
 
 See [the development lab](development-lab.md) for running and [acceptance evidence](design-system-acceptance.md) for verification limits.
 
-## Experimental button skin
+## Default action buttons
 
-The Debug lab offers a **soft-button candidate** next to the current native styles. Its `NSButton` implementation and gallery live in `Development`, guarded by `FRALO_DEV`, while the default `ActionButton` remains unchanged. Candidate drawing uses a restrained accent fill, rounded neutral surfaces, light highlights and semantic action roles. These geometry/color treatments are Fralo design choices.
+The selected soft style is the shared `ActionButton` default in Debug and Release. Its implementation lives in `Sources/FraloDesignSystem/ActionButton.swift`; there is no separate Dev copy. `IconButton`, `ExportAction`, state actions, preview tools and the lab reuse it. The existing product workbench is adopted in the later UI-rewrite phase.
 
-This separation keeps an unaccepted experiment out of production dependencies. Human visual approval is required before promoting the skin into a shared stable variant. See [the lab](development-lab.md#soft-button-candidate) for the working comparison and state examples.
+`FraloStyle.Button` owns regular/compact heights (34/28 pt), corner radii (9/7 pt), content insets and symbol sizes. These are Fralo choices. Use regular buttons for panel actions and compact controls for toolbars. Keep an icon-only button's explicit accessibility label.
+
+The four roles are primary, secondary, quiet and destructive. Busy state preserves width and requested availability; title changes update default accessibility labels and tooltips. Explicit icon labels and custom tooltips are retained. System accessibility changes refresh the button; reduced motion uses a static hourglass for busy feedback, while increased contrast strengthens the border.
+
+`NativeActionButton` is reserved for the labelled native comparison and image-choice cells such as `BackgroundSwatch`. Ordinary action UI uses `ActionButton`; avoid selecting different skins per page. `SoftButtonGallery` is a Debug-only consumer of the shared implementation. See [the lab](development-lab.md#shared-button-style) for comparison and state examples.
 
 ## Apple references
 

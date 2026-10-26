@@ -26,13 +26,13 @@ This builds Debug, creates a separate `Fralo Design Lab.app` with bundle identif
 
 The appearance selector changes this window only. Preview checkboxes strengthen accessibility behavior locally; the footer separately reports actual OS settings. System-setting changes also refresh the lab. Reset restores local experiment values, not user product settings.
 
-## Soft-button candidate
+## Shared button style
 
-Components starts with **按钮外观对照 · 柔和定制候选**. The native row remains available. The soft row supplies primary, secondary, quiet, destructive and icon buttons, followed by disabled/busy examples, a short simulated processing action and a keyboard-focus check. A separate example shows the candidate on a material panel.
+Components starts with **按钮规范 · 柔和定制**. The user-selected soft style now comes directly from `FraloDesignSystem.ActionButton`; the labelled native row remains a comparison. Roles, disabled/busy examples, processing replay, focus check and the panel example all use the shared implementation.
 
-The candidate is a real `NSButton` with custom drawing, not a screenshot. It supports native activation, keyboard focus/Tab, hover/press feedback and accessibility button semantics. Busy state preserves width and prevents duplicate activation. Reduced motion replaces its decorative spinning indicator with a static hourglass; increased contrast strengthens borders. Fill and text colors resolve against the current appearance and system accent.
+The same style appears in Scenarios, Motion, preview tools, export actions and status/retry actions. Regular and compact metrics are centralized in `FraloStyle.Button`. Try both light/dark appearance and the local accessibility previews. Busy state preserves width and prevents duplicate activation; default labels/tooltips follow title updates.
 
-`SoftButton` and its gallery are **Debug-only experiments**, not shared stable defaults. Review the candidate before promoting it into `FraloDesignSystem`. Scenario and production buttons continue using the existing shared implementation.
+The gallery is Debug-only. The selected reusable button is available to Debug and Release consumers. The normal product workbench will adopt these controls in its later rewrite; this step does not change the production screen layout.
 
 ## Isolation
 

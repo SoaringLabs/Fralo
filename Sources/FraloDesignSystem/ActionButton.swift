@@ -1,61 +1,69 @@
-#if FRALO_DEV
 import AppKit
-import FraloDesignSystem
 
-/// A real NSButton with an experimental skin. Promote only after visual acceptance.
+/// Default Fralo action style; native button events with the selected soft appearance.
 @MainActor
-final class SoftButton: NSButton {
-    let role: ActionButton.Role
-    var onPress: (() -> Void)?
-    var preferences = DesignPreferences() { didSet { refresh() } }
-    private let symbol: NSImage?
-    private let accessibleName: String
+public class ActionButton: NSButton {
+    public enum Role { case primary, secondary, quiet, destructive }
+    public enum Size { case regular, compact }
+    public let size: Size
+    public let role: Role
+    public var onPress: (() -> Void)?
+    public var preferences = DesignPreferences() { didSet { refresh() } }
+    private let explicitLabel: String?
+    private var accessibleName: String { explicitLabel ?? title }
+    private var accessibilityObserver: NSObjectProtocol?
     private let activity = NSProgressIndicator()
     private var requestedEnabled = true
     private var tracking: NSTrackingArea?
     private var windowObservers: [NSObjectProtocol] = []
     private(set) var isHovered = false
-    var isBusy = false { didSet { super.isEnabled = requestedEnabled && !isBusy; refresh() } }
-    override var isEnabled: Bool {
+    public var isBusy = false { didSet { super.isEnabled = requestedEnabled && !isBusy; refresh() } }
+    public override var isEnabled: Bool {
         get { super.isEnabled }
         set { requestedEnabled = newValue; super.isEnabled = newValue && !isBusy; refresh() }
     }
-    override var acceptsFirstResponder: Bool { isEnabled }
-    override var isFlipped: Bool { true }
-    override var intrinsicContentSize: NSSize {
-        if title.isEmpty { return NSSize(width: 34, height: 34) }
+    public override var acceptsFirstResponder: Bool { isEnabled }
+    public override var isFlipped: Bool { true }
+    public override var intrinsicContentSize: NSSize {
+        if title.isEmpty { return NSSize(width: buttonHeight, height: buttonHeight) }
         let width = (title as NSString).size(withAttributes: [.font: font ?? .systemFont(ofSize: 13, weight: .medium)]).width
-        return NSSize(width: ceil(width) + 32 + (symbol == nil ? 0 : 24), height: 34)
+        return NSSize(width: ceil(width) + inset * 2 + iconSlot, height: buttonHeight)
     }
 
-    init(_ title: String, role: ActionButton.Role = .secondary, symbol: String? = nil,
+    public init(_ title: String, role: Role = .secondary, size: Size = .regular, symbol: String? = nil,
          label: String? = nil, onPress: (() -> Void)? = nil) {
-        self.role = role; self.onPress = onPress; accessibleName = label ?? title
-        self.symbol = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
+        self.role = role; self.size = size; self.onPress = onPress; explicitLabel = label
         super.init(frame: .zero)
-        self.title = title; font = .systemFont(ofSize: 13, weight: .medium)
+        self.title = title; self.image = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
+        font = .systemFont(ofSize: size == .regular ? 13 : 12, weight: .medium)
         setButtonType(.momentaryPushIn); isBordered = false
         target = self; action = #selector(activate(_:)); focusRingType = .exterior
-        hasDestructiveAction = role == .destructive; toolTip = accessibleName
+        hasDestructiveAction = role == .destructive; toolTip = label ?? title
         setAccessibilityElement(true); setAccessibilityRole(.button); setAccessibilityLabel(accessibleName)
         setContentCompressionResistancePriority(.required, for: .horizontal)
         setContentCompressionResistancePriority(.required, for: .vertical)
         activity.style = .spinning; activity.controlSize = .small; activity.isDisplayedWhenStopped = false
         addSubview(activity); refresh()
+        accessibilityObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }
     }
-    required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
-    deinit { windowObservers.forEach(NotificationCenter.default.removeObserver) }
+    required public init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+    deinit {
+        windowObservers.forEach(NotificationCenter.default.removeObserver)
+        if let accessibilityObserver { NSWorkspace.shared.notificationCenter.removeObserver(accessibilityObserver) }
+    }
 
     @objc private func activate(_ sender: Any?) { if isEnabled && !isBusy { onPress?() } }
-    override func keyDown(with event: NSEvent) {
+    public override func keyDown(with event: NSEvent) {
         if event.keyCode == 48 {
             if event.modifierFlags.contains(.shift) { window?.selectKeyView(preceding: self) }
             else { window?.selectKeyView(following: self) }
         } else { super.keyDown(with: event) }
     }
-    override func highlight(_ flag: Bool) { super.highlight(flag); needsDisplay = true }
-    override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); needsDisplay = true }
-    override func viewDidMoveToWindow() {
+    public override func highlight(_ flag: Bool) { super.highlight(flag); needsDisplay = true }
+    public override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); needsDisplay = true }
+    public override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         windowObservers.forEach(NotificationCenter.default.removeObserver); windowObservers.removeAll()
         guard let window else { return }
@@ -65,18 +73,18 @@ final class SoftButton: NSButton {
             })
         }
     }
-    override func updateTrackingAreas() {
+    public override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let tracking { removeTrackingArea(tracking) }
         let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
         addTrackingArea(area); tracking = area
     }
-    override func mouseEntered(with event: NSEvent) { isHovered = isEnabled; needsDisplay = true }
-    override func mouseExited(with event: NSEvent) { isHovered = false; needsDisplay = true }
-    override func layout() {
+    public override func mouseEntered(with event: NSEvent) { isHovered = isEnabled; needsDisplay = true }
+    public override func mouseExited(with event: NSEvent) { isHovered = false; needsDisplay = true }
+    public override func layout() {
         super.layout()
-        let x: CGFloat = title.isEmpty || symbol == nil ? bounds.midX - 7 : 16
-        activity.frame = NSRect(x: x, y: bounds.midY - 7, width: 14, height: 14)
+        let x: CGFloat = title.isEmpty || image == nil ? bounds.midX - iconSide / 2 : inset
+        activity.frame = NSRect(x: x, y: bounds.midY - iconSide / 2, width: iconSide, height: iconSide)
     }
     private func refresh() {
         if !isEnabled { isHovered = false }
@@ -86,14 +94,26 @@ final class SoftButton: NSButton {
         activity.isHidden = !isBusy || preferences.effectiveReduceMotion
         needsLayout = true; needsDisplay = true
     }
+    public override var title: String {
+        didSet {
+            if explicitLabel == nil && (toolTip == oldValue || toolTip == nil) { toolTip = title }
+            invalidateIntrinsicContentSize(); refresh()
+        }
+    }
+    public override var image: NSImage? { didSet { invalidateIntrinsicContentSize(); needsLayout = true; needsDisplay = true } }
+    private var buttonHeight: CGFloat { size == .regular ? FraloStyle.Button.height : FraloStyle.Button.compactHeight }
+    private var inset: CGFloat { size == .regular ? FraloStyle.Button.inset : FraloStyle.Button.compactInset }
+    private var radius: CGFloat { size == .regular ? FraloStyle.Button.radius : FraloStyle.Button.compactRadius }
+    private var iconSide: CGFloat { size == .regular ? FraloStyle.Button.icon : FraloStyle.Button.compactIcon }
+    private var iconSlot: CGFloat { image == nil ? 0 : iconSide + (size == .regular ? 10 : 8) }
     private var surfaceRect: NSRect { bounds.insetBy(dx: 2, dy: 2) }
-    override var focusRingMaskBounds: NSRect { surfaceRect }
-    override func drawFocusRingMask() { NSBezierPath(roundedRect: surfaceRect, xRadius: 9, yRadius: 9).fill() }
+    public override var focusRingMaskBounds: NSRect { surfaceRect }
+    public override func drawFocusRingMask() { NSBezierPath(roundedRect: surfaceRect, xRadius: radius, yRadius: radius).fill() }
 
-    override func draw(_ dirtyRect: NSRect) {
+    public override func draw(_ dirtyRect: NSRect) {
         let pressed = cell?.isHighlighted == true && isEnabled
         let contrast = preferences.effectiveIncreaseContrast
-        let path = NSBezierPath(roundedRect: surfaceRect, xRadius: 9, yRadius: 9)
+        let path = NSBezierPath(roundedRect: surfaceRect, xRadius: radius, yRadius: radius)
         let base = NSColor.controlBackgroundColor.blended(withFraction: 0.32, of: .windowBackgroundColor) ?? .controlBackgroundColor
         var fill = base, edge = NSColor.separatorColor, ink = NSColor.labelColor
         var hasSurface = true
@@ -133,18 +153,18 @@ final class SoftButton: NSButton {
             }
             edge.setStroke(); path.lineWidth = contrast ? 1.25 : 0.5; path.stroke()
         }
-        let slot: CGFloat = symbol == nil ? 0 : 24
-        let textRect = NSRect(x: 16 + slot, y: bounds.midY - 8, width: max(0, bounds.width - 32 - slot), height: 18)
-        let centeredBusy = isBusy && symbol == nil
+        let slot = iconSlot
+        let textRect = NSRect(x: inset + slot, y: bounds.midY - 8, width: max(0, bounds.width - inset * 2 - slot), height: 18)
+        let centeredBusy = isBusy && image == nil
         if !title.isEmpty && !centeredBusy {
             let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .center; paragraph.lineBreakMode = .byTruncatingTail
-            (title as NSString).draw(in: textRect, withAttributes: [.font: font!, .foregroundColor: ink, .paragraphStyle: paragraph])
+            (title as NSString).draw(in: textRect, withAttributes: [.font: font ?? FraloStyle.TextRole.body.font, .foregroundColor: ink, .paragraphStyle: paragraph])
         }
         if !isBusy || preferences.effectiveReduceMotion {
-            let icon = isBusy ? NSImage(systemSymbolName: "hourglass", accessibilityDescription: nil) : symbol
+            let icon = isBusy ? NSImage(systemSymbolName: "hourglass", accessibilityDescription: nil) : image
             if let icon {
-                let x: CGFloat = title.isEmpty || centeredBusy ? bounds.midX - 7 : 16
-                let rect = NSRect(x: x, y: bounds.midY - 7, width: 14, height: 14)
+                let x: CGFloat = title.isEmpty || centeredBusy ? bounds.midX - iconSide / 2 : inset
+                let rect = NSRect(x: x, y: bounds.midY - iconSide / 2, width: iconSide, height: iconSide)
                 NSGraphicsContext.saveGraphicsState()
                 let tinted = NSImage(size: rect.size, flipped: true) { target in
                     icon.draw(in: target); ink.setFill(); target.fill(using: .sourceIn); return true
@@ -160,4 +180,3 @@ final class SoftButton: NSButton {
         return (luminance + 0.05) / 0.05 > 1.05 / (luminance + 0.05) ? .black : .white
     }
 }
-#endif

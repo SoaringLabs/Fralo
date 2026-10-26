@@ -3,6 +3,43 @@ import XCTest
 @testable import FraloDesignSystem
 
 final class DesignSystemTests: XCTestCase {
+    @MainActor func testActionButtonBusyPreservesWidthAndRequestedAvailability() async {
+        _ = NSApplication.shared
+        var presses = 0
+        let button = ActionButton("导出全部", role: .primary, symbol: "square.and.arrow.up") { presses += 1 }
+        let size = button.intrinsicContentSize
+        button.performClick(nil); XCTAssertEqual(presses, 1)
+        button.isBusy = true; button.performClick(nil)
+        XCTAssertEqual(presses, 1); XCTAssertFalse(button.isEnabled)
+        XCTAssertEqual(button.intrinsicContentSize, size)
+        XCTAssertEqual(button.accessibilityLabel(), "导出全部，正在处理")
+        button.isEnabled = false; button.isBusy = false
+        XCTAssertFalse(button.isEnabled)
+        button.isEnabled = true; button.performClick(nil)
+        XCTAssertEqual(presses, 2)
+        XCTAssertEqual(button.accessibilityRole(), .button)
+        XCTAssertEqual(button.accessibilityLabel(), "导出全部")
+    }
+
+    @MainActor func testActionButtonTabLeavesTheControlInBothDirections() async {
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 300), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.autorecalculatesKeyViewLoop = false
+        let button = ActionButton("添加图片", symbol: "plus")
+        button.frame = NSRect(x: 0, y: 0, width: 120, height: 34)
+        let field = NSTextField(frame: NSRect(x: 150, y: 0, width: 120, height: 24))
+        window.contentView?.addSubview(button); window.contentView?.addSubview(field)
+        button.nextKeyView = field; field.nextKeyView = button
+        for modifiers: NSEvent.ModifierFlags in [[], .shift] {
+            window.makeFirstResponder(button)
+            button.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0,
+                windowNumber: window.windowNumber, context: nil, characters: "\t", charactersIgnoringModifiers: "\t", isARepeat: false, keyCode: 48)!)
+            XCTAssertTrue(window.firstResponder === field.currentEditor())
+        }
+        window.close()
+    }
+
+
     @MainActor func testPickerRestorationDoesNotEditAndKeyboardRespectsDisabledState() async {
         _ = NSApplication.shared
         var edits: [Int] = []
@@ -111,9 +148,13 @@ final class DesignSystemTests: XCTestCase {
         var all = 0, current = 0
         let action = ExportAction(count: 3)
         action.onExportAll = { all += 1 }; action.onExportCurrent = { current += 1 }
+        XCTAssertEqual(action.primary.accessibilityLabel(), "导出全部 · 3 张")
+        XCTAssertEqual(action.primary.toolTip, "导出全部 · 3 张")
         action.exportCurrent(); action.primary.performClick(nil)
         XCTAssertEqual(current, 1); XCTAssertEqual(all, 1)
         action.count = 0; action.exportCurrent(); action.primary.performClick(nil)
+        XCTAssertEqual(action.primary.accessibilityLabel(), "导出全部 · 0 张")
+        XCTAssertEqual(action.primary.toolTip, "导出全部 · 0 张")
         XCTAssertEqual(current, 1); XCTAssertEqual(all, 1)
         XCTAssertFalse(action.disclosure.isEnabled)
     }
