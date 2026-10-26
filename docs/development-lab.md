@@ -26,6 +26,8 @@ This builds Debug, creates a separate `Fralo Design Lab.app` with bundle identif
 
 The appearance selector changes this window only. Preview checkboxes strengthen accessibility behavior locally; the footer separately reports actual OS settings. System-setting changes also refresh the lab. Reset restores local experiment values, not user product settings.
 
+In Scenarios, the image list fills the space between the fixed panel header and footer and grows with the window. Each inspector page owns one scroll view; the mode selector, tabs and export footer remain visible. Native overlay scrollers hide automatically without a persistent white gutter. Short settings pages do not force overflow.
+
 ## Shared button style
 
 Components starts with **按钮规范 · 柔和定制**. The user-selected soft style now comes directly from `FraloDesignSystem.ActionButton`; the labelled native row remains a comparison. Roles, disabled/busy examples, processing replay, focus check and the panel example all use the shared implementation.

@@ -4,15 +4,15 @@ Implementation scope: Debug-only native development lab and the shared AppKit de
 
 ## Executed checks
 
-Verified locally on 2026-10-26 on Apple Silicon. The minimum supported target remains macOS 14; this run does not establish runtime compatibility on every supported OS version.
+Verified locally on 2026-10-27 on Apple Silicon. The minimum supported target remains macOS 14; this run does not establish runtime compatibility on every supported OS version.
 
 | Check | Observed result |
 | --- | --- |
-| Debug build and `swift test` | Passed: 34 tests — 14 shared-control tests, 12 core tests, 4 development tests, 4 updater tests |
+| Debug build and `swift test` | Passed: 36 tests — 14 shared-control tests, 12 core tests, 6 development tests, 4 updater tests |
 | Release shared-control tests and local package | All 14 shared-control tests passed in Release; ad-hoc packaging passed, no publication |
 | `scripts/verify_cli.py` | Passed all 10 checks, including isolated settings, partial failure, cancellation and source preservation |
 | `scripts/verify_design_system.py` | Debug contains Dev symbols; Release excludes them; shared module compiles for Release; packaged binary matches verified Release code; no Dev fixture resources |
-| Runtime probe | All 20 observations passed, with 12 view-cache captures; report bound to the current Debug executable |
+| Runtime probe | All 22 observations passed, with 13 view-cache captures; report bound to the current Debug executable |
 | Native window inspection | Five pages reachable; real radio/tab accessibility roles; scenario sliders use full form width; aligned panel edges; local appearance changes and opaque fallback visible; native Tab moves from a parameter to the numeric field and Shift-Tab leaves it; canvas name/size/help exposed |
 | Source checks | `git diff --check` and `scripts/check_public_source.py` passed |
 
@@ -33,6 +33,12 @@ The user selected the soft style and authorized its promotion. The implementatio
 - Native Scenarios inspection covered light/dark appearances, regular export/add actions and compact preview/sidebar controls. No layout-constraint diagnostics appeared in the probe run. A stale export-count tooltip found during inspection was corrected and covered by the shared export-action test.
 - Release packaging excludes the lab/gallery/fixtures while retaining a Release-compilable and tested shared design system. The earlier CLI checks remain applicable: no Core/CLI, saved-settings, package-manifest or CLI-verifier source changed.
 - Button visual direction is selected. A complete keyboard traversal, VoiceOver speech, diverse-desktop material perception and final full-stage human review remain separate.
+
+## Scroll layout follow-up
+
+The reported source list was constrained to 240 pt inside a second scroll view; the inspector inherited a fixed 540 pt tab height. Two actual-window regression tests reproduced the empty panel space, unchanged viewport after resizing, nested scrolling and unnecessary short-form overflow before the fix. Both now pass: the list grows by 300 pt when its window grows by 300 pt, and short device settings fit without forced overflow. Headers, inspector tabs and footers stay fixed while only their middle content scrolls.
+
+Native overlay scrollers replace the persistent white gutter. A live 100-image Scenarios window was inspected and scrolled through CUA; visible rows advanced from 1–7 to 7–13. The runtime probe additionally reaches row 100. Final full Debug tests, Release shared tests, packaging and binary/probe isolation checks passed; no layout-constraint diagnostics appeared in the final targeted layout run. Earlier CLI evidence is reused after confirming Core/CLI and its verifier are unchanged. Full human styling/material/motion acceptance remains pending.
 
 ## Remaining manual acceptance
 

@@ -52,13 +52,23 @@ public final class FlippedDocument: NSView {
 
 @MainActor
 public enum ScrollContent {
+    public static func configure(_ scroll: NSScrollView) {
+        scroll.hasVerticalScroller = true; scroll.hasHorizontalScroller = false
+        scroll.autohidesScrollers = true; scroll.scrollerStyle = .overlay
+        scroll.scrollerKnobStyle = .default; scroll.borderType = .noBorder; scroll.drawsBackground = false
+    }
+
+    public static func make(_ content: NSView, inset: CGFloat = 16) -> NSScrollView {
+        let scroll = NSScrollView(); install(content, in: scroll, inset: inset); return scroll
+    }
+
     /// Pins width to the clip view; long settings remain vertically reachable.
     public static func install(_ content: NSView, in scroll: NSScrollView, inset: CGFloat = 16) {
         let document = FlippedDocument()
         document.translatesAutoresizingMaskIntoConstraints = false
         content.translatesAutoresizingMaskIntoConstraints = false
         document.addSubview(content); scroll.documentView = document
-        scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true; scroll.drawsBackground = false
+        configure(scroll)
         NSLayoutConstraint.activate([
             document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
             content.leadingAnchor.constraint(equalTo: document.leadingAnchor, constant: inset),
@@ -72,11 +82,12 @@ public enum ScrollContent {
 @MainActor
 public final class FloatingPanel: NSView {
     public let surface = MaterialSurface(.panel, radius: 18)
-    public let scroll = NSScrollView()
+    /// The supplied body owns scrolling; the panel only arranges its viewport.
+    public let body: NSView
     public init(header: NSView, body: NSView, footer: NSView) {
+        self.body = body
         super.init(frame: .zero)
-        for view in [surface, header, scroll, footer] { view.translatesAutoresizingMaskIntoConstraints = false; addSubview(view) }
-        ScrollContent.install(body, in: scroll)
+        for view in [surface, header, body, footer] { view.translatesAutoresizingMaskIntoConstraints = false; addSubview(view) }
         NSLayoutConstraint.activate([
             surface.leadingAnchor.constraint(equalTo: leadingAnchor), surface.trailingAnchor.constraint(equalTo: trailingAnchor),
             surface.topAnchor.constraint(equalTo: topAnchor), surface.bottomAnchor.constraint(equalTo: bottomAnchor),
@@ -84,8 +95,8 @@ public final class FloatingPanel: NSView {
             header.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
             footer.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16), footer.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
             footer.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
-            scroll.leadingAnchor.constraint(equalTo: leadingAnchor), scroll.trailingAnchor.constraint(equalTo: trailingAnchor),
-            scroll.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 12), scroll.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -12)
+            body.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16), body.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
+            body.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 12), body.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -12)
         ])
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
@@ -161,13 +172,13 @@ public final class BatchList: NSScrollView, NSTableViewDataSource, NSTableViewDe
     public var selectedIndex: Int? { entries.indices.contains(table.selectedRow) ? table.selectedRow : nil }
     public init(entries: [BatchEntry] = []) {
         super.init(frame: .zero)
-        table.headerView = nil; table.style = .sourceList; table.rowHeight = 76
+        table.headerView = nil; table.style = .sourceList; table.rowHeight = 76; table.backgroundColor = .clear
         table.allowsMultipleSelection = false; table.allowsEmptySelection = false
         let column = NSTableColumn(identifier: .init("source")); table.addTableColumn(column)
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.dataSource = self; table.delegate = self
         table.setAccessibilityLabel("原始图片列表")
-        documentView = table; hasVerticalScroller = true; autohidesScrollers = true; drawsBackground = false
+        documentView = table; ScrollContent.configure(self)
         update(entries)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }

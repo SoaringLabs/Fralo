@@ -41,6 +41,18 @@ enum LabProbe {
             }
             controller.selectPage(4)
             let scene = controller.scenarioView!
+            controller.state.scenario.count = 100
+            scene.list.update(controller.state.samples.entries(count: 100)); scene.refreshInspector(); scene.render()
+            scene.layoutSubtreeIfNeeded()
+            checks["large_batch_fills_panel"] = scene.list.bounds.height > scene.leftPanel.bounds.height - 160
+            scene.list.select(99); scene.layoutSubtreeIfNeeded()
+            if let table = scene.list.documentView as? NSTableView {
+                checks["large_batch_end_reachable"] = scene.list.selectedIndex == 99 && table.visibleRect.intersects(table.rect(ofRow: 99))
+            }
+            try snapshot(controller.window!.contentView!, to: output.deletingLastPathComponent().appendingPathComponent("large-batch-scroll.png"))
+            snapshots.append("large-batch-scroll.png")
+            controller.state.scenario.count = 3
+            scene.list.update(controller.state.samples.entries(count: 3)); scene.refreshInspector(); scene.render()
             let beforeSize = scene.canvas.image?.size
             scene.toggleSidebar(); scene.layoutSubtreeIfNeeded()
             checks["collapse_preserves_artwork_size"] = beforeSize == scene.canvas.image?.size

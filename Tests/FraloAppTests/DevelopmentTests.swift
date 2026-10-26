@@ -5,6 +5,42 @@ import FraloCore
 @testable import FraloApp
 
 final class DevelopmentTests: XCTestCase {
+    @MainActor func testLargeBatchViewportFillsPanelAndResizes() async {
+        _ = NSApplication.shared
+        let state = DesignLabState(); state.scenario.count = 100
+        let scene = ScenarioWorkbench(state: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1200, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentView = scene
+        var viewportHeights: [CGFloat] = []
+        for height: CGFloat in [600, 900] {
+            window.setContentSize(NSSize(width: 1200, height: height)); scene.layoutSubtreeIfNeeded()
+            viewportHeights.append(scene.list.contentView.bounds.height)
+            XCTAssertGreaterThan(scene.list.frame.height, scene.leftPanel.bounds.height - 160,
+                                 "The source viewport should fill the space between the fixed header and footer")
+        }
+        XCTAssertEqual(viewportHeights[1] - viewportHeights[0], 300, accuracy: 2,
+                       "Growing the panel must grow the source viewport, not leave a fixed-height list")
+        var parent = scene.list.superview; var scrollAncestors = 0
+        while let view = parent { if view is NSScrollView { scrollAncestors += 1 }; parent = view.superview }
+        XCTAssertEqual(scrollAncestors, 0, "The source list must own its single scrolling viewport")
+        scene.list.select(99); XCTAssertEqual(scene.list.selectedIndex, 99)
+        window.close()
+    }
+
+    @MainActor func testShortInspectorContentDoesNotForceOverflow() async throws {
+        _ = NSApplication.shared
+        let state = DesignLabState(); state.scenario.transparent = true
+        let scene = ScenarioWorkbench(state: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1200, height: 650), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; window.contentView = scene; scene.layoutSubtreeIfNeeded()
+        defer { window.close() }
+        func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
+        let scroll = try XCTUnwrap(descendants(scene.rightPanel).compactMap { $0 as? NSScrollView }.first { $0.bounds.height > 0 })
+        let document = try XCTUnwrap(scroll.documentView)
+        XCTAssertLessThanOrEqual(document.frame.height, scroll.contentView.bounds.height + 1,
+                                 "A short device form should not inherit an oversized fixed tab height")
+    }
+
     @MainActor func testExperimentsDoNotChangeConfiguredProductSettings() async throws {
         _ = NSApplication.shared
         let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")

@@ -45,7 +45,9 @@ final class ScenarioWorkbench: NSView {
     init(state: DesignLabState) {
         self.state = state
         list = BatchList(entries: state.samples.entries(count: state.scenario.count, longNames: state.scenario.longNames))
-        super.init(frame: .zero)
+        // The host will resize this preview. Start with valid geometry so AppKit
+        // never solves fixed header/footer insets against zero-sized manual frames.
+        super.init(frame: NSRect(x: 0, y: 0, width: 1100, height: 650))
         wantsLayer = true; sidebarContainer.wantsLayer = true; sidebarContainer.layer?.masksToBounds = true
         workspace.preferences = state.preferences; rail.surface.preferences = state.preferences
         addSubview(workspace); addSubview(sidebarContainer); addSubview(canvas); addSubview(toolbar); addSubview(fixtureLabel)
@@ -67,8 +69,7 @@ final class ScenarioWorkbench: NSView {
         let footer = FraloStyle.stack([ActionButton("添加样例") { [weak self] in
             guard let self else { return }; self.state.scenario.count += 1; self.refreshList()
         }, FraloStyle.text("↑ ↓ 切换 · Esc 返回预览", role: .caption, secondary: true)], spacing: 8)
-        // BatchList owns its scrolling; the panel's body wrapper only pins layout.
-        list.heightAnchor.constraint(greaterThanOrEqualToConstant: 240).isActive = true
+        // The list is the panel viewport, with no second scroll view around it.
         leftPanel = FloatingPanel(header: header, body: list, footer: footer)
         leftPanel.surface.preferences = state.preferences
         sidebarContainer.addSubview(leftPanel); sidebarContainer.addSubview(rail)
@@ -86,6 +87,7 @@ final class ScenarioWorkbench: NSView {
         refreshInspector(); setSidebarVisibility(); render()
         sidebarContainer.isHidden = state.scenario.preview; controls.isHidden = state.scenario.preview
         toolbar.preview.title = state.scenario.preview ? "返回编辑 · Esc" : "成品预览"
+        applyLayout(animated: false)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     override func layout() { super.layout(); applyLayout(animated: false) }
@@ -156,8 +158,8 @@ final class ScenarioWorkbench: NSView {
         }
         mode.preferences = state.preferences; modePicker = mode
         let heading = FraloStyle.stack([mode, FraloStyle.text("样式应用于全部 \(state.scenario.count) 张样例", role: .caption, secondary: true)], spacing: 10)
-        let tabs = InspectorTabs([("设备", deviceControls()), ("背景", backgroundControls()), ("导出", exportControls())])
-        tabs.heightAnchor.constraint(equalToConstant: 540).isActive = true
+        let pages: [(String, NSView)] = [("设备", deviceControls()), ("背景", backgroundControls()), ("导出", exportControls())]
+        let tabs = InspectorTabs(pages.map { ($0.0, ScrollContent.make($0.1, inset: 0)) })
         tabs.selectTabViewItem(at: inspectorIndex)
         tabs.onSelection = { [weak self] in self?.inspectorIndex = $0 }
         let action = ExportAction(count: state.scenario.count)
@@ -165,7 +167,8 @@ final class ScenarioWorkbench: NSView {
         action.onExportCurrent = { [weak self] in self?.feedback.stringValue = "样例动作：导出当前；主按钮仍导出全部" }
         let footer = FraloStyle.stack([FraloStyle.text("布局样例 · \(state.scenario.format == 0 ? "PNG" : "JPEG")", role: .caption, secondary: true), action], spacing: 8)
         rightPanel = FloatingPanel(header: heading, body: tabs, footer: footer)
-        rightPanel.surface.preferences = state.preferences; addSubview(rightPanel)
+        rightPanel.surface.preferences = state.preferences
+        applyLayout(animated: false); addSubview(rightPanel)
         rightPanel.isHidden = state.scenario.preview
         needsLayout = true
     }
@@ -214,7 +217,7 @@ final class ScenarioWorkbench: NSView {
     private func inset(_ view: NSView) -> NSView {
         let wrapper = NSView(); view.translatesAutoresizingMaskIntoConstraints = false; wrapper.addSubview(view)
         NSLayoutConstraint.activate([view.leadingAnchor.constraint(equalTo: wrapper.leadingAnchor, constant: 10), view.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor, constant: -10),
-                                     view.topAnchor.constraint(equalTo: wrapper.topAnchor, constant: 14), view.bottomAnchor.constraint(lessThanOrEqualTo: wrapper.bottomAnchor, constant: -14)])
+                                     view.topAnchor.constraint(equalTo: wrapper.topAnchor, constant: 14), view.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor, constant: -14)])
         return wrapper
     }
     func render() {

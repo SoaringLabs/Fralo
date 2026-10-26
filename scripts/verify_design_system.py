@@ -75,6 +75,7 @@ def verify(debug, release, probe=None, release_app=None):
             'transparent_mode_has_image', 'opaque_accessibility_fallback', 'reduced_motion',
             'minimum_window_has_canvas', 'minimum_window_panels_align',
             'shared_action_controls', 'soft_busy_preserves_width', 'soft_accessibility_roles',
+            'large_batch_fills_panel', 'large_batch_end_reachable',
         }
         observed = report.get('checks', {})
         checks['runtime_probe'] = report.get('passed') is True and all(observed.get(name) is True for name in required)
