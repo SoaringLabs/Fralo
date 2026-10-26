@@ -20,6 +20,15 @@ The CLI checks generate ten PNG fixtures in a temporary directory and isolate
 FRALO_SETTINGS_PATH. They do not require a simulator, private screenshots, network
 access, or changes to your App settings.
 
+## Design-system development
+
+Before changing the workbench, use `scripts/run-design-lab.sh` or the Debug-only
+**开发 → 设计实验室…** menu. The gallery consumes the real `FraloDesignSystem`
+module; new ordinary UI should reuse those roles and controls. Material and
+motion candidates remain experiments until reviewed. See
+[the design system](docs/design-system.md) and
+[development lab](docs/development-lab.md).
+
 ## Changes and feedback
 
 Keep changes focused on a concrete screenshot workflow. Include reproduction

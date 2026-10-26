@@ -6,17 +6,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainController: MainWindowController?
     private var updateController: UpdateController?
     private var pendingURLs: [URL] = []
+    #if FRALO_DEV
+    private let development = DevelopmentEntry()
+    #endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let controller = MainWindowController()
         mainController = controller
+        #if FRALO_DEV
+        if !DevelopmentEntry.labOnly { updateController = UpdateController(mainController: controller) }
+        #else
         updateController = UpdateController(mainController: controller)
+        #endif
         installMenus(controller)
+        #if FRALO_DEV
+        if DevelopmentEntry.labOnly {
+            development.showLab()
+            development.runProbeIfRequested()
+            return
+        }
+        #endif
         controller.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         let paths = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-") }
         controller.importURLs(pendingURLs + paths.map { URL(fileURLWithPath: $0) })
         pendingURLs.removeAll()
+        #if FRALO_DEV
+        if CommandLine.arguments.contains("--design-lab") { development.showLab() }
+        #endif
     }
     func application(_ sender: NSApplication, openFiles filenames: [String]) {
         let urls = filenames.map { URL(fileURLWithPath: $0) }
@@ -86,6 +103,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let window = NSMenu(title: "窗口"); let windowItem = NSMenuItem(title: "窗口", action: nil, keyEquivalent: ""); windowItem.submenu = window; bar.addItem(windowItem)
         window.addItem(withTitle: "最小化", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
         window.addItem(withTitle: "缩放", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        #if FRALO_DEV
+        development.install(in: bar, mainWindow: controller.window)
+        #endif
         NSApp.mainMenu = bar; NSApp.windowsMenu = window
     }
 
