@@ -19,7 +19,6 @@ final class CompositionInspector: NSView {
     private let backgroundSection = NSStackView()
     private let backgroundType: ValuePicker
     private let artwork = InspectorArtwork()
-    private var input: ImageInput?
     private weak var modelCards: VisualChoiceGroup?
     private weak var orientationCards: VisualChoiceGroup?
     private weak var backgroundCards: VisualChoiceGroup?
@@ -63,9 +62,8 @@ final class CompositionInspector: NSView {
         settings = value; mode.selectedIndex = value.mode == .transparent ? 0 : 1
     }
     func chooseCanvas(_ value: CanvasRatio) { edit { $0.canvas = value }; rebuildBackground() }
-    func setInput(_ value: ImageInput?) { input = value; refreshArtwork() }
     private func refreshArtwork() {
-        artwork.load(input, display: settings.display) { [weak self] result in
+        artwork.load(display: settings.display) { [weak self] result in
             guard let self else { return }
             let frames = result.frames.map { cg in cg.map { NSImage(cgImage: $0, size: NSSize(width: $0.width, height: $0.height)) } }
             self.modelCards?.setImages(frames)

@@ -9,7 +9,7 @@ public final class MaterialSurface: NSView {
     public let contentView = NSView()
     private var nativeGlass: NSView?
     private let fallbackView = NSView()
-    private let panelTint = NSView()
+    let panelTint = NSView()
     private var observer: NSObjectProtocol?
     public var preferences = DesignPreferences() { didSet { refresh() } }
     public var cornerRadius: CGFloat = 0 { didSet { refresh() } }
@@ -24,7 +24,7 @@ public final class MaterialSurface: NSView {
         effect.material = role == .workspace ? .underWindowBackground : .sidebar
         effect.blendingMode = role == .workspace ? .behindWindow : .withinWindow
         effect.state = .followsWindowActiveState
-        for view in [effect, panelTint] {
+        for view in [effect] {
             view.translatesAutoresizingMaskIntoConstraints = false; addSubview(view)
             NSLayoutConstraint.activate([view.leadingAnchor.constraint(equalTo: leadingAnchor), view.trailingAnchor.constraint(equalTo: trailingAnchor),
                                          view.topAnchor.constraint(equalTo: topAnchor), view.bottomAnchor.constraint(equalTo: bottomAnchor)])
@@ -43,6 +43,9 @@ public final class MaterialSurface: NSView {
         } else { addSubview(contentView); host = self }
         NSLayoutConstraint.activate([contentView.leadingAnchor.constraint(equalTo: host.leadingAnchor), contentView.trailingAnchor.constraint(equalTo: host.trailingAnchor),
             contentView.topAnchor.constraint(equalTo: host.topAnchor), contentView.bottomAnchor.constraint(equalTo: host.bottomAnchor)])
+        panelTint.translatesAutoresizingMaskIntoConstraints = false; contentView.addSubview(panelTint)
+        NSLayoutConstraint.activate([panelTint.leadingAnchor.constraint(equalTo: contentView.leadingAnchor), panelTint.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            panelTint.topAnchor.constraint(equalTo: contentView.topAnchor), panelTint.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)])
         fallbackView.translatesAutoresizingMaskIntoConstraints = false; contentView.addSubview(fallbackView)
         NSLayoutConstraint.activate([fallbackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor), fallbackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             fallbackView.topAnchor.constraint(equalTo: contentView.topAnchor), fallbackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)])
@@ -64,7 +67,7 @@ public final class MaterialSurface: NSView {
             layer?.borderWidth = role == .panel ? (preferences.effectiveIncreaseContrast ? 1 : 0.5) : 0
             fallbackView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
             fallbackView.layer?.cornerRadius = cornerRadius
-            panelTint.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.82).cgColor
+            panelTint.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.82).cgColor
         }
         if #available(macOS 26.0, *), let glass = nativeGlass as? NSGlassEffectView {
             glass.cornerRadius = cornerRadius
@@ -84,13 +87,13 @@ public final class FlippedDocument: NSView {
 @MainActor
 public enum ScrollContent {
     public static func configure(_ scroll: NSScrollView) {
-        scroll.hasVerticalScroller = true; scroll.hasHorizontalScroller = false
+        scroll.hasVerticalScroller = !(scroll is PanelScrollView); scroll.hasHorizontalScroller = false
         scroll.autohidesScrollers = true; scroll.scrollerStyle = .overlay
         scroll.scrollerKnobStyle = .default; scroll.borderType = .noBorder; scroll.drawsBackground = false
     }
 
     public static func make(_ content: NSView, inset: CGFloat = 16) -> NSScrollView {
-        let scroll = NSScrollView(); install(content, in: scroll, inset: inset); return scroll
+        let scroll = PanelScrollView(frame: .zero); install(content, in: scroll, inset: inset); return scroll
     }
 
     /// Pins width to the clip view; long settings remain vertically reachable.
@@ -220,7 +223,27 @@ public final class ThumbnailRow: NSTableCellView {
 @MainActor
 private final class BatchNavigationTable: NSTableView {
     var onDelete: (() -> Void)?
+    override func becomeFirstResponder() -> Bool {
+        if NSApp.currentEvent?.type == .keyDown { focusRingType = .exterior }
+        return super.becomeFirstResponder()
+    }
+    override func mouseDown(with event: NSEvent) { focusRingType = .none; super.mouseDown(with: event) }
+    override func rightMouseDown(with event: NSEvent) {
+        let row = row(at: convert(event.locationInWindow, from: nil))
+        guard row >= 0, let menu else { return }
+        focusRingType = .none
+        selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+        window?.makeFirstResponder(self)
+        // Avoid NSTableView's extra contextual-row highlight over the selected card.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.window != nil else { return }
+            NSMenu.popUpContextMenu(menu, with: event, for: self)
+        }
+    }
+    override var focusRingMaskBounds: NSRect { selectedRow >= 0 ? rect(ofRow: selectedRow).insetBy(dx: 1, dy: 5) : .zero }
+    override func drawFocusRingMask() { NSBezierPath(roundedRect: focusRingMaskBounds, xRadius: 11, yRadius: 11).fill() }
     override func keyDown(with event: NSEvent) {
+        focusRingType = .exterior
         if (event.keyCode == 51 || event.keyCode == 117), let onDelete { onDelete() }
         else { super.keyDown(with: event) }
     }
@@ -245,7 +268,7 @@ private final class BatchSelectionRow: NSTableRowView {
 }
 
 @MainActor
-public final class BatchList: NSScrollView, NSTableViewDataSource, NSTableViewDelegate {
+public final class BatchList: PanelScrollView, NSTableViewDataSource, NSTableViewDelegate {
     private let table = BatchNavigationTable()
     private var updating = false
     private let compact: Bool
@@ -292,7 +315,7 @@ public final class BatchList: NSScrollView, NSTableViewDataSource, NSTableViewDe
     public func numberOfRows(in tableView: NSTableView) -> Int { entries.count }
     public func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? { ThumbnailRow(entry: entries[row], compact: compact) }
     public func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? { BatchSelectionRow() }
-    public func tableViewSelectionDidChange(_ notification: Notification) { if !updating, let selectedIndex { onSelection?(selectedIndex) } }
+    public func tableViewSelectionDidChange(_ notification: Notification) { table.noteFocusRingMaskChanged(); if !updating, let selectedIndex { onSelection?(selectedIndex) } }
 }
 
 @MainActor
@@ -395,21 +418,39 @@ public final class CanvasSurface: NSView {
 public final class ViewToolbar: NSView {
     public let surface = MaterialSurface(.panel, radius: 18)
     public let zoom = ChoiceMenu(["适应窗口", "100%", "50%"], label: "查看倍率")
-    public let dimensions = FraloStyle.text("2400 × 1800", role: .detail, secondary: true)
+    public let dimensions = FraloStyle.text("—", role: .detail, secondary: true)
     public let composition = ChoiceMenu(["4:3"], label: "画布比例")
-    public var showsComposition = false { didSet { composition.isHidden = !showsComposition; dimensions.isHidden = showsComposition } }
+    private let statusHost = NSView()
+    private let progress = NSProgressIndicator()
+    private let activity: NSStackView
+    private var pendingActivity: DispatchWorkItem?
+    private var activityVersion = 0
+    public private(set) var isUpdatingPreview = false
+    public var showsComposition = false { didSet { composition.isHidden = !showsComposition; statusHost.isHidden = showsComposition } }
     public let preview = ActionButton("成品预览", role: .quiet, symbol: "photo")
     public init() {
+        activity = FraloStyle.stack([progress, FraloStyle.text("更新预览…", role: .detail, secondary: true)], axis: .horizontal, spacing: 6)
         super.init(frame: .zero)
         surface.translatesAutoresizingMaskIntoConstraints = false; addSubview(surface)
         zoom.showsSurface = false; composition.showsSurface = false; composition.isHidden = true
         zoom.leadingSymbol = "display"
+        progress.style = .spinning; progress.controlSize = .small; progress.isDisplayedWhenStopped = true
+        progress.setAccessibilityLabel("正在更新预览")
+        progress.widthAnchor.constraint(equalToConstant: 14).isActive = true
+        progress.heightAnchor.constraint(equalToConstant: 14).isActive = true
+        activity.isHidden = true
+        for view in [dimensions, activity] {
+            view.translatesAutoresizingMaskIntoConstraints = false; statusHost.addSubview(view)
+            NSLayoutConstraint.activate([view.centerXAnchor.constraint(equalTo: statusHost.centerXAnchor), view.centerYAnchor.constraint(equalTo: statusHost.centerYAnchor), view.widthAnchor.constraint(lessThanOrEqualTo: statusHost.widthAnchor)])
+        }
+        statusHost.widthAnchor.constraint(equalToConstant: 128).isActive = true
+        statusHost.heightAnchor.constraint(equalToConstant: 28).isActive = true
         func divider() -> NSView {
             let view = NSView(); view.wantsLayer = true; view.layer?.backgroundColor = NSColor.separatorColor.withAlphaComponent(0.4).cgColor
             view.widthAnchor.constraint(equalToConstant: 1).isActive = true; view.heightAnchor.constraint(equalToConstant: 22).isActive = true
             return view
         }
-        let row = FraloStyle.stack([zoom, divider(), dimensions, composition, divider(), preview], axis: .horizontal, spacing: 10)
+        let row = FraloStyle.stack([zoom, divider(), statusHost, composition, divider(), preview], axis: .horizontal, spacing: 10)
         row.translatesAutoresizingMaskIntoConstraints = false; surface.contentView.addSubview(row)
         NSLayoutConstraint.activate([
             surface.leadingAnchor.constraint(equalTo: leadingAnchor), surface.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -419,6 +460,25 @@ public final class ViewToolbar: NSView {
         ])
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+    deinit { pendingActivity?.cancel() }
+    public func beginPreviewUpdate() {
+        pendingActivity?.cancel(); activityVersion += 1
+        guard !isUpdatingPreview else { return }
+        let version = activityVersion
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.activityVersion == version else { return }
+                self.isUpdatingPreview = true; self.activity.isHidden = false; self.dimensions.isHidden = true
+                if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion { self.progress.startAnimation(nil) }
+            }
+        }
+        pendingActivity = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: work)
+    }
+    public func finishPreviewUpdate() {
+        pendingActivity?.cancel(); pendingActivity = nil; activityVersion += 1
+        isUpdatingPreview = false; progress.stopAnimation(nil); activity.isHidden = true; dimensions.isHidden = false
+    }
 }
 
 @MainActor

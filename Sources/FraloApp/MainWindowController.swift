@@ -29,7 +29,6 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private let emptyAction = ActionButton("添加图片", role: .primary, symbol: "plus")
     private let emptyMessage = label("拖入截图，开始套框", size: 22, weight: .semibold)
     private let emptyDetail = label("PNG / JPEG · 支持批量导入", secondary: true)
-    private let previewSpinner = NSProgressIndicator()
     private let footer = NSView()
     private var fitMenu: NSPopUpButton { viewing.zoom }
     private let dimensions = FraloStyle.text("尚无成品", role: .detail, secondary: true)
@@ -150,9 +149,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
             empty.leadingAnchor.constraint(equalTo: center.view.leadingAnchor), empty.trailingAnchor.constraint(equalTo: center.view.trailingAnchor), empty.topAnchor.constraint(equalTo: center.view.topAnchor), empty.bottomAnchor.constraint(equalTo: center.view.bottomAnchor),
             emptyContent.centerXAnchor.constraint(equalTo: empty.centerXAnchor), emptyContent.centerYAnchor.constraint(equalTo: empty.centerYAnchor)
         ])
-        previewSpinner.style = .spinning; previewSpinner.controlSize = .small; previewSpinner.isDisplayedWhenStopped = false
-        previewSpinner.translatesAutoresizingMaskIntoConstraints = false; center.view.addSubview(previewSpinner)
-        NSLayoutConstraint.activate([previewSpinner.trailingAnchor.constraint(equalTo: center.view.trailingAnchor, constant: -22), previewSpinner.topAnchor.constraint(equalTo: center.view.topAnchor, constant: 18)])
+
     }
 
     private func buildInspector() -> NSView {
@@ -354,19 +351,17 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private func requestPreview() {
         previewRequest += 1; renderWork?.cancel(); rendered = nil; renderedID = nil
         guard let index = selectedIndex else {
-            inspectorUI.setInput(nil)
             canvas.image = nil; empty.isHidden = false; emptyMessage.stringValue = "拖入截图，开始套框"
             emptyAction.title = "添加图片"; emptyAction.onPress = { [weak self] in self?.addImages(nil) }
             emptyDetail.stringValue = "PNG / JPEG · 支持批量导入"
             previewScroll.isHidden = true; footer.isHidden = true; filename.stringValue = ""; position.stringValue = ""
-            window?.title = "Fralo"; documentTitle.stringValue = "Fralo"; dimensions.stringValue = "尚无成品"; inspectorUI.sourceInfo.stringValue = "尚未选择图片"; inspectorUI.outputInfo.stringValue = "—"; previewSpinner.stopAnimation(nil); updateActions(); return
+            window?.title = "Fralo"; documentTitle.stringValue = "Fralo"; dimensions.stringValue = "尚无成品"; inspectorUI.sourceInfo.stringValue = "尚未选择图片"; inspectorUI.outputInfo.stringValue = "—"; viewing.finishPreviewUpdate(); updateActions(); return
         }
         let input = items[index].input, snapshot = settings, generation = previewRequest
-        inspectorUI.setInput(input)
         window?.title = input.name; filename.stringValue = input.name; position.stringValue = "\(index + 1) / \(items.count)"
         documentTitle.stringValue = input.name
         empty.isHidden = true; previewScroll.isHidden = false; footer.isHidden = false
-        previewSpinner.startAnimation(nil); updateActions()
+        viewing.beginPreviewUpdate(); updateActions()
         let work = DispatchWorkItem { [weak self] in
             let result = autoreleasepool { Result { () -> (RenderedComposition, CGImage, CGSize, CGSize?) in
                 let backdrop = try CompositionRenderer.backgroundData(snapshot)
@@ -376,7 +371,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
             } }
             DispatchQueue.main.async {
                 guard let self, self.previewRequest == generation else { return }
-                self.previewSpinner.stopAnimation(nil)
+                self.viewing.finishPreviewUpdate()
                 switch result {
                 case .success(let (frame, display, sourceSize, backgroundSize)):
                     self.backgroundImageSize = backgroundSize

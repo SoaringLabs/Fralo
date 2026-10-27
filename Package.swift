@@ -18,6 +18,7 @@ let package = Package(
         .target(name: "FraloDesignSystem"),
         .executableTarget(name: "FraloApp", dependencies: ["FraloCore", "FraloDesignSystem", .product(name: "Sparkle", package: "Sparkle")],
                           exclude: ["Development/Fixtures"],
+                          resources: [.copy("Resources")],
                           swiftSettings: [.define("FRALO_DEV", .when(configuration: .debug))],
                           linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]),
         .executableTarget(name: "FraloCLI", dependencies: ["FraloCore"]),

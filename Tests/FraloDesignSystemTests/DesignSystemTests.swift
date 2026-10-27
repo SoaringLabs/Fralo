@@ -3,6 +3,43 @@ import XCTest
 @testable import FraloDesignSystem
 
 final class DesignSystemTests: XCTestCase {
+    @MainActor func testPanelIndicatorScrollsAndReservesAStableGutter() async {
+        _ = NSApplication.shared
+        final class FlippedDocument: NSView { override var isFlipped: Bool { true } }
+        let scroll = PanelScrollView(frame: NSRect(x: 0, y: 0, width: 320, height: 240))
+        let document = FlippedDocument(frame: NSRect(x: 0, y: 0, width: 308, height: 1000))
+        scroll.documentView = document; scroll.tile()
+        let width = scroll.contentView.bounds.width
+        XCTAssertFalse(scroll.positionIndicator.isHidden)
+        XCTAssertTrue(scroll.positionIndicator.isEnabled)
+        scroll.positionIndicator.doubleValue = 0.75
+        scroll.positionIndicator.sendAction(scroll.positionIndicator.action, to: scroll)
+        XCTAssertEqual(scroll.contentView.bounds.minY, 570, accuracy: 1)
+        for height: CGFloat in [100, 1200, 150, 1000] {
+            document.setFrameSize(NSSize(width: width, height: height)); scroll.tile()
+            XCTAssertEqual(scroll.contentView.bounds.width, width)
+            XCTAssertEqual(scroll.positionIndicator.isHidden, height <= 240)
+            XCTAssertEqual(scroll.positionIndicator.isEnabled, height > 240)
+        }
+    }
+
+    @MainActor func testPreviewActivityIsDelayedCancelledAndKeepsToolbarGeometry() async throws {
+        let toolbar = ViewToolbar(); toolbar.frame = NSRect(x: 0, y: 0, width: 420, height: 48)
+        toolbar.layoutSubtreeIfNeeded()
+        let before = toolbar.preview.frame
+        toolbar.beginPreviewUpdate(); toolbar.finishPreviewUpdate()
+        try await Task.sleep(nanoseconds: 230_000_000)
+        XCTAssertFalse(toolbar.isUpdatingPreview, "A fast render must not flash a stale loading indicator")
+        toolbar.beginPreviewUpdate()
+        try await Task.sleep(nanoseconds: 230_000_000)
+        toolbar.layoutSubtreeIfNeeded()
+        XCTAssertTrue(toolbar.isUpdatingPreview)
+        XCTAssertEqual(toolbar.preview.frame, before, "Showing progress must not shift toolbar actions")
+        toolbar.beginPreviewUpdate(); toolbar.finishPreviewUpdate()
+        try await Task.sleep(nanoseconds: 230_000_000)
+        XCTAssertFalse(toolbar.isUpdatingPreview)
+    }
+
     @MainActor func testActionButtonBusyPreservesWidthAndRequestedAvailability() async {
         _ = NSApplication.shared
         var presses = 0

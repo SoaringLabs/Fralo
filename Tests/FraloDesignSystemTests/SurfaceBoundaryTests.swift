@@ -7,7 +7,7 @@ final class SurfaceBoundaryTests: XCTestCase {
     @MainActor func testPanelKeepsItsBackingAndDoesNotAnimateAsAnInteractiveControl() async throws {
         _ = NSApplication.shared
         let panel = MaterialSurface(.panel, radius: 24)
-        let backing = try XCTUnwrap(panel.subviews.dropFirst().first)
+        let backing = panel.panelTint
         XCTAssertFalse(backing.isHidden)
         for name: NSAppearance.Name in [.aqua, .darkAqua] {
             panel.appearance = NSAppearance(named: name); panel.refresh()

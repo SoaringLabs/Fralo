@@ -245,6 +245,8 @@ public final class ExportAction: NSStackView {
         super.init(frame: .zero)
         orientation = .horizontal; alignment = .centerY; spacing = 0; distribution = .fill
         wantsLayer = true; layer?.cornerRadius = 11
+        // Keep custom-drawn button content in its own backing when the window loses focus.
+        primary.wantsLayer = true; disclosure.wantsLayer = true
         primary.drawsSurface = false; disclosure.drawsSurface = false
         let divider = NSView(); divider.wantsLayer = true; divider.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.22).cgColor
         addArrangedSubview(primary); addArrangedSubview(divider); addArrangedSubview(disclosure)
