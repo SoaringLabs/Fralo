@@ -5,6 +5,37 @@ import FraloDesignSystem
 @testable import FraloApp
 
 final class PanelPolishTests: XCTestCase {
+    @MainActor func testNativeHeaderAndShadowChangesKeepThePreviewScaleStable() async throws {
+        _ = NSApplication.shared
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let suite = "fralo-header-shadow-\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        let controller = MainWindowController(store: SettingsStore(url: directory.appendingPathComponent("settings.json")), preferences: defaults, restoreWindow: false)
+        defer { controller.window?.close(); defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: directory) }
+        let window = try XCTUnwrap(controller.window)
+        XCTAssertEqual(window.titleVisibility, .visible); XCTAssertFalse(window.titlebarAppearsTransparent)
+        XCTAssertEqual(window.toolbarStyle, .unified)
+        window.setContentSize(NSSize(width: 1400, height: 1000))
+        let root = try XCTUnwrap(window.contentView as? WorkbenchView)
+        func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
+        let shadow = try XCTUnwrap(descendants(root).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == "阴影" })
+        let canvas = try XCTUnwrap(descendants(root).compactMap { $0 as? CanvasSurface }.first)
+        let context = try XCTUnwrap(CGContext(data: nil, width: 400, height: 800, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.setFillColor(CGColor(srgbRed: 0.1, green: 0.4, blue: 0.3, alpha: 1)); context.fill(CGRect(x: 0, y: 0, width: 400, height: 800))
+        let file = directory.appendingPathComponent("shadow.png"); try FrameRenderer.pngData(XCTUnwrap(context.makeImage())).write(to: file)
+        controller.importURLs([file])
+        for _ in 0..<150 where canvas.image == nil { try await Task.sleep(nanoseconds: 20_000_000) }
+        root.layoutSubtreeIfNeeded()
+        let initial = try XCTUnwrap(canvas.zoom)
+        for index in [1, 2, 0] {
+            let previous = canvas.image; shadow.choose(index)
+            for _ in 0..<150 where canvas.image === previous { try await Task.sleep(nanoseconds: 20_000_000) }
+            root.layoutSubtreeIfNeeded()
+            XCTAssertEqual(try XCTUnwrap(canvas.zoom), initial, accuracy: 0.0001, "Shadow padding must not rescale the device in fit-to-window preview")
+        }
+    }
+
     @MainActor func testInspectorWidthStaysFixedWhenLongSettingsNeedScrolling() async throws {
         _ = NSApplication.shared
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -83,6 +114,18 @@ final class PanelPolishTests: XCTestCase {
         for _ in 0..<150 where canvas.image === first { try await Task.sleep(nanoseconds: 20_000_000) }
         XCTAssertFalse(canvas.image === first, "The real preview still follows the selected input")
         XCTAssertEqual(try illustration(), before, "The inspector demo must not follow the selected input")
+        let inspector = try XCTUnwrap(root.right.body as? CompositionInspector)
+        XCTAssertTrue(inspector.calculateSize.isEnabled)
+        inspector.calculateSize.performClick(nil)
+        for _ in 0..<150 where !inspector.outputSize.stringValue.hasPrefix("预计 ") { try await Task.sleep(nanoseconds: 20_000_000) }
+        XCTAssertTrue(inspector.outputSize.stringValue.hasPrefix("预计 "))
+        XCTAssertTrue(inspector.calculateSize.isHidden, "Retain the computed count until input or settings change")
+        let compression = try XCTUnwrap(descendants(inspector).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == "PNG 压缩" })
+        let previous = canvas.image; compression.choose(1)
+        for _ in 0..<250 where canvas.image === previous { try await Task.sleep(nanoseconds: 20_000_000) }
+        XCTAssertFalse(inspector.settings.pngLossless)
+        XCTAssertFalse(canvas.image === previous)
+        XCTAssertTrue(inspector.outputSize.stringValue.hasPrefix("预计 "), "Reuse PNG preview encoding to report bytes without another render")
     }
 
 }

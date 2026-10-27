@@ -57,7 +57,11 @@ public final class VisualChoiceGroup: NSControl {
             card.frame = NSRect(x: CGFloat(index % columns) * (width + 8), y: CGFloat(index / columns) * (rowHeight + 8), width: width, height: rowHeight)
         }
     }
-    @objc private func pressed(_ sender: NSButton) { window?.makeFirstResponder(self); choose(sender.tag) }
+    @objc private func pressed(_ sender: NSButton) { focusRingType = .none; window?.makeFirstResponder(self); choose(sender.tag) }
+    public override func becomeFirstResponder() -> Bool {
+        if NSApp.currentEvent?.type == .keyDown { focusRingType = .exterior }
+        return super.becomeFirstResponder()
+    }
     public func choose(_ index: Int) { guard isEnabled else { return }; select(index, notify: true) }
     private func select(_ index: Int?, notify: Bool) {
         if let index, !cards.indices.contains(index) { return }
@@ -66,12 +70,13 @@ public final class VisualChoiceGroup: NSControl {
             card.chosen = i == index; card.state = i == index ? .on : .off
             card.setAccessibilityValue(i == index ? 1 : 0)
         }
-        needsDisplay = true
+        needsDisplay = true; noteFocusRingMaskChanged()
         if changed { NSAccessibility.post(element: self, notification: .valueChanged) }
         if changed && notify, let index { onChange?(index); sendAction(action, to: target) }
     }
     public override func keyDown(with event: NSEvent) {
         guard isEnabled else { return }
+        focusRingType = .exterior
         let current = selection ?? 0
         switch event.keyCode {
         case 48:

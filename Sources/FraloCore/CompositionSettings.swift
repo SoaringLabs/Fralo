@@ -52,13 +52,47 @@ public struct CompositionSettings: Codable, Equatable, Sendable {
     public var backgroundShadow: ShadowStyle = .soft
     public var format: ImageFormat = .png
     public var jpegQuality = 0.9
+    public var pngLossless = true
+    public var pngQuality = 0.85
     public var jpegFill = ArtworkColor(1, 1, 1)
     public var shadow: ShadowStyle { mode == .transparent ? transparentShadow : backgroundShadow }
     public init() {}
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, display, orientation, browser, windowRatio, mode, canvas, deviceScale, deviceX, deviceY, deviceOpacity, background, backgroundColor, localBackgroundPath, backgroundScale, backgroundX, backgroundY, backgroundOpacity, transparentShadow, backgroundShadow, format, jpegQuality, jpegFill, pngLossless, pngQuality
+    }
+    public init(from decoder: Decoder) throws {
+        self.init()
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try values.decode(Int.self, forKey: .schemaVersion)
+        display = try values.decode(DisplayKind.self, forKey: .display)
+        orientation = try values.decode(Orientation.self, forKey: .orientation)
+        browser = try values.decode(BrowserStyle.self, forKey: .browser)
+        windowRatio = try values.decode(WindowRatio.self, forKey: .windowRatio)
+        mode = try values.decode(CompositionMode.self, forKey: .mode)
+        canvas = try values.decode(CanvasRatio.self, forKey: .canvas)
+        deviceScale = try values.decode(Double.self, forKey: .deviceScale)
+        deviceX = try values.decode(Double.self, forKey: .deviceX)
+        deviceY = try values.decode(Double.self, forKey: .deviceY)
+        deviceOpacity = try values.decode(Double.self, forKey: .deviceOpacity)
+        background = try values.decode(BackgroundKind.self, forKey: .background)
+        backgroundColor = try values.decode(ArtworkColor.self, forKey: .backgroundColor)
+        localBackgroundPath = try values.decodeIfPresent(String.self, forKey: .localBackgroundPath)
+        backgroundScale = try values.decode(Double.self, forKey: .backgroundScale)
+        backgroundX = try values.decode(Double.self, forKey: .backgroundX)
+        backgroundY = try values.decode(Double.self, forKey: .backgroundY)
+        backgroundOpacity = try values.decode(Double.self, forKey: .backgroundOpacity)
+        transparentShadow = try values.decode(ShadowStyle.self, forKey: .transparentShadow)
+        backgroundShadow = try values.decode(ShadowStyle.self, forKey: .backgroundShadow)
+        format = try values.decode(ImageFormat.self, forKey: .format)
+        jpegQuality = try values.decode(Double.self, forKey: .jpegQuality)
+        jpegFill = try values.decode(ArtworkColor.self, forKey: .jpegFill)
+        pngLossless = try values.decodeIfPresent(Bool.self, forKey: .pngLossless) ?? true
+        pngQuality = try values.decodeIfPresent(Double.self, forKey: .pngQuality) ?? 0.85
+    }
     public func validated() throws -> Self {
         let values: [(Double, ClosedRange<Double>)] = [(deviceScale, 0.1...1.5), (deviceX, -1...1), (deviceY, -1...1),
             (deviceOpacity, 0...1), (backgroundScale, 1...4), (backgroundX, -1...1), (backgroundY, -1...1),
-            (backgroundOpacity, 0...1), (jpegQuality, 0.1...1)]
+            (backgroundOpacity, 0...1), (jpegQuality, 0.1...1), (pngQuality, 0.1...1)]
         guard schemaVersion == 1, values.allSatisfy({ $0.0.isFinite && $0.1.contains($0.0) }), backgroundColor.isValid, jpegFill.isValid else {
             throw FraloError.message("成图配置包含不支持的版本或无效数值。")
         }

@@ -7,10 +7,17 @@ import UniformTypeIdentifiers
 public struct RenderedComposition {
     public let image: CGImage
     public let pixelSize: CGSize
+    /// A stable fit-to-window envelope, independent of the selected shadow's export padding.
+    public let previewReferenceSize: CGSize
+    init(image: CGImage, pixelSize: CGSize, previewReferenceSize: CGSize? = nil) {
+        self.image = image; self.pixelSize = pixelSize; self.previewReferenceSize = previewReferenceSize ?? pixelSize
+    }
 }
 
 /// Deterministic image assembly. Never inspects screenshot content or changes its crop.
 public enum CompositionRenderer {
+    private static let strongestShadowBlur: CGFloat = 42
+    private static let shadowOffsetY: CGFloat = 12
     public static func backgroundData(_ settings: CompositionSettings) throws -> Data? {
         guard settings.mode == .background else { return nil }
         let name: String
@@ -41,8 +48,8 @@ public enum CompositionRenderer {
         case .tablet, .browser:
             let frame = try shell(input, settings: settings, maxDimension: limit); device = frame.image; nativeSize = frame.pixelSize
         }
-        let blur: CGFloat = settings.shadow == .none ? 0 : settings.shadow == .soft ? 24 : 42
-        let shadowOffset: CGFloat = settings.shadow == .none ? 0 : 12
+        let blur: CGFloat = settings.shadow == .none ? 0 : settings.shadow == .soft ? 24 : strongestShadowBlur
+        let shadowOffset: CGFloat = settings.shadow == .none ? 0 : shadowOffsetY
         let margin = ceil(blur * 3 + shadowOffset)
         let size = settings.mode == .background ? settings.canvas.size : CGSize(width: nativeSize.width + margin * 2, height: nativeSize.height + margin * 2)
         let reduction = maxDimension.map { min(1, CGFloat($0) / max(size.width, size.height)) } ?? 1
@@ -78,7 +85,9 @@ public enum CompositionRenderer {
         if blur > 0 { context.setShadow(offset: CGSize(width: 0, height: shadowOffset), blur: blur, color: CGColor(srgbRed: 0, green: 0, blue: 0, alpha: settings.shadow == .strong ? 0.4 : 0.23)) }
         draw(device, in: rect, context: context); context.restoreGState()
         guard let image = context.makeImage() else { throw FraloError.message("无法合成成品。") }
-        return RenderedComposition(image: image, pixelSize: size)
+        let maximumMargin = ceil(strongestShadowBlur * 3 + shadowOffsetY)
+        let reference = settings.mode == .background ? size : CGSize(width: nativeSize.width + maximumMargin * 2, height: nativeSize.height + maximumMargin * 2)
+        return RenderedComposition(image: image, pixelSize: size, previewReferenceSize: reference)
     }
 
     public static func panBackground(_ settings: inout CompositionSettings, delta: CGPoint, imageSize: CGSize) {
@@ -97,7 +106,9 @@ public enum CompositionRenderer {
         return context.makeImage()!
     }
     public static func data(_ image: CGImage, settings: CompositionSettings) throws -> Data {
-        if settings.format == .png { return try FrameRenderer.pngData(image) }
+        if settings.format == .png {
+            return try settings.pngLossless ? FrameRenderer.pngData(image) : PNGPaletteEncoder.data(image, quality: settings.pngQuality)
+        }
         let flattened = try Self.flattened(image, color: settings.jpegFill)
         let bytes = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(bytes, UTType.jpeg.identifier as CFString, 1, nil) else { throw FraloError.message("无法创建 JPEG。") }

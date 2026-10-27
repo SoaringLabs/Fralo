@@ -13,16 +13,20 @@ final class CompositionInspector: NSView {
     let exportSettings = NSStackView()
     let sourceInfo = FraloStyle.text("尚未选择图片", role: .detail, secondary: true)
     let outputInfo = FraloStyle.text("—", role: .detail, secondary: true)
+    let outputSize = FraloStyle.text("尚未计算文件大小", role: .detail, secondary: true)
+    let calculateSize = ActionButton("计算当前大小", role: .quiet)
     var dragBackground = false
     private weak var dragToggle: ToggleControl?
     private let deviceDetails = NSView(), backgroundDetails = NSView(), exportDetails = NSView()
     private let backgroundSection = NSStackView()
     private let backgroundType: ValuePicker
+    private let pngCompression: ValuePicker
     private let artwork = InspectorArtwork()
     private weak var modelCards: VisualChoiceGroup?
     private weak var orientationCards: VisualChoiceGroup?
     private weak var backgroundCards: VisualChoiceGroup?
     private var editingEnabled = true
+    private var previewReady = false
 
     init(settings: CompositionSettings) {
         self.settings = settings
@@ -30,6 +34,7 @@ final class CompositionInspector: NSView {
         devicePicker = ValuePicker(["手机", "平板", "浏览器"], label: "展示类型", selected: DisplayKind.allCases.firstIndex(of: settings.display)!)
         formatPicker = ValuePicker(["PNG", "JPEG"], label: "文件格式", selected: settings.format == .png ? 0 : 1)
         backgroundType = ValuePicker(["纯色", "渐变", "图片"], label: "背景类型")
+        pngCompression = ValuePicker(["无损", "减色压缩"], label: "PNG 压缩", selected: settings.pngLossless ? 0 : 1)
         mode.controlHeight = 36
         super.init(frame: NSRect(x: 0, y: 0, width: 250, height: 500))
         mode.onChange = { [weak self] index in
@@ -46,9 +51,13 @@ final class CompositionInspector: NSView {
             self?.edit { $0.background = index == 0 ? .solid : index == 1 ? .gradient : .warm }
             self?.stopBackgroundDrag(); self?.rebuildBackground()
         }
+        pngCompression.onChange = { [weak self] index in
+            self?.edit { $0.pngLossless = index == 0 }; self?.rebuildExport()
+        }
         configure(backgroundSection, views: [FraloStyle.text("背景与画布", role: .heading), backgroundType, backgroundDetails])
         let deviceSection = FormSection("设备", views: [devicePicker, deviceDetails])
-        configure(exportSettings, views: [FraloStyle.text("导出", role: .heading), formatPicker, exportDetails, outputInfo])
+        let sizeRow = FraloStyle.stack([outputSize, calculateSize], axis: .horizontal, spacing: 8)
+        configure(exportSettings, views: [FraloStyle.text("导出", role: .heading), formatPicker, exportDetails, outputInfo, sizeRow])
         outputInfo.alignment = .center
         let body = FraloStyle.stack([deviceSection, backgroundSection, FraloStyle.divider(), exportSettings], spacing: 24, fillWidth: true)
         let scroll = ScrollContent.make(body, inset: 0)
@@ -58,6 +67,13 @@ final class CompositionInspector: NSView {
         rebuildDevice(); rebuildBackground(); rebuildExport()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+    func showOutputSize(_ count: Int?, busy: Bool = false) {
+        outputSize.stringValue = count.map { "预计 " + ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) } ?? (busy ? "正在计算…" : "尚未计算文件大小")
+        calculateSize.isBusy = busy; calculateSize.isHidden = count != nil
+    }
+    func setPreviewReady(_ ready: Bool) {
+        previewReady = ready; calculateSize.isEnabled = editingEnabled && ready
+    }
     func set(_ value: CompositionSettings) {
         // Artwork dragging updates positions only; selection controls keep their identity and focus.
         settings = value; mode.selectedIndex = value.mode == .transparent ? 0 : 1
@@ -76,6 +92,7 @@ final class CompositionInspector: NSView {
         editingEnabled = enabled
         func visit(_ view: NSView) { (view as? NSControl)?.isEnabled = enabled; view.subviews.forEach(visit) }
         visit(self); visit(exportSettings); mode.isEnabled = enabled
+        calculateSize.isEnabled = enabled && previewReady
     }
     private func edit(_ change: (inout CompositionSettings) -> Void) {
         guard editingEnabled else { return }; change(&settings); onChange?(settings)
@@ -183,7 +200,14 @@ final class CompositionInspector: NSView {
             }
             views.append(FraloStyle.stack([FraloStyle.text("透明区域填色", role: .detail), color], axis: .horizontal, spacing: 12))
             views.append(FraloStyle.paragraph("JPEG 会填充透明区域；复制图片仍使用透明 PNG。"))
-        } else { views.append(FraloStyle.paragraph("PNG 保留透明区域。")) }
+        } else {
+            pngCompression.selectedIndex = settings.pngLossless ? 0 : 1
+            views.append(pngCompression)
+            if !settings.pngLossless {
+                views.append(SliderRow("PNG 品质", range: 10...100, value: settings.pngQuality * 100) { [weak self] v in self?.edit { $0.pngQuality = v / 100 } })
+            }
+            views.append(FraloStyle.paragraph(settings.pngLossless ? "保留全部颜色与透明度。" : "减少颜色以减小体积，可能改变细节；透明区域保留。"))
+        }
         install(views, in: exportDetails)
     }
     private func chooseBackground() {

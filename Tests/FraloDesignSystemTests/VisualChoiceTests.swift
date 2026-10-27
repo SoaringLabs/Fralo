@@ -3,6 +3,21 @@ import XCTest
 @testable import FraloDesignSystem
 
 final class VisualChoiceTests: XCTestCase {
+    @MainActor func testPointerSelectionDoesNotLeaveAKeyboardHaloOnThePreviousCard() async throws {
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; defer { window.close() }
+        let group = VisualChoiceGroup([.init("竖屏"), .init("横屏")], label: "方向", selected: 1, captionsBelow: true)
+        group.frame = NSRect(x: 0, y: 0, width: 300, height: 112); window.contentView?.addSubview(group)
+        window.makeFirstResponder(group); group.layoutSubtreeIfNeeded()
+        try XCTUnwrap(group.subviews.first as? NSButton).performClick(nil)
+        XCTAssertEqual(group.selectedIndex, 0)
+        XCTAssertEqual(group.focusRingType, .none, "Pointer use must not leave the previously cached focus outline")
+        group.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: 124)!)
+        XCTAssertEqual(group.selectedIndex, 1); XCTAssertEqual(group.focusRingType, .exterior)
+    }
+
     @MainActor func testExportDisclosureStaysAtTrailingEdgeWhenPanelExpands() async {
         _ = NSApplication.shared
         let action = ExportAction(count: 3)

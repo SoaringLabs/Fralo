@@ -20,7 +20,6 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private let viewing = ViewToolbar()
     private let exportAction = ExportAction(count: 0)
     private let batchCount = FraloStyle.text("图片 · 0", role: .heading)
-    private let documentTitle = FraloStyle.text("Fralo", role: .body)
     private let filename = FraloStyle.text("", role: .heading), position = FraloStyle.text("", role: .caption, secondary: true)
     private let previewScroll = PreviewScrollView()
     private let canvas = CanvasSurface(frame: .zero)
@@ -37,8 +36,10 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private var renderedID: String?
     private var previewRequest = 0, thumbnailRequest = 0
     private var renderWork: DispatchWorkItem?
+    private var previewToken = CancellationToken()
     private let renderQueue = DispatchQueue(label: "app.fralo.preview", qos: .userInitiated)
     private let thumbnailQueue = DispatchQueue(label: "app.fralo.thumbnails", qos: .utility)
+    private let sizeQueue = DispatchQueue(label: "app.fralo.output-size", qos: .utility)
     private var zoom: CGFloat? = nil
     private var backgroundImageSize: CGSize?
     private var dragDevicePosition: CGPoint?
@@ -63,8 +64,8 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: min(1400, area.width - 80), height: min(950, area.height - 80)), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         super.init(window: window)
         selectAppearance(preferences.string(forKey: "workbenchAppearance") ?? "system", persist: false)
-        window.title = "Fralo"; window.titleVisibility = .hidden; window.toolbarStyle = .unifiedCompact
-        window.titlebarAppearsTransparent = true; window.titlebarSeparatorStyle = .none
+        window.title = "Fralo"; window.titleVisibility = .visible; window.toolbarStyle = .unified
+        window.titlebarAppearsTransparent = false; window.titlebarSeparatorStyle = .line
         // Let the behind-window workspace material composite with the desktop.
         // Keep window alpha at 1 so artwork and controls remain fully opaque.
         window.isOpaque = false; window.backgroundColor = .clear
@@ -107,7 +108,6 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         buildPreview()
         let toolbar = NSToolbar(identifier: "FraloToolbar")
         toolbar.delegate = self; toolbar.displayMode = .iconOnly; toolbar.allowsUserCustomization = false
-        toolbar.centeredItemIdentifiers = [.init("documentTitle")]
         window?.toolbar = toolbar
         updateActions(); window?.recalculateKeyViewLoop()
     }
@@ -153,6 +153,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
 
     private func buildInspector() -> NSView {
         inspectorUI = CompositionInspector(settings: settings)
+        inspectorUI.calculateSize.onPress = { [weak self] in self?.calculateCurrentSize() }
         inspectorUI.onChange = { [weak self] value in
             guard let self, !self.isExporting else { return }
             self.settings = value
@@ -187,17 +188,11 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(toolbar) }
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.init("brand"), .init("add"), .flexibleSpace, .init("documentTitle"), .flexibleSpace, .init("copy"), .init("settings"), .init("more")]
+        [.init("sidebar"), .init("add"), .flexibleSpace, .init("copy"), .init("settings"), .init("more")]
     }
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         let item = NSToolbarItem(itemIdentifier: identifier)
         switch identifier.rawValue {
-        case "brand":
-            let brand = FraloStyle.text("Fralo", role: .heading); item.view = brand; item.label = "Fralo"
-        case "documentTitle":
-            documentTitle.font = .systemFont(ofSize: 14, weight: .medium)
-            documentTitle.widthAnchor.constraint(lessThanOrEqualToConstant: 320).isActive = true
-            item.view = documentTitle; item.label = "当前图片"
         case "more":
             let menu = NSMenu(); let title = NSMenuItem(title: "", action: nil, keyEquivalent: "")
             title.image = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: nil); menu.addItem(title)
@@ -349,24 +344,28 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     }
     private func requestPreview() {
         previewRequest += 1; renderWork?.cancel(); rendered = nil; renderedID = nil
+        previewToken.cancel(); let token = CancellationToken(); previewToken = token
+        inspectorUI.showOutputSize(nil)
         guard let index = selectedIndex else {
             canvas.image = nil; empty.isHidden = false; emptyMessage.stringValue = "拖入截图，开始套框"
             emptyAction.title = "添加图片"; emptyAction.onPress = { [weak self] in self?.addImages(nil) }
             emptyDetail.stringValue = "PNG / JPEG · 支持批量导入"
             previewScroll.isHidden = true; footer.isHidden = true; filename.stringValue = ""; position.stringValue = ""
-            window?.title = "Fralo"; documentTitle.stringValue = "Fralo"; dimensions.stringValue = "尚无成品"; inspectorUI.sourceInfo.stringValue = "尚未选择图片"; inspectorUI.outputInfo.stringValue = "—"; viewing.finishPreviewUpdate(); updateActions(); return
+            window?.title = "Fralo"; dimensions.stringValue = "尚无成品"; inspectorUI.sourceInfo.stringValue = "尚未选择图片"; inspectorUI.outputInfo.stringValue = "—"; viewing.finishPreviewUpdate(); updateActions(); return
         }
         let input = items[index].input, snapshot = settings, generation = previewRequest
         window?.title = input.name; filename.stringValue = input.name; position.stringValue = "\(index + 1) / \(items.count)"
-        documentTitle.stringValue = input.name
         empty.isHidden = true; previewScroll.isHidden = false; footer.isHidden = false
         viewing.beginPreviewUpdate(); updateActions()
         let work = DispatchWorkItem { [weak self] in
-            let result = autoreleasepool { Result { () -> (RenderedComposition, CGImage, CGSize, CGSize?) in
+            guard !token.isCancelled else { return }
+            let result = autoreleasepool { Result { () -> (RenderedComposition, CGImage, CGSize, CGSize?, Int?) in
                 let backdrop = try CompositionRenderer.backgroundData(snapshot)
                 let frame = try CompositionRenderer.render(input, settings: snapshot, backgroundData: backdrop)
-                let display = snapshot.format == .jpeg ? try ImageInput(data: CompositionRenderer.data(frame.image, settings: snapshot), name: "preview.jpg").decode() : frame.image
-                return (frame, display, try input.dimensions(), try backdrop.map { try ImageInput(data: $0, name: "background.png").dimensions() })
+                guard !token.isCancelled else { throw CancellationError() }
+                let encoded = snapshot.format == .jpeg || !snapshot.pngLossless ? try CompositionRenderer.data(frame.image, settings: snapshot) : nil
+                let display = try encoded.map { try ImageInput(data: $0, name: "preview").decode() } ?? frame.image
+                return (frame, display, try input.dimensions(), try backdrop.map { try ImageInput(data: $0, name: "background.png").dimensions() }, encoded?.count)
             } }
             // NSMenu runs a nested event-tracking loop, which does not drain main-queue work.
             RunLoop.main.perform(inModes: [.default, .eventTracking, .modalPanel]) {
@@ -374,12 +373,13 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
                     guard let self, self.previewRequest == generation else { return }
                     self.viewing.finishPreviewUpdate()
                     switch result {
-                    case .success(let (frame, display, sourceSize, backgroundSize)):
+                    case .success(let (frame, display, sourceSize, backgroundSize, byteCount)):
                         self.backgroundImageSize = backgroundSize
                         if let row = self.items.firstIndex(where: { $0.input.id == input.id }), self.items[row].error != nil { self.items[row].error = nil; self.refreshList() }
                         self.inspectorUI.sourceInfo.stringValue = "\(input.name)\n\(Int(sourceSize.width)) × \(Int(sourceSize.height))"
                         self.dimensions.toolTip = "原始图片：" + self.inspectorUI.sourceInfo.stringValue
                         self.inspectorUI.outputInfo.stringValue = "\(snapshot.format == .png ? "PNG" : "JPEG") · \(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height))"
+                        self.inspectorUI.showOutputSize(byteCount)
                         self.rendered = frame; self.renderedID = input.id; self.canvas.image = NSImage(cgImage: display, size: frame.pixelSize)
                         self.canvas.setAccessibilityLabel("成品画布，" + input.name)
                         self.canvas.showsElevation = snapshot.mode == .background
@@ -402,13 +402,30 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         renderWork = work; renderQueue.async(execute: work)
     }
 
+    private func calculateCurrentSize() {
+        guard let rendered, let index = selectedIndex, renderedID == items[index].input.id, !isExporting else { return }
+        let generation = previewRequest, snapshot = settings
+        inspectorUI.showOutputSize(nil, busy: true)
+        sizeQueue.async { [weak self] in
+            let result = autoreleasepool { Result { try CompositionRenderer.data(rendered.image, settings: snapshot).count } }
+            DispatchQueue.main.async {
+                guard let self, self.previewRequest == generation else { return }
+                switch result {
+                case .success(let count): self.inspectorUI.showOutputSize(count)
+                case .failure: self.inspectorUI.showOutputSize(nil); self.inspectorUI.outputSize.stringValue = "暂时无法计算大小"
+                }
+            }
+        }
+    }
+
     private func layoutPreview() {
         guard !layingOutPreview, let rendered else { return }
         layingOutPreview = true; defer { layingOutPreview = false }
         let available = previewScroll.contentView.bounds.size
         guard available.width > 0, available.height > 0 else { return }
         let pixels = rendered.pixelSize, backing = window?.backingScaleFactor ?? 2
-        let factor = zoom.map { $0 / backing } ?? min(max(10, available.width - 8) / pixels.width, max(10, available.height - 32) / pixels.height)
+        let reference = rendered.previewReferenceSize
+        let factor = zoom.map { $0 / backing } ?? min(max(10, available.width - 8) / reference.width, max(10, available.height - 32) / reference.height)
         let size = NSSize(width: pixels.width * factor, height: pixels.height * factor)
         let document = NSSize(width: max(available.width, size.width + 8), height: max(available.height, size.height + 32))
         canvas.setFrameSize(document); canvas.zoom = factor
@@ -433,7 +450,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         if sender is NSMenuItem, let editor = window?.firstResponder as? NSTextView, editor.isEditable { editor.copy(sender); return }
         guard let rendered, let index = selectedIndex, renderedID == items[index].input.id else { return }
         do {
-            let data = try FrameRenderer.pngData(rendered.image)
+            let data = settings.format == .png ? try CompositionRenderer.data(rendered.image, settings: settings) : try FrameRenderer.pngData(rendered.image)
             pasteboard.clearContents(); pasteboard.setData(data, forType: .png)
         } catch { showError(error.localizedDescription) }
     }
@@ -522,9 +539,11 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         addButton.isEnabled = !isExporting
         workbench.rail.add.isEnabled = !isExporting
         batchCount.stringValue = "图片 · \(items.count)"
+        window?.subtitle = items.isEmpty ? "" : "\(items.count) 张图片"
         exportAction.count = items.count; exportAction.isEnabled = !isExporting
         workbench.rail.update(index: selectedIndex, count: items.count)
         copyButton.isEnabled = rendered != nil && !isExporting
+        inspectorUI?.setPreviewReady(rendered != nil && !isExporting)
         if items.isEmpty { empty.isHidden = false; footer.isHidden = true; previewScroll.isHidden = true }
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
