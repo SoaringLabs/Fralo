@@ -423,6 +423,9 @@ public final class ViewToolbar: NSView {
     private let statusHost = NSView()
     private let progress = NSProgressIndicator()
     private let activity: NSStackView
+    private var statusWidth: NSLayoutConstraint!
+    private var row: NSStackView!
+    public private(set) var isCompact = false
     private var pendingActivity: DispatchWorkItem?
     private var activityVersion = 0
     public private(set) var isUpdatingPreview = false
@@ -443,14 +446,14 @@ public final class ViewToolbar: NSView {
             view.translatesAutoresizingMaskIntoConstraints = false; statusHost.addSubview(view)
             NSLayoutConstraint.activate([view.centerXAnchor.constraint(equalTo: statusHost.centerXAnchor), view.centerYAnchor.constraint(equalTo: statusHost.centerYAnchor), view.widthAnchor.constraint(lessThanOrEqualTo: statusHost.widthAnchor)])
         }
-        statusHost.widthAnchor.constraint(equalToConstant: 128).isActive = true
+        statusWidth = statusHost.widthAnchor.constraint(equalToConstant: 128); statusWidth.isActive = true
         statusHost.heightAnchor.constraint(equalToConstant: 28).isActive = true
         func divider() -> NSView {
             let view = NSView(); view.wantsLayer = true; view.layer?.backgroundColor = NSColor.separatorColor.withAlphaComponent(0.4).cgColor
             view.widthAnchor.constraint(equalToConstant: 1).isActive = true; view.heightAnchor.constraint(equalToConstant: 22).isActive = true
             return view
         }
-        let row = FraloStyle.stack([zoom, divider(), statusHost, composition, divider(), preview], axis: .horizontal, spacing: 10)
+        row = FraloStyle.stack([zoom, divider(), statusHost, composition, divider(), preview], axis: .horizontal, spacing: 10)
         row.translatesAutoresizingMaskIntoConstraints = false; surface.contentView.addSubview(row)
         NSLayoutConstraint.activate([
             surface.leadingAnchor.constraint(equalTo: leadingAnchor), surface.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -461,6 +464,15 @@ public final class ViewToolbar: NSView {
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     deinit { pendingActivity?.cancel() }
+    public func fitControls(to availableWidth: CGFloat) {
+        let compact = availableWidth > 0 && availableWidth < 440
+        if compact != isCompact {
+            isCompact = compact
+            statusWidth.constant = compact ? 84 : 128
+            row.spacing = compact ? 6 : 10
+            zoom.leadingSymbol = compact ? nil : "display"
+        }
+    }
     public func beginPreviewUpdate() {
         pendingActivity?.cancel(); activityVersion += 1
         guard !isUpdatingPreview else { return }

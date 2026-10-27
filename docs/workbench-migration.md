@@ -141,3 +141,17 @@ The native AppKit toolbar item is marked navigational and kept at the leading ed
 Verification for this revision is recorded separately from the earlier floating-panel results. Full VoiceOver speech and subjective animation acceptance remain manual checks.
 
 This sidebar revision passed all 75 Debug and 67 Release tests. The production-window regressions cover full width recovery, real-batch keyboard selection while hidden, inspector editing focus, persisted collapse, rapid toggles and minimum/default geometry. Live native checks verified the leading header button, full collapse/reopen, keyboard selection retention, light 1400×1000, dark 1030×640 and empty dark minimum states. The toolbar uses an ordinary native `NSToolbarItem` with `isNavigational` and an explicit controller target, avoiding the built-in split-view item's specialized validation. Local screenshots/runtime records are in the current chat's `fralo-docked-sidebar` evidence folder. No push, merge or release is included.
+
+
+## Fixed inspector and compact actions — 2026-10-28
+
+The approved layout replaces proportional inspector sizing with a fixed 360 pt width. Window growth belongs to the preview. The inspector retains a scrolling parameter body and pinned mode/export regions, and can be independently hidden with the header slider icon. Visibility is saved separately from sidebar collapse. Hiding a focused inspector transfers focus to the canvas; returning from clean preview restores the user's panel preferences. Using the Inspector button while in clean preview returns to editing and reveals the inspector.
+
+The right toolbar is More, Inspector visibility, separator, Copy. Shared quiet icon buttons keep consistent 28 pt hit areas, proportionally contained symbols and a persistent neutral selected surface for the inspector. The More menu groups folder import/paste, remove/clear and application settings. Global appearance remains in the settings window; renderer/export behavior is unchanged.
+
+The full-width Add Images action now sits above the sidebar count/list. When the sidebar is hidden, a compact header plus is inserted in the leading navigation group. The same import path appends to the current batch, and native file menus, Command-O and the empty-state action remain available.
+
+All 76 Debug and 68 Release tests passed. Production-window regressions verify 360 pt at minimum/default/wide sizes, retained artwork/batch/settings and copy output when the inspector is hidden, focus transfer, persisted visibility, clean-preview transitions, toolbar state and accessibility checkbox value, and both add-entry states. Native checks covered both file-panel entry points and More → Application Settings. Final runtime screenshots and version provenance are saved with this chat's fixed-inspector preview. Full VoiceOver speech and subjective visual acceptance remain manual checks; no push, merge or release is included.
+
+
+At minimum width, the fixed inspector leaves a narrower preview viewport. The viewing toolbar now uses a compact layout below 440 pt: tighter gaps, an 84 pt status slot and no decorative display icon. Zoom text, pixel dimensions/loading status and the full preview action remain available. A production-window assertion verifies the zoom action has at least its intrinsic text width; the final dark minimum screenshot confirms it is readable.

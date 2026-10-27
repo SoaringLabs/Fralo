@@ -5,6 +5,75 @@ import FraloDesignSystem
 @testable import FraloApp
 
 final class PanelPolishTests: XCTestCase {
+    @MainActor func testFixedInspectorAndCompactActionsKeepBatchAndOutputIntact() async throws {
+        _ = NSApplication.shared
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let suite = "fralo-compact-actions-\(UUID())", board = NSPasteboard.withUniqueName()
+        let defaults = UserDefaults(suiteName: suite)!, store = SettingsStore(url: directory.appendingPathComponent("settings.json"))
+        let controller = MainWindowController(store: store, preferences: defaults, pasteboard: board, restoreWindow: false)
+        let window = try XCTUnwrap(controller.window)
+        defer { window.close(); defaults.removePersistentDomain(forName: suite); board.releaseGlobally(); try? FileManager.default.removeItem(at: directory) }
+        let root = try XCTUnwrap(window.contentView as? WorkbenchView), toolbar = try XCTUnwrap(window.toolbar)
+        func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
+        let inspector = try XCTUnwrap(root.right.body as? CompositionInspector)
+        let toggle = try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "inspector" }?.view as? NSButton)
+        let more = try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "more" }?.view as? NSButton)
+        let copy = try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "copy" }?.view as? NSButton)
+        XCTAssertEqual(Array(toolbar.items.suffix(4).map { $0.itemIdentifier.rawValue }), ["more", "inspector", "actionSeparator", "copy"])
+        XCTAssertEqual(more.menu?.items.filter { !$0.isSeparatorItem }.map(\.title), ["导入文件夹…", "粘贴图片", "移除当前图片", "清空批次", "应用设置…"])
+        for size in [NSSize(width: 1030, height: 640), NSSize(width: 1400, height: 1000), NSSize(width: 1900, height: 1000)] {
+            window.setContentSize(size); root.layoutSubtreeIfNeeded()
+            XCTAssertEqual(root.right.bounds.width, 360, accuracy: 0.1)
+            XCTAssertGreaterThan(root.content.bounds.width, 300)
+        }
+        XCTAssertEqual(toggle.state, .on); XCTAssertFalse(copy.isEnabled)
+        XCTAssertEqual((toggle.accessibilityValue() as? NSNumber)?.boolValue, true)
+        let context = try XCTUnwrap(CGContext(data: nil, width: 300, height: 600, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.setFillColor(CGColor(srgbRed: 0.1, green: 0.6, blue: 0.3, alpha: 1)); context.fill(CGRect(x: 0, y: 0, width: 300, height: 600))
+        let input = directory.appendingPathComponent("input.png"); try FrameRenderer.pngData(XCTUnwrap(context.makeImage())).write(to: input)
+        controller.importURLs([input])
+        let canvas = try XCTUnwrap(descendants(root.content).compactMap { $0 as? CanvasSurface }.first)
+        for _ in 0..<150 where canvas.image == nil { try await Task.sleep(nanoseconds: 20_000_000) }
+        let image = try XCTUnwrap(canvas.image), list = try XCTUnwrap(root.left.body as? BatchList)
+        inspector.mode.choose(1)
+        for _ in 0..<150 where canvas.image === image { try await Task.sleep(nanoseconds: 20_000_000) }
+        let encoder = JSONEncoder(); encoder.outputFormatting = .sortedKeys
+        let rendered = try XCTUnwrap(canvas.image), stored = try encoder.encode(CompositionStore(legacy: store).load())
+        window.setContentSize(NSSize(width: 1030, height: 640))
+        root.layoutSubtreeIfNeeded()
+        let viewing = try XCTUnwrap(descendants(root.content).compactMap { $0 as? ViewToolbar }.first)
+        XCTAssertTrue(viewing.isCompact)
+        XCTAssertGreaterThanOrEqual(viewing.zoom.bounds.width, viewing.zoom.intrinsicContentSize.width - 1, "The fixed inspector must not truncate the zoom action at minimum width")
+        let previousWidth = root.content.bounds.width
+        let field = try XCTUnwrap(descendants(inspector).compactMap { $0 as? NSTextField }.first { $0.isEditable && !$0.isHiddenOrHasHiddenAncestor })
+        XCTAssertTrue(window.makeFirstResponder(field))
+        toggle.performClick(nil)
+        try await Task.sleep(nanoseconds: 350_000_000); root.layoutSubtreeIfNeeded()
+        XCTAssertTrue(root.inspectorHidden); XCTAssertTrue(root.right.isHidden); XCTAssertEqual(toggle.state, .off)
+        XCTAssertEqual((toggle.accessibilityValue() as? NSNumber)?.boolValue, false)
+        XCTAssertTrue(window.firstResponder === canvas)
+        XCTAssertGreaterThan(root.content.bounds.width, previousWidth + 350)
+        XCTAssertTrue(canvas.image === rendered); XCTAssertEqual(list.selectedIndex, 0)
+        XCTAssertEqual(try encoder.encode(CompositionStore(legacy: store).load()), stored)
+        copy.performClick(nil)
+        XCTAssertNotNil(board.data(forType: .png), "Header copy must remain connected when the inspector is hidden")
+        let restored = MainWindowController(store: store, preferences: defaults, restoreWindow: false)
+        defer { restored.window?.close() }
+        XCTAssertTrue(try XCTUnwrap(restored.window?.contentView as? WorkbenchView).inspectorHidden)
+        viewing.preview.performClick(nil)
+        XCTAssertTrue(root.previewing); XCTAssertEqual(toggle.state, .off)
+        XCTAssertTrue(toolbar.items.contains { $0.itemIdentifier.rawValue == "add" })
+        toggle.performClick(nil)
+        try await Task.sleep(nanoseconds: 350_000_000); root.layoutSubtreeIfNeeded()
+        XCTAssertFalse(root.previewing); XCTAssertFalse(root.inspectorHidden); XCTAssertFalse(root.right.isHidden)
+        XCTAssertEqual(toggle.state, .on); XCTAssertFalse(toolbar.items.contains { $0.itemIdentifier.rawValue == "add" })
+        XCTAssertEqual(root.right.bounds.width, 360, accuracy: 0.1)
+        window.setContentSize(NSSize(width: 1900, height: 1000)); root.layoutSubtreeIfNeeded()
+        XCTAssertFalse(viewing.isCompact, "A wide preview viewport must restore the regular toolbar spacing")
+    }
+
+
     @MainActor func testDockedSidebarUsesLeadingNativeToggleAndRestoresCollapsedState() async throws {
         _ = NSApplication.shared
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

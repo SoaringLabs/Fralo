@@ -63,6 +63,12 @@ public class ActionButton: NSButton {
         } else { super.keyDown(with: event) }
     }
     public override func highlight(_ flag: Bool) { super.highlight(flag); needsDisplay = true }
+    public override var state: NSControl.StateValue {
+        didSet {
+            needsDisplay = true
+            if accessibilityRole() == .checkBox { setAccessibilityValue(state == .on) }
+        }
+    }
     public override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); needsDisplay = true }
     public override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -131,9 +137,9 @@ public class ActionButton: NSButton {
             if isHovered { fill = fill.blended(withFraction: 0.06, of: .labelColor) ?? fill }
             if pressed { fill = fill.blended(withFraction: 0.12, of: .labelColor) ?? fill }
         case .quiet:
-            hasSurface = isHovered || pressed
+            hasSurface = state == .on || isHovered || pressed
             fill = base.blended(withFraction: pressed ? 0.15 : 0.07, of: .labelColor) ?? base
-            edge = .clear
+            edge = state == .on && contrast ? .labelColor : .clear
         case .destructive:
             ink = .systemRed
             edge = NSColor.systemRed.withAlphaComponent(contrast ? 0.8 : 0.24)

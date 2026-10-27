@@ -52,9 +52,14 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertFalse(inspector.exportSettings.isHiddenOrHasHiddenAncestor)
         XCTAssertNotEqual(device.focusRingType, .none)
         let toolbar = try XCTUnwrap(window.toolbar)
-        let add = try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "add" }?.view as? ActionButton)
+        XCTAssertFalse(toolbar.items.contains { $0.itemIdentifier.rawValue == "add" })
+        let sidebarAdd = try XCTUnwrap(descendants(root.left).compactMap { $0 as? ActionButton }.first { $0.title == "添加图片" })
+        XCTAssertFalse(sidebarAdd.isHiddenOrHasHiddenAncestor)
         controller.toggleSidebar(nil); root.layoutSubtreeIfNeeded()
-        XCTAssertEqual(add.title, "添加图片"); XCTAssertFalse(add.isHiddenOrHasHiddenAncestor)
+        let addItem = try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "add" })
+        let add = try XCTUnwrap(addItem.view as? NSButton)
+        XCTAssertEqual(add.accessibilityLabel(), "添加图片"); XCTAssertTrue(addItem.isNavigational)
+        XCTAssertFalse(add.isHiddenOrHasHiddenAncestor)
     }
 
     @MainActor func testWorkspaceWindowAllowsBehindWindowMaterial() async throws {

@@ -31,7 +31,9 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private var fitMenu: NSPopUpButton { viewing.zoom }
     private let dimensions = FraloStyle.text("尚无成品", role: .detail, secondary: true)
     private let addButton = ActionButton("添加图片", symbol: "plus")
-    private let copyButton = ActionButton("", role: .quiet, size: .compact, symbol: "doc.on.doc", label: "复制当前图片")
+    private var copyButton: NSButton?
+    private var inspectorButton: NSButton?
+    private var toolbarAddButton: NSButton?
     private var rendered: RenderedComposition?
     private var renderedID: String?
     private var previewRequest = 0, thumbnailRequest = 0
@@ -80,9 +82,12 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         center.view = DropContainer()
         (center.view as? DropContainer)?.onDrop = { [weak self] in self?.importURLs($0) }
         let heading = FraloStyle.stack([batchCount, NSView()], axis: .horizontal, spacing: 4)
+        addButton.onPress = { [weak self] in self?.addImages(nil) }
+        addButton.toolTip = "添加图片（⌘O）"
+        let sidebarHeader = FraloStyle.stack([addButton, heading], spacing: 16, fillWidth: true)
         let shortcut = FraloStyle.text("↑ ↓  切换图片", role: .caption, secondary: true); shortcut.alignment = .center
         let leftFooter = FraloStyle.stack([shortcut], spacing: 14, fillWidth: true)
-        let left = DockedSidebar(header: heading, body: list, footer: leftFooter)
+        let left = DockedSidebar(header: sidebarHeader, body: list, footer: leftFooter)
         list.onSelection = { [weak self] _ in self?.selectionChanged() }
         list.onDelete = { [weak self] in self?.removeSelected(nil) }
         let menu = NSMenu(); menu.addItem(actionItem("移除当前图片", #selector(removeSelected(_:))))
@@ -96,12 +101,15 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
                                   footer: FraloStyle.stack([FraloStyle.divider(), exportAction], spacing: 10, fillWidth: true), bodySpacing: 18)
         workbench = WorkbenchView(left: left, right: right, content: center.view)
         workbench.collapsed = preferences.bool(forKey: "sidebarCollapsed")
+        workbench.inspectorHidden = preferences.bool(forKey: "inspectorHidden")
         workbench.onGeometryChange = { [weak self] in self?.layoutPreview() }
+        workbench.onPanelVisibilityChange = { [weak self] in self?.updatePanelControls() }
         window?.contentView = workbench
         buildPreview()
         let toolbar = NSToolbar(identifier: "FraloToolbar")
         toolbar.delegate = self; toolbar.displayMode = .iconOnly; toolbar.allowsUserCustomization = false
         window?.toolbar = toolbar
+        updatePanelControls()
         updateActions(); window?.recalculateKeyViewLoop()
     }
 
@@ -179,9 +187,12 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         requestPreview()
     }
 
-    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(toolbar) }
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [.init("sidebar"), .init("add"), .flexibleSpace, .init("more"), .init("inspector"), .init("actionSeparator"), .init("copy")]
+    }
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.init("sidebar"), .init("add"), .flexibleSpace, .init("copy"), .init("settings"), .init("more")]
+        [.init("sidebar")] + (workbench.collapsed || workbench.previewing ? [.init("add")] : []) +
+        [.flexibleSpace, .init("more"), .init("inspector"), .init("actionSeparator"), .init("copy")]
     }
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         let item = NSToolbarItem(itemIdentifier: identifier)
@@ -193,30 +204,66 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
             item.target = self; item.action = #selector(toggleSidebar(_:))
             item.isNavigational = true; item.isBordered = true; item.visibilityPriority = .user
         case "more":
-            let menu = NSMenu(); let title = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-            title.image = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: nil); menu.addItem(title)
-            menu.addItem(actionItem("添加图片…", #selector(addImages(_:))))
-            menu.addItem(actionItem("导入文件夹…", #selector(addFolder(_:))))
-            menu.addItem(actionItem("粘贴图片", #selector(pasteImage(_:))))
-            menu.addItem(actionItem("设置…", #selector(showSettings(_:))))
-            let appearance = NSMenuItem(title: "外观", action: nil, keyEquivalent: ""); appearance.submenu = appearanceMenu(); menu.addItem(appearance)
-            menu.addItem(.separator()); menu.addItem(actionItem("移除当前图片", #selector(removeSelected(_:))))
-            let button = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 24, height: 28), pullsDown: true)
-            button.menu = menu; button.isBordered = false; button.imagePosition = .imageOnly
-            (button.cell as? NSPopUpButtonCell)?.arrowPosition = .noArrow
-            button.setAccessibilityLabel("更多图片操作"); item.view = button; item.label = "更多图片操作"
+            let button = toolbarButton("ellipsis", label: "更多操作", action: #selector(showMore(_:)))
+            button.menu = moreMenu(); item.view = button; item.label = "更多操作"
+        case "inspector":
+            let button = toolbarButton("slider.horizontal.3", label: "显示或隐藏出图设置", action: #selector(toggleInspector(_:)))
+            button.setButtonType(.pushOnPushOff)
+            button.setAccessibilityRole(.checkBox)
+            button.state = workbench.inspectorHidden || workbench.previewing ? .off : .on
+            inspectorButton = button; item.view = button; item.label = "出图设置"
+        case "actionSeparator":
+            let view = NSView(frame: NSRect(x: 0, y: 0, width: 12, height: 28))
+            let divider = NSBox(); divider.boxType = .separator; divider.frame = NSRect(x: 5, y: 5, width: 1, height: 18)
+            view.addSubview(divider); item.view = view; item.label = ""
         case "add":
-            addButton.onPress = { [weak self] in self?.addImages(nil) }
-            item.view = addButton; item.label = "添加图片"; item.visibilityPriority = .high
+            let button = toolbarButton("plus", label: "添加图片", action: #selector(addImages(_:)))
+            button.toolTip = "添加图片（⌘O）"; button.isEnabled = !isExporting
+            toolbarAddButton = button; item.view = button; item.label = "添加图片"
+            item.isNavigational = true; item.visibilityPriority = .user
         case "copy":
-            copyButton.onPress = { [weak self] in self?.copyCurrent(nil) }
-            item.view = copyButton; item.label = "复制当前图片"
-        case "settings":
-            item.view = IconButton("gearshape", label: "设置") { [weak self] in self?.showSettings(nil) }
-            item.label = "设置"
+            let button = toolbarButton("doc.on.doc", label: "复制当前图片", action: #selector(copyCurrent(_:)))
+            button.isEnabled = rendered != nil && !isExporting
+            copyButton = button; item.view = button; item.label = "复制当前图片"
         default: return nil
         }
+        if item.view != nil { item.autovalidates = false }
         return item
+    }
+
+    private func toolbarButton(_ symbol: String, label: String, action: Selector) -> IconButton {
+        let button = IconButton(symbol, label: label)
+        button.onPress = { [weak self, weak button] in
+            guard let self, let button else { return }
+            NSApp.sendAction(action, to: self, from: button)
+        }
+        button.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([button.widthAnchor.constraint(equalToConstant: 28), button.heightAnchor.constraint(equalToConstant: 28)])
+        return button
+    }
+    private func moreMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.addItem(actionItem("导入文件夹…", #selector(addFolder(_:))))
+        menu.addItem(actionItem("粘贴图片", #selector(pasteImage(_:))))
+        menu.addItem(.separator())
+        menu.addItem(actionItem("移除当前图片", #selector(removeSelected(_:))))
+        menu.addItem(actionItem("清空批次", #selector(newBatch(_:))))
+        menu.addItem(.separator())
+        menu.addItem(actionItem("应用设置…", #selector(showSettings(_:))))
+        return menu
+    }
+    @objc private func showMore(_ sender: NSButton) {
+        let y = sender.isFlipped ? sender.bounds.maxY + 6 : -6
+        sender.menu?.popUp(positioning: nil, at: NSPoint(x: 0, y: y), in: sender)
+    }
+    private func updatePanelControls() {
+        guard let toolbar = window?.toolbar else { return }
+        let showAdd = workbench.collapsed || workbench.previewing
+        let addIndex = toolbar.items.firstIndex { $0.itemIdentifier.rawValue == "add" }
+        if showAdd && addIndex == nil { toolbar.insertItem(withItemIdentifier: .init("add"), at: 1) }
+        else if !showAdd, let addIndex { toolbar.removeItem(at: addIndex); toolbarAddButton = nil }
+        inspectorButton?.state = workbench.inspectorHidden || workbench.previewing ? .off : .on
+        window?.recalculateKeyViewLoop()
     }
 
     private func actionItem(_ title: String, _ action: Selector) -> NSMenuItem {
@@ -253,6 +300,17 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         if !workbench.previewing && (!workbench.collapsed || focusWasInList) {
             window?.makeFirstResponder(workbench.collapsed ? canvas : list.documentView)
         }
+    }
+    @objc func toggleInspector(_ sender: Any?) {
+        if workbench.previewing {
+            togglePreview()
+            workbench.setInspectorHidden(false, animated: true)
+        } else {
+            let focusWasInInspector = (window?.firstResponder as? NSView).map { $0.isDescendant(of: workbench.right) } ?? false
+            workbench.setInspectorHidden(!workbench.inspectorHidden, animated: true)
+            if workbench.inspectorHidden && focusWasInInspector { window?.makeFirstResponder(canvas) }
+        }
+        preferences.set(workbench.inspectorHidden, forKey: "inspectorHidden")
     }
     private func togglePreview() {
         if !workbench.previewing { previewRestoreFocus = window?.firstResponder }
@@ -420,6 +478,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private func layoutPreview() {
         guard !layingOutPreview, let rendered else { return }
         layingOutPreview = true; defer { layingOutPreview = false }
+        viewing.fitControls(to: center.view.bounds.width)
         let available = previewScroll.contentView.bounds.size
         guard available.width > 0, available.height > 0 else { return }
         let pixels = rendered.pixelSize, backing = window?.backingScaleFactor ?? 2
@@ -536,10 +595,11 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private func updateActions() {
         inspectorUI?.setEditingEnabled(!isExporting)
         addButton.isEnabled = !isExporting
+        toolbarAddButton?.isEnabled = !isExporting
         batchCount.stringValue = "图片 · \(items.count)"
         window?.subtitle = items.isEmpty ? "" : "\(items.count) 张图片"
         exportAction.count = items.count; exportAction.isEnabled = !isExporting
-        copyButton.isEnabled = rendered != nil && !isExporting
+        copyButton?.isEnabled = rendered != nil && !isExporting
         inspectorUI?.setPreviewReady(rendered != nil && !isExporting)
         if items.isEmpty { empty.isHidden = false; footer.isHidden = true; previewScroll.isHidden = true }
     }
