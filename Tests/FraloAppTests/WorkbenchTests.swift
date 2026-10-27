@@ -5,6 +5,42 @@ import FraloDesignSystem
 @testable import FraloApp
 
 final class WorkbenchTests: XCTestCase {
+    @MainActor func testFloatingInspectorKeepsNavigationAboveFormAndActionsFullWidth() async throws {
+        _ = NSApplication.shared
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = SettingsStore(url: directory.appendingPathComponent("settings.json"))
+        var settings = CompositionSettings(); settings.display = .browser; settings.mode = .background
+        try CompositionStore(legacy: store).save(settings)
+        let suite = "fralo-polish-\(UUID())"; let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let controller = MainWindowController(store: store, preferences: defaults, restoreWindow: false)
+        let window = try XCTUnwrap(controller.window); window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let root = try XCTUnwrap(window.contentView as? WorkbenchView)
+        let inspector = try XCTUnwrap(root.right.body as? CompositionInspector)
+        func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
+        let export = try XCTUnwrap(descendants(root.right).compactMap { $0 as? ExportAction }.first)
+        let navigation = try XCTUnwrap(descendants(inspector).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == "设置页面" })
+        let device = try XCTUnwrap(descendants(inspector).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == "展示类型" })
+        for size in [NSSize(width: 1030, height: 640), NSSize(width: 1400, height: 838), NSSize(width: 1586, height: 945)] {
+            window.setContentSize(size); root.layoutSubtreeIfNeeded()
+            XCTAssertEqual(inspector.mode.bounds.width, root.right.bounds.width - 32, accuracy: 1)
+            XCTAssertEqual(export.bounds.width, inspector.mode.bounds.width, accuracy: 1)
+            let nav = navigation.convert(navigation.bounds, to: inspector)
+            let form = device.convert(device.bounds, to: inspector)
+            if inspector.isFlipped { XCTAssertLessThan(nav.maxY, form.minY) }
+            else { XCTAssertGreaterThan(nav.minY, form.maxY) }
+            XCTAssertEqual(root.left.frame.minY, root.right.frame.minY, accuracy: 1)
+            XCTAssertEqual(root.left.frame.height, root.right.frame.height, accuracy: 1)
+        }
+        let tabs = try XCTUnwrap(descendants(inspector).compactMap { $0 as? InspectorTabs }.first)
+        tabs.selectTabViewItem(at: 2)
+        XCTAssertEqual(navigation.selectedIndex, 2, "Native page selection must update the visible navigation")
+        navigation.choose(0)
+        XCTAssertEqual(tabs.indexOfTabViewItem(try XCTUnwrap(tabs.selectedTabViewItem)), 0)
+    }
+
     @MainActor func testWorkspaceWindowAllowsBehindWindowMaterial() async throws {
         _ = NSApplication.shared
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

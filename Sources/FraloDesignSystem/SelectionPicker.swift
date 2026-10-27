@@ -6,7 +6,11 @@ import QuartzCore
 public final class ValuePicker: NSControl {
     private let indicator = NSView()
     private var buttons: [NSButton] = []
+    private var symbols: [String] = []
     private var selection: Int
+    public var controlHeight: CGFloat = FraloStyle.Workbench.controlHeight {
+        didSet { invalidateIntrinsicContentSize(); select(selection, animated: false, notify: false); needsLayout = true; needsDisplay = true }
+    }
     public var preferences = DesignPreferences()
     public var onChange: ((Int) -> Void)?
     public var selectedIndex: Int {
@@ -20,7 +24,7 @@ public final class ValuePicker: NSControl {
     public override var wantsUpdateLayer: Bool { true }
     public override var intrinsicContentSize: NSSize {
         let widths = buttons.map { $0.intrinsicContentSize.width + 20 }
-        return NSSize(width: (widths.max() ?? 50) * CGFloat(buttons.count), height: 30)
+        return NSSize(width: (widths.max() ?? 50) * CGFloat(buttons.count), height: controlHeight)
     }
 
     public init(_ titles: [String], label: String, selected: Int = 0, onChange: ((Int) -> Void)? = nil) {
@@ -45,6 +49,7 @@ public final class ValuePicker: NSControl {
         select(selection, animated: false, notify: false)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+    public func setSymbols(_ names: [String]) { symbols = names; select(selection, animated: false, notify: false) }
 
     public override func layout() {
         super.layout()
@@ -59,10 +64,13 @@ public final class ValuePicker: NSControl {
         return NSRect(x: CGFloat(selection) * width + 2, y: 2, width: max(0, width - 4), height: max(0, bounds.height - 4))
     }
     public override func updateLayer() {
-        layer?.backgroundColor = NSColor.quaternaryLabelColor.withAlphaComponent(0.12).cgColor
-        layer?.cornerRadius = bounds.height / 2
-        indicator.layer?.backgroundColor = NSColor.controlColor.cgColor
-        indicator.layer?.cornerRadius = max(0, bounds.height / 2 - 2)
+        layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.065).cgColor
+        layer?.cornerRadius = 10
+        indicator.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        indicator.layer?.cornerRadius = 8
+        indicator.layer?.shadowColor = NSColor.black.cgColor
+        indicator.layer?.shadowOpacity = preferences.effectiveIncreaseContrast ? 0 : 0.10
+        indicator.layer?.shadowRadius = 3; indicator.layer?.shadowOffset = NSSize(width: 0, height: -1)
         indicator.layer?.borderWidth = preferences.effectiveIncreaseContrast ? 1 : 0.5
         indicator.layer?.borderColor = NSColor.separatorColor.cgColor
         indicator.alphaValue = isEnabled ? 1 : 0.45
@@ -82,6 +90,16 @@ public final class ValuePicker: NSControl {
         let changed = index != selection; selection = index
         for (index, button) in buttons.enumerated() {
             button.state = index == selection ? .on : .off
+            button.font = .systemFont(ofSize: controlHeight >= 40 ? 14 : 13, weight: index == selection ? .semibold : .medium)
+            let title = NSAttributedString(string: button.title, attributes: [.font: button.font!,
+                .foregroundColor: index == selection ? NSColor.labelColor : NSColor.secondaryLabelColor])
+            button.attributedTitle = title; button.attributedAlternateTitle = title
+            if symbols.indices.contains(index) {
+                let image = NSImage(systemSymbolName: symbols[index], accessibilityDescription: nil)?
+                    .withSymbolConfiguration(.init(pointSize: 14, weight: .medium))?
+                    .withSymbolConfiguration(.init(paletteColors: [index == selection ? .controlAccentColor : .labelColor]))
+                button.image = image; button.imagePosition = .imageLeft; button.imageHugsTitle = true
+            }
             button.setAccessibilityValue(index == selection ? 1 : 0)
         }
         if animated && changed && window != nil {
@@ -112,8 +130,10 @@ public final class ValuePicker: NSControl {
 /// Actual NSTabView retains system navigation semantics and keyboard behavior.
 @MainActor
 public final class InspectorTabs: NSTabView, NSTabViewDelegate {
+    public enum Style { case standard, floating }
+    private var navigation: ValuePicker?
     public var onSelection: ((Int) -> Void)?
-    public init(_ pages: [(String, NSView)]) {
+    public init(_ pages: [(String, NSView)], style: Style = .standard) {
         // NSTabView lays out its chrome while adding items, before Auto Layout sizes it.
         super.init(frame: NSRect(x: 0, y: 0, width: 640, height: 400))
         tabViewType = .topTabsBezelBorder; delegate = self
@@ -121,9 +141,26 @@ public final class InspectorTabs: NSTabView, NSTabViewDelegate {
             let item = NSTabViewItem(identifier: index); item.label = page.0; item.view = page.1
             addTabViewItem(item)
         }
+        if style == .floating {
+            tabViewType = .noTabsNoBorder; drawsBackground = false
+            let bar = ValuePicker(pages.map(\.0), label: "设置页面")
+            bar.controlHeight = 42
+            bar.setSymbols(["iphone", "photo", "square.and.arrow.up"])
+            bar.setAccessibilityRole(.tabGroup)
+            bar.onChange = { [weak self] in self?.selectTabViewItem(at: $0) }
+            navigation = bar; addSubview(bar)
+        }
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     public func tabView(_ tabView: NSTabView, didSelect tabViewItem: NSTabViewItem?) {
-        guard let tabViewItem else { return }; onSelection?(indexOfTabViewItem(tabViewItem))
+        guard let tabViewItem else { return }
+        let index = indexOfTabViewItem(tabViewItem)
+        navigation?.selectedIndex = index; needsLayout = true; onSelection?(index)
+    }
+    public override func layout() {
+        super.layout()
+        guard let navigation else { return }
+        navigation.frame = NSRect(x: 0, y: isFlipped ? 0 : bounds.height - 42, width: bounds.width, height: 42)
+        selectedTabViewItem?.view?.frame = NSRect(x: 0, y: isFlipped ? 58 : 0, width: bounds.width, height: max(0, bounds.height - 58))
     }
 }

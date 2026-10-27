@@ -36,8 +36,8 @@ enum LabPages {
             FormSection("空间与尺寸", views: [
                 InfoRow("间距阶梯", value: "4 / 8 / 12 / 16 / 24 / 32 pt"),
                 InfoRow("图标按钮命中区", value: "28 × 28 pt · 图标来自 SF Symbols"),
-                InfoRow("参数选择器", value: "30 pt 起 · 单选语义，不冒充导航"),
-                InfoRow("缩略图", value: "48 × 60 pt 等比容纳，76 pt 行高")
+                InfoRow("参数选择器", value: "36 pt 起 · 模式 44 pt · 单选语义"),
+                InfoRow("缩略图", value: "72 × 66 pt 等比容纳，88 pt 行高")
             ]),
             FormSection("反馈与动效", detail: "系统开启减少动态效果时直接切换。上方模拟选项只能加强系统设置。", views: [
                 InfoRow("选择 / 结构 / 预览", value: "180 / 220 / 160 ms，减少动态效果时为 0"),
@@ -69,7 +69,7 @@ enum LabPages {
         let slider = SliderRow("设备缩放", range: 20...100, value: 74) { feedback.stringValue = "设备缩放：\(Int($0))%" }
         let opacity = SliderRow("设备透明度", range: 0...100, value: 100)
         let unavailable = SliderRow("不可用设置", range: 0...100, value: 40); unavailable.isEnabled = false
-        let navigation = InspectorTabs([("设备", FraloStyle.text("设备页内容")), ("背景", FraloStyle.text("背景页内容")), ("导出", FraloStyle.text("导出页内容"))])
+        let navigation = InspectorTabs([("设备", FraloStyle.text("设备页内容")), ("背景", FraloStyle.text("背景页内容")), ("导出", FraloStyle.text("导出页内容"))], style: .floating)
         navigation.heightAnchor.constraint(equalToConstant: 88).isActive = true
         navigation.onSelection = { feedback.stringValue = "内容导航切换到第 \($0 + 1) 页" }
         let list = BatchList(entries: state.samples.entries(longNames: true))

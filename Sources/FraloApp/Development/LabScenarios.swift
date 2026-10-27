@@ -159,7 +159,7 @@ final class ScenarioWorkbench: NSView {
         mode.preferences = state.preferences; modePicker = mode
         let heading = FraloStyle.stack([mode, FraloStyle.text("样式应用于全部 \(state.scenario.count) 张样例", role: .caption, secondary: true)], spacing: 10)
         let pages: [(String, NSView)] = [("设备", deviceControls()), ("背景", backgroundControls()), ("导出", exportControls())]
-        let tabs = InspectorTabs(pages.map { ($0.0, ScrollContent.make($0.1, inset: 0)) })
+        let tabs = InspectorTabs(pages.map { ($0.0, ScrollContent.make($0.1, inset: 0)) }, style: .floating)
         tabs.selectTabViewItem(at: inspectorIndex)
         tabs.onSelection = { [weak self] in self?.inspectorIndex = $0 }
         let action = ExportAction(count: state.scenario.count)

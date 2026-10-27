@@ -18,12 +18,14 @@ final class CompositionInspector: NSView {
     init(settings: CompositionSettings) {
         self.settings = settings
         mode = ValuePicker(["透明套壳", "背景成图"], label: "出图模式", selected: settings.mode == .transparent ? 0 : 1)
+        mode.controlHeight = 44
         super.init(frame: NSRect(x: 0, y: 0, width: 250, height: 500))
         mode.onChange = { [weak self] index in self?.edit(rebuild: true) { $0.mode = index == 0 ? .transparent : .background } }
         rebuild()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     func set(_ value: CompositionSettings) { settings = value; mode.selectedIndex = value.mode == .transparent ? 0 : 1 }
+    func chooseCanvas(_ value: CanvasRatio) { edit(rebuild: true) { $0.canvas = value } }
     func setEditingEnabled(_ enabled: Bool) {
         func visit(_ view: NSView) { (view as? NSControl)?.isEnabled = enabled; view.subviews.forEach(visit) }
         visit(self); mode.isEnabled = enabled
@@ -34,9 +36,9 @@ final class CompositionInspector: NSView {
     private func rebuild() {
         if settings.mode != .background || settings.background == .solid || settings.background == .gradient { dragBackground = false }
         tabs?.removeFromSuperview()
-        tabs = InspectorTabs([("设备", ScrollContent.make(devicePage(), inset: 10)),
-                              ("背景", ScrollContent.make(backgroundPage(), inset: 10)),
-                              ("导出", ScrollContent.make(exportPage(), inset: 10))])
+        tabs = InspectorTabs([("设备", ScrollContent.make(devicePage(), inset: 0)),
+                              ("背景", ScrollContent.make(backgroundPage(), inset: 0)),
+                              ("导出", ScrollContent.make(exportPage(), inset: 0))], style: .floating)
         tabs.translatesAutoresizingMaskIntoConstraints = false; addSubview(tabs)
         NSLayoutConstraint.activate([tabs.leadingAnchor.constraint(equalTo: leadingAnchor), tabs.trailingAnchor.constraint(equalTo: trailingAnchor), tabs.topAnchor.constraint(equalTo: topAnchor), tabs.bottomAnchor.constraint(equalTo: bottomAnchor)])
         tabs.selectTabViewItem(at: selectedTab); tabs.onSelection = { [weak self] index in
@@ -46,33 +48,35 @@ final class CompositionInspector: NSView {
         window?.recalculateKeyViewLoop()
     }
     private func column(_ views: [NSView]) -> NSView {
-        let stack = FraloStyle.stack(views, spacing: 18)
+        let stack = FraloStyle.stack(views, spacing: 20)
         for view in views { view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true }
         return stack
     }
     private func picker(_ titles: [String], label: String, selected: Int, change: @escaping (Int) -> Void) -> NSView {
         let control = ValuePicker(titles, label: label, selected: selected, onChange: change)
-        return column([FraloStyle.text(label, role: .detail, secondary: true), control])
+        return FraloStyle.stack([FraloStyle.text(label, role: .detail, secondary: true), control], spacing: 8, fillWidth: true)
     }
     private func slider(_ title: String, range: ClosedRange<Double>, value: Double, change: @escaping (Double) -> Void) -> SliderRow {
         SliderRow(title, range: range, value: value, onChange: change)
     }
     private func devicePage() -> NSView {
-        var views: [NSView] = [picker(["手机", "平板", "浏览器"], label: "展示类型", selected: DisplayKind.allCases.firstIndex(of: settings.display)!) { [weak self] index in self?.edit(rebuild: true) { $0.display = DisplayKind.allCases[index] } }]
+        let device = ValuePicker(["手机", "平板", "浏览器"], label: "展示类型", selected: DisplayKind.allCases.firstIndex(of: settings.display)!) { [weak self] index in self?.edit(rebuild: true) { $0.display = DisplayKind.allCases[index] } }
+        var views: [NSView] = [device]
         if settings.display == .browser {
-            views.append(ChoiceMenu(["Safari", "Chrome"], label: "浏览器外观", selected: settings.browser == .safari ? 0 : 1) { [weak self] index in self?.edit { $0.browser = index == 0 ? .safari : .chrome } })
-            views.append(ChoiceMenu(WindowRatio.allCases.map(\.rawValue), label: "浏览器窗口比例", selected: WindowRatio.allCases.firstIndex(of: settings.windowRatio)!) { [weak self] index in self?.edit { $0.windowRatio = WindowRatio.allCases[index] } })
+            views.append(FraloStyle.stack([FraloStyle.text("窗口样式", role: .detail, secondary: true), ChoiceMenu(["Safari", "Chrome"], label: "浏览器外观", selected: settings.browser == .safari ? 0 : 1) { [weak self] index in self?.edit { $0.browser = index == 0 ? .safari : .chrome } }], spacing: 6, fillWidth: true))
+            views.append(FraloStyle.stack([FraloStyle.text("窗口比例", role: .detail, secondary: true), ChoiceMenu(WindowRatio.allCases.map(\.rawValue), label: "浏览器窗口比例", selected: WindowRatio.allCases.firstIndex(of: settings.windowRatio)!) { [weak self] index in self?.edit { $0.windowRatio = WindowRatio.allCases[index] } }], spacing: 6, fillWidth: true))
         } else {
             views.append(ChoiceMenu([settings.display == .phone ? "iPhone" : "iPad"], label: "设备外框"))
             views.append(picker(["竖屏", "横屏"], label: "方向", selected: settings.orientation == .portrait ? 0 : 1) { [weak self] index in self?.edit { $0.orientation = index == 0 ? .portrait : .landscape } })
         }
         if settings.mode == .background {
             views.append(slider("设备缩放", range: 10...150, value: settings.deviceScale * 100) { [weak self] v in self?.edit { $0.deviceScale = v / 100 } })
-            views.append(ActionButton("设备居中", symbol: "scope") { [weak self] in self?.edit { $0.deviceX = 0; $0.deviceY = 0 } })
         }
         views.append(slider("设备透明度", range: 0...100, value: settings.deviceOpacity * 100) { [weak self] v in self?.edit { $0.deviceOpacity = v / 100 } })
         views.append(picker(["无", "柔和", "明显"], label: "阴影", selected: ShadowStyle.allCases.firstIndex(of: settings.shadow)!) { [weak self] index in self?.edit { if $0.mode == .transparent { $0.transparentShadow = ShadowStyle.allCases[index] } else { $0.backgroundShadow = ShadowStyle.allCases[index] } } })
-        if settings.mode == .background { views.append(FraloStyle.paragraph("可在成品上拖动设备；居中不改变设备大小。")) }
+        if settings.mode == .background {
+            views.append(ActionButton("居中", symbol: "arrow.up.and.down.and.arrow.left.and.right") { [weak self] in self?.edit { $0.deviceX = 0; $0.deviceY = 0 } })
+        }
         return column(views)
     }
     private func backgroundPage() -> NSView {

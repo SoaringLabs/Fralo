@@ -39,16 +39,61 @@ public final class IconButton: ActionButton {
 @MainActor
 public final class ChoiceMenu: NSPopUpButton {
     public var onChange: ((Int) -> Void)?
+    public var showsSurface = true { didSet { needsDisplay = true } }
+    public var displayTitle: String? { didSet { invalidateIntrinsicContentSize(); needsDisplay = true } }
+    public var leadingSymbol: String? { didSet { invalidateIntrinsicContentSize(); needsDisplay = true } }
     public init(_ titles: [String], label: String, selected: Int = 0, onChange: ((Int) -> Void)? = nil) {
         self.onChange = onChange
         super.init(frame: .zero, pullsDown: false)
         addItems(withTitles: titles)
         if titles.indices.contains(selected) { selectItem(at: selected) }
         target = self; action = #selector(changed(_:)); setAccessibilityLabel(label)
-        FraloStyle.configure(self)
+        isBordered = false; font = .systemFont(ofSize: 14, weight: .medium)
+        focusRingType = .exterior
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
-    @objc private func changed(_ sender: Any?) { if isEnabled { onChange?(indexOfSelectedItem) } }
+    @objc private func changed(_ sender: Any?) { needsDisplay = true; if isEnabled { onChange?(indexOfSelectedItem) } }
+    public override var intrinsicContentSize: NSSize {
+        let text = displayTitle ?? titleOfSelectedItem ?? ""
+        return NSSize(width: ceil((text as NSString).size(withAttributes: [.font: font ?? FraloStyle.TextRole.body.font]).width) + (leadingSymbol == nil && image == nil ? 38 : 62), height: 32)
+    }
+    public override var alignmentRectInsets: NSEdgeInsets { .init(top: 0, left: 0, bottom: 0, right: 0) }
+    public override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); needsDisplay = true }
+    public override func draw(_ dirtyRect: NSRect) {
+        let rect = bounds.insetBy(dx: 1, dy: 1)
+        let path = NSBezierPath(roundedRect: rect, xRadius: 8, yRadius: 8)
+        if showsSurface {
+            NSColor.controlBackgroundColor.withAlphaComponent(isEnabled ? 0.92 : 0.5).setFill(); path.fill()
+            NSColor.separatorColor.withAlphaComponent(0.20).setStroke(); path.lineWidth = 0.5; path.stroke()
+        }
+        let ink: NSColor = isEnabled ? .labelColor : .disabledControlTextColor
+        var leading: CGFloat = 11
+        if let image = leadingSymbol.flatMap({ NSImage(systemSymbolName: $0, accessibilityDescription: nil) }) ?? image {
+            let target = NSRect(x: 10, y: bounds.midY - 9, width: 18, height: 18)
+            let tinted = NSImage(size: target.size, flipped: false) { rect in
+                let scale = min(rect.width / max(1, image.size.width), rect.height / max(1, image.size.height))
+                let size = NSSize(width: image.size.width * scale, height: image.size.height * scale)
+                image.draw(in: NSRect(x: (rect.width - size.width) / 2, y: (rect.height - size.height) / 2, width: size.width, height: size.height))
+                ink.setFill(); rect.fill(using: .sourceIn); return true
+            }
+            tinted.draw(in: target); leading = 36
+        }
+        let text = displayTitle ?? titleOfSelectedItem ?? ""
+        let paragraph = NSMutableParagraphStyle(); paragraph.lineBreakMode = .byTruncatingTail
+        (text as NSString).draw(in: NSRect(x: leading, y: bounds.midY - 8, width: max(0, bounds.width - leading - 24), height: 19),
+                               withAttributes: [.font: font ?? FraloStyle.TextRole.body.font, .foregroundColor: ink, .paragraphStyle: paragraph])
+        if let arrow = NSImage(systemSymbolName: showsSurface ? "chevron.up.chevron.down" : "chevron.down", accessibilityDescription: nil) {
+            let tinted = NSImage(size: NSSize(width: 10, height: 12), flipped: false) { target in
+                let scale = min(target.width / max(1, arrow.size.width), target.height / max(1, arrow.size.height))
+                let size = NSSize(width: arrow.size.width * scale, height: arrow.size.height * scale)
+                arrow.draw(in: NSRect(x: (target.width - size.width) / 2, y: (target.height - size.height) / 2, width: size.width, height: size.height))
+                (self.showsSurface ? NSColor.controlAccentColor : ink).setFill(); target.fill(using: .sourceIn); return true
+            }
+            tinted.draw(in: NSRect(x: bounds.maxX - 17, y: bounds.midY - 6, width: 10, height: 12))
+        }
+    }
+    public override var focusRingMaskBounds: NSRect { bounds.insetBy(dx: 1, dy: 1) }
+    public override func drawFocusRingMask() { NSBezierPath(roundedRect: focusRingMaskBounds, xRadius: 8, yRadius: 8).fill() }
 }
 
 @MainActor
@@ -71,7 +116,8 @@ public final class SliderRow: NSStackView {
         self.onChange = onChange
         super.init(frame: .zero)
         orientation = .vertical; alignment = .leading; spacing = 6
-        addArrangedSubview(FraloStyle.text(title))
+        let label = FraloStyle.text(title); label.font = .systemFont(ofSize: 13, weight: .medium)
+        addArrangedSubview(label)
         let row = FraloStyle.stack([slider, valueLabel], axis: .horizontal, spacing: 8)
         addArrangedSubview(row); row.widthAnchor.constraint(equalTo: widthAnchor).isActive = true
         valueLabel.alignment = .right; valueLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 48).isActive = true
@@ -182,21 +228,35 @@ public final class ToggleControl: NSButton {
 @MainActor
 public final class ExportAction: NSStackView {
     public let primary = ActionButton("导出全部 · 0 张", role: .primary, symbol: "square.and.arrow.up")
-    public let disclosure = IconButton("chevron.down", label: "更多导出操作")
+    public let disclosure = ActionButton("", role: .primary, symbol: "chevron.down", label: "更多导出操作")
     public var onExportAll: (() -> Void)?
     public var onExportCurrent: (() -> Void)?
     public var count = 0 { didSet { primary.title = "导出全部 · \(count) 张"; refresh() } }
     public var isEnabled = true { didSet { refresh() } }
     public init(count: Int) {
         super.init(frame: .zero)
-        orientation = .horizontal; alignment = .centerY; spacing = 4
-        addArrangedSubview(primary); addArrangedSubview(disclosure)
+        orientation = .horizontal; alignment = .centerY; spacing = 0
+        wantsLayer = true; layer?.cornerRadius = 11
+        primary.drawsSurface = false; disclosure.drawsSurface = false
+        let divider = NSView(); divider.wantsLayer = true; divider.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.22).cgColor
+        addArrangedSubview(primary); addArrangedSubview(divider); addArrangedSubview(disclosure)
+        NSLayoutConstraint.activate([heightAnchor.constraint(equalToConstant: 46), primary.heightAnchor.constraint(equalTo: heightAnchor),
+            disclosure.heightAnchor.constraint(equalTo: heightAnchor), disclosure.widthAnchor.constraint(equalToConstant: 34),
+            divider.widthAnchor.constraint(equalToConstant: 1), divider.heightAnchor.constraint(equalToConstant: 24)])
+        primary.setContentHuggingPriority(.defaultLow, for: .horizontal)
         primary.onPress = { [weak self] in self?.onExportAll?() }
         disclosure.onPress = { [weak self] in self?.showMenu() }
         self.count = count; primary.title = "导出全部 · \(count) 张"; refresh()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
-    private func refresh() { primary.isEnabled = isEnabled && count > 0; disclosure.isEnabled = primary.isEnabled }
+    private func refresh() {
+        primary.isEnabled = isEnabled && count > 0; disclosure.isEnabled = primary.isEnabled
+        let accent = NSColor.controlAccentColor.blended(withFraction: 0.10, of: .black) ?? .controlAccentColor
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = (primary.isEnabled ? accent : NSColor.quaternaryLabelColor).cgColor
+        }
+    }
+    public override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); refresh() }
     public func exportCurrent() { if isEnabled && count > 0 { onExportCurrent?() } }
     private func showMenu() {
         let menu = NSMenu()

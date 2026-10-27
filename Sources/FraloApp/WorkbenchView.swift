@@ -43,16 +43,23 @@ final class WorkbenchView: NSView {
     }
     private func arrange(animated: Bool = false) {
         workspace.frame = bounds
-        let margin: CGFloat = 20, gap: CGFloat = 14
-        let leftWidth: CGFloat = collapsed ? 56 : 218, rightWidth: CGFloat = 282
-        let height = max(0, bounds.height - margin * 2)
-        let leftRect = NSRect(x: margin, y: margin, width: leftWidth, height: height)
-        let rightRect = NSRect(x: bounds.width - margin - rightWidth, y: margin, width: rightWidth, height: height)
+        let margin = min(30, max(20, bounds.width * 0.0185))
+        let gap = min(30, max(18, bounds.width * 0.019))
+        let chrome = safeAreaInsets.top
+        let compact = bounds.height - chrome < 720
+        let top: CGFloat = chrome + (compact ? 22 : 36)
+        let bottom: CGFloat = compact ? 22 : 62
+        let expandedWidth = min(268, max(206, bounds.width * 0.169))
+        let leftWidth: CGFloat = collapsed ? 56 : expandedWidth
+        let rightWidth = min(334, max(282, bounds.width * 0.211))
+        let height = max(0, bounds.height - top - bottom)
+        let leftRect = NSRect(x: margin, y: top, width: leftWidth, height: height)
+        let rightRect = NSRect(x: bounds.width - margin - rightWidth, y: top, width: rightWidth, height: height)
         let start = previewing ? margin : leftRect.maxX + gap
         let end = previewing ? bounds.width - margin : rightRect.minX - gap
-        let centerRect = NSRect(x: start, y: margin, width: max(0, end - start), height: height)
-        for (view, frame) in [(left as NSView, NSRect(x: margin, y: margin, width: 218, height: height)),
-                              (rail as NSView, NSRect(x: margin, y: margin, width: 56, height: height)), (right, rightRect), (content, centerRect)] {
+        let centerRect = NSRect(x: start, y: top, width: max(0, end - start), height: height + (compact ? 0 : 30))
+        for (view, frame) in [(left as NSView, NSRect(x: margin, y: top, width: expandedWidth, height: height)),
+                              (rail as NSView, NSRect(x: margin, y: top, width: 56, height: height)), (right, rightRect), (content, centerRect)] {
             if animated { view.animator().frame = frame } else { view.frame = frame }
         }
     }

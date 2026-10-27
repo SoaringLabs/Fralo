@@ -4,6 +4,16 @@ import AppKit
 /// This entire type and its entry points are absent from a Release compilation.
 @MainActor
 final class DevelopmentEntry: NSObject {
+    /// Deterministic content geometry for native reference-image comparisons.
+    func applyPreviewGeometry(to window: NSWindow?) {
+        guard CommandLine.arguments.contains("--workbench-preview"), let window,
+              let argument = CommandLine.arguments.first(where: { $0.hasPrefix("--preview-window=") }) else { return }
+        let parts = argument.dropFirst("--preview-window=".count).split(separator: "x").compactMap { Double($0) }
+        guard parts.count == 2, parts.allSatisfy(\.isFinite), parts[0] >= 1030, parts[1] >= 640 else { return }
+        let visible = window.screen?.visibleFrame ?? NSScreen.main!.visibleFrame
+        window.setContentSize(NSSize(width: min(parts[0], visible.width), height: min(parts[1], visible.height - 52)))
+        window.center()
+    }
     static var labOnly: Bool { CommandLine.arguments.contains("--design-lab-only") }
     private(set) var controller: DesignLabController?
     private var productMenu: NSMenu?

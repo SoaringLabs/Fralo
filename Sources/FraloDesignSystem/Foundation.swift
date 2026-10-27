@@ -4,14 +4,21 @@ import AppKit
 @MainActor
 public enum FraloStyle {
     public enum Button {
-        public static let height: CGFloat = 34
+        public static let height: CGFloat = 40
         public static let compactHeight: CGFloat = 28
-        public static let radius: CGFloat = 9
+        public static let radius: CGFloat = 10
         public static let compactRadius: CGFloat = 7
         public static let inset: CGFloat = 16
         public static let compactInset: CGFloat = 12
         public static let icon: CGFloat = 14
-        public static let compactIcon: CGFloat = 12
+        public static let compactIcon: CGFloat = 14
+    }
+
+    public enum Workbench {
+        public static let panelRadius: CGFloat = 20
+        public static let panelInset: CGFloat = 16
+        public static let rowHeight: CGFloat = 88
+        public static let controlHeight: CGFloat = 36
     }
 
     public enum Space {
@@ -28,10 +35,10 @@ public enum FraloStyle {
         public var font: NSFont {
             switch self {
             case .title: return .systemFont(ofSize: 23, weight: .semibold)
-            case .heading: return .systemFont(ofSize: 15, weight: .semibold)
-            case .body: return .systemFont(ofSize: 13)
-            case .detail: return .systemFont(ofSize: 12)
-            case .caption: return .systemFont(ofSize: 11)
+            case .heading: return .systemFont(ofSize: 17, weight: .semibold)
+            case .body: return .systemFont(ofSize: 14)
+            case .detail: return .systemFont(ofSize: 13)
+            case .caption: return .systemFont(ofSize: 12)
             }
         }
     }

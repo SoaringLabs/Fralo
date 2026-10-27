@@ -60,7 +60,11 @@ See [the development lab](development-lab.md) for running and [acceptance eviden
 
 The selected soft style is the shared `ActionButton` default in Debug and Release. Its implementation lives in `Sources/FraloDesignSystem/ActionButton.swift`; there is no separate Dev copy. `IconButton`, `ExportAction`, state actions, preview tools and the lab reuse it. The production workbench now consumes these shared implementations directly.
 
-`FraloStyle.Button` owns regular/compact heights (34/28 pt), corner radii (9/7 pt), content insets and symbol sizes. These are Fralo choices. Use regular buttons for panel actions and compact controls for toolbars. Keep an icon-only button's explicit accessibility label.
+`FraloStyle.Button` owns regular/compact heights (40/28 pt), corner radii (10/7 pt), content insets and symbol sizes. These are Fralo choices. Use regular buttons for panel actions and compact controls for toolbars. Keep an icon-only button's explicit accessibility label.
+
+The reference-image calibration uses 20 pt floating-panel radii, a 36 pt rounded value picker (44 pt for output mode), 32 pt soft native popups, 88 pt batch rows and 72 × 66 pt proportionally contained thumbnails. `InspectorTabs(style: .floating)` retains an actual borderless `NSTabView` with a persistent, icon-labelled navigation bar above the scrollable page; the lab's five-section navigation may use the standard style. `ExportAction` is a full-width 46 pt split action with separate whole-batch and current-image callbacks, press/hover feedback and keyboard focus. `ViewToolbar` can expose a real canvas-ratio popup alongside viewing scale and clean preview.
+
+Panel elevation and a restrained semantic tint belong to panel chrome only. Workspace material remains the complete native effect with no additional workspace tint (100% / 0% in the Dev experiment). `CanvasSurface.showsElevation` adds a viewing-only edge/shadow around background compositions, never changes artwork pixels or output aspect ratio. Batch selection uses a restrained accent fill with normal dark/light semantic text in both active and inactive windows.
 
 The four roles are primary, secondary, quiet and destructive. Busy state preserves width and requested availability; title changes update default accessibility labels and tooltips. Explicit icon labels and custom tooltips are retained. System accessibility changes refresh the button; reduced motion uses a static hourglass for busy feedback, while increased contrast strengthens the border.
 

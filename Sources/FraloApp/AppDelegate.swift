@@ -26,6 +26,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         #endif
+        #if FRALO_DEV
+        development.applyPreviewGeometry(to: controller.window)
+        #endif
         controller.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         let paths = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-") }

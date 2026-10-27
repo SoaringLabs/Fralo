@@ -7,6 +7,7 @@ public class ActionButton: NSButton {
     public enum Size { case regular, compact }
     public let size: Size
     public let role: Role
+    public var drawsSurface = true { didSet { needsDisplay = true } }
     public var onPress: (() -> Void)?
     public var preferences = DesignPreferences() { didSet { refresh() } }
     private let explicitLabel: String?
@@ -35,7 +36,7 @@ public class ActionButton: NSButton {
         self.role = role; self.size = size; self.onPress = onPress; explicitLabel = label
         super.init(frame: .zero)
         self.title = title; self.image = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
-        font = .systemFont(ofSize: size == .regular ? 13 : 12, weight: .medium)
+        font = .systemFont(ofSize: size == .regular ? 14 : 12, weight: .semibold)
         setButtonType(.momentaryPushIn); isBordered = false
         target = self; action = #selector(activate(_:)); focusRingType = .exterior
         hasDestructiveAction = role == .destructive; toolTip = label ?? title
@@ -83,7 +84,7 @@ public class ActionButton: NSButton {
     public override func mouseExited(with event: NSEvent) { isHovered = false; needsDisplay = true }
     public override func layout() {
         super.layout()
-        let x: CGFloat = title.isEmpty || image == nil ? bounds.midX - iconSide / 2 : inset
+        let x: CGFloat = title.isEmpty || image == nil ? bounds.midX - iconSide / 2 : contentStart
         activity.frame = NSRect(x: x, y: bounds.midY - iconSide / 2, width: iconSide, height: iconSide)
     }
     private func refresh() {
@@ -106,6 +107,10 @@ public class ActionButton: NSButton {
     private var radius: CGFloat { size == .regular ? FraloStyle.Button.radius : FraloStyle.Button.compactRadius }
     private var iconSide: CGFloat { size == .regular ? FraloStyle.Button.icon : FraloStyle.Button.compactIcon }
     private var iconSlot: CGFloat { image == nil ? 0 : iconSide + (size == .regular ? 10 : 8) }
+    private var contentStart: CGFloat {
+        let text = (title as NSString).size(withAttributes: [.font: font ?? FraloStyle.TextRole.body.font]).width
+        return max(inset, (bounds.width - text - iconSlot) / 2)
+    }
     private var surfaceRect: NSRect { bounds.insetBy(dx: 2, dy: 2) }
     public override var focusRingMaskBounds: NSRect { surfaceRect }
     public override func drawFocusRingMask() { NSBezierPath(roundedRect: surfaceRect, xRadius: radius, yRadius: radius).fill() }
@@ -114,12 +119,12 @@ public class ActionButton: NSButton {
         let pressed = cell?.isHighlighted == true && isEnabled
         let contrast = preferences.effectiveIncreaseContrast
         let path = NSBezierPath(roundedRect: surfaceRect, xRadius: radius, yRadius: radius)
-        let base = NSColor.controlBackgroundColor.blended(withFraction: 0.32, of: .windowBackgroundColor) ?? .controlBackgroundColor
+        let base = NSColor.labelColor.withAlphaComponent(0.065)
         var fill = base, edge = NSColor.separatorColor, ink = NSColor.labelColor
         var hasSurface = true
         switch role {
         case .primary:
-            fill = NSColor.controlAccentColor.blended(withFraction: 0.20, of: .black) ?? .controlAccentColor
+            fill = NSColor.controlAccentColor.blended(withFraction: 0.10, of: .black) ?? .controlAccentColor
             if isHovered { fill = fill.blended(withFraction: 0.04, of: .white) ?? fill }
             if pressed { fill = fill.blended(withFraction: 0.13, of: .black) ?? fill }
             edge = fill.blended(withFraction: 0.18, of: .black) ?? fill
@@ -140,7 +145,7 @@ public class ActionButton: NSButton {
             fill = base; edge = .separatorColor; ink = .disabledControlTextColor
             hasSurface = role != .quiet
         }
-        if hasSurface {
+        if hasSurface && drawsSurface {
             NSGraphicsContext.saveGraphicsState()
             if isEnabled && !pressed && !contrast && role != .quiet {
                 let shadow = NSShadow(); shadow.shadowColor = NSColor.black.withAlphaComponent(0.12)
@@ -153,8 +158,12 @@ public class ActionButton: NSButton {
             }
             edge.setStroke(); path.lineWidth = contrast ? 1.25 : 0.5; path.stroke()
         }
+        if !drawsSurface && isEnabled && (isHovered || pressed) {
+            (pressed ? NSColor.black.withAlphaComponent(0.12) : NSColor.white.withAlphaComponent(0.10)).setFill()
+            path.fill()
+        }
         let slot = iconSlot
-        let textRect = NSRect(x: inset + slot, y: bounds.midY - 8, width: max(0, bounds.width - inset * 2 - slot), height: 18)
+        let textRect = NSRect(x: contentStart + slot, y: bounds.midY - 8, width: max(0, bounds.width - contentStart * 2 - slot), height: 18)
         let centeredBusy = isBusy && image == nil
         if !title.isEmpty && !centeredBusy {
             let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .center; paragraph.lineBreakMode = .byTruncatingTail
@@ -163,11 +172,14 @@ public class ActionButton: NSButton {
         if !isBusy || preferences.effectiveReduceMotion {
             let icon = isBusy ? NSImage(systemSymbolName: "hourglass", accessibilityDescription: nil) : image
             if let icon {
-                let x: CGFloat = title.isEmpty || centeredBusy ? bounds.midX - iconSide / 2 : inset
+                let x: CGFloat = title.isEmpty || centeredBusy ? bounds.midX - iconSide / 2 : contentStart
                 let rect = NSRect(x: x, y: bounds.midY - iconSide / 2, width: iconSide, height: iconSide)
                 NSGraphicsContext.saveGraphicsState()
                 let tinted = NSImage(size: rect.size, flipped: true) { target in
-                    icon.draw(in: target); ink.setFill(); target.fill(using: .sourceIn); return true
+                    let scale = min(target.width / max(1, icon.size.width), target.height / max(1, icon.size.height))
+                    let size = NSSize(width: icon.size.width * scale, height: icon.size.height * scale)
+                    icon.draw(in: NSRect(x: (target.width - size.width) / 2, y: (target.height - size.height) / 2, width: size.width, height: size.height))
+                    ink.setFill(); target.fill(using: .sourceIn); return true
                 }
                 tinted.draw(in: rect); NSGraphicsContext.restoreGraphicsState()
             }

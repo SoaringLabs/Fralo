@@ -6,6 +6,7 @@ public final class MaterialSurface: NSView {
     public let role: Role
     public let effect = NSVisualEffectView()
     private let fallbackView = NSView()
+    private let panelTint = NSView()
     private var observer: NSObjectProtocol?
     public var preferences = DesignPreferences() { didSet { refresh() } }
     public var cornerRadius: CGFloat = 0 { didSet { refresh() } }
@@ -15,11 +16,11 @@ public final class MaterialSurface: NSView {
     public init(_ role: Role, radius: CGFloat = 0) {
         self.role = role; cornerRadius = radius
         super.init(frame: .zero)
-        wantsLayer = true; fallbackView.wantsLayer = true
+        wantsLayer = true; fallbackView.wantsLayer = true; panelTint.wantsLayer = true
         effect.material = role == .workspace ? .underWindowBackground : .sidebar
         effect.blendingMode = role == .workspace ? .behindWindow : .withinWindow
         effect.state = .followsWindowActiveState
-        for view in [effect, fallbackView] {
+        for view in [effect, panelTint, fallbackView] {
             view.translatesAutoresizingMaskIntoConstraints = false; addSubview(view)
             NSLayoutConstraint.activate([view.leadingAnchor.constraint(equalTo: leadingAnchor), view.trailingAnchor.constraint(equalTo: trailingAnchor),
                                          view.topAnchor.constraint(equalTo: topAnchor), view.bottomAnchor.constraint(equalTo: bottomAnchor)])
@@ -36,10 +37,12 @@ public final class MaterialSurface: NSView {
     public func refresh() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
             layer?.cornerRadius = cornerRadius; layer?.masksToBounds = true
-            layer?.borderColor = NSColor.separatorColor.cgColor
+            layer?.borderColor = (preferences.effectiveIncreaseContrast ? NSColor.separatorColor : NSColor.white.withAlphaComponent(0.30)).cgColor
             layer?.borderWidth = role == .panel ? (preferences.effectiveIncreaseContrast ? 1 : 0.5) : 0
             fallbackView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+            panelTint.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.18).cgColor
         }
+        panelTint.isHidden = role != .panel
         fallbackView.isHidden = !preferences.effectiveReduceTransparency
         effect.isHidden = !fallbackView.isHidden
     }
@@ -81,12 +84,15 @@ public enum ScrollContent {
 
 @MainActor
 public final class FloatingPanel: NSView {
-    public let surface = MaterialSurface(.panel, radius: 18)
+    public let surface = MaterialSurface(.panel, radius: FraloStyle.Workbench.panelRadius)
     /// The supplied body owns scrolling; the panel only arranges its viewport.
     public let body: NSView
-    public init(header: NSView, body: NSView, footer: NSView) {
+    public init(header: NSView, body: NSView, footer: NSView, bodySpacing: CGFloat = 12) {
         self.body = body
         super.init(frame: .zero)
+        wantsLayer = true
+        layer?.shadowColor = NSColor.black.cgColor; layer?.shadowOpacity = 0.10
+        layer?.shadowRadius = 16; layer?.shadowOffset = NSSize(width: 0, height: -6)
         for view in [surface, header, body, footer] { view.translatesAutoresizingMaskIntoConstraints = false; addSubview(view) }
         NSLayoutConstraint.activate([
             surface.leadingAnchor.constraint(equalTo: leadingAnchor), surface.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -96,10 +102,14 @@ public final class FloatingPanel: NSView {
             footer.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16), footer.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
             footer.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
             body.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16), body.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
-            body.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 12), body.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -12)
+            body.topAnchor.constraint(equalTo: header.bottomAnchor, constant: bodySpacing), body.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -12)
         ])
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+    public override func layout() {
+        super.layout()
+        layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: FraloStyle.Workbench.panelRadius, cornerHeight: FraloStyle.Workbench.panelRadius, transform: nil)
+    }
 }
 
 @MainActor
@@ -148,17 +158,19 @@ public final class ThumbnailRow: NSTableCellView {
         let image = NSImageView(); image.image = entry.image ?? NSImage(systemSymbolName: entry.failed ? "exclamationmark.triangle" : "photo", accessibilityDescription: nil)
         image.imageScaling = .scaleProportionallyUpOrDown
         image.translatesAutoresizingMaskIntoConstraints = false
-        let title = FraloStyle.text(entry.title)
+        let title = FraloStyle.text(entry.title); title.font = .systemFont(ofSize: 13, weight: .medium)
         let detail = FraloStyle.text(entry.detail, role: .caption, secondary: true)
+        detail.isHidden = entry.detail.isEmpty
         if entry.failed { detail.textColor = .systemRed }
         let text = FraloStyle.stack([title, detail], spacing: 4); text.translatesAutoresizingMaskIntoConstraints = false
         addSubview(image); addSubview(text)
         NSLayoutConstraint.activate([
             image.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8), image.centerYAnchor.constraint(equalTo: centerYAnchor),
-            image.widthAnchor.constraint(equalToConstant: 48), image.heightAnchor.constraint(equalToConstant: 60),
+            image.widthAnchor.constraint(equalToConstant: 72), image.heightAnchor.constraint(equalToConstant: 66),
             text.leadingAnchor.constraint(equalTo: image.trailingAnchor, constant: 8), text.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8), text.centerYAnchor.constraint(equalTo: centerYAnchor)
         ])
         textField = title; imageView = image
+        toolTip = entry.title
         setAccessibilityLabel(entry.title + (entry.failed ? "，加载失败" : ""))
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
@@ -174,6 +186,16 @@ private final class BatchNavigationTable: NSTableView {
 }
 
 @MainActor
+private final class BatchSelectionRow: NSTableRowView {
+    override var isEmphasized: Bool { get { true } set {} }
+    override var interiorBackgroundStyle: NSView.BackgroundStyle { .normal }
+    override func drawSelection(in dirtyRect: NSRect) {
+        NSColor.controlAccentColor.withAlphaComponent(0.17).setFill()
+        NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 2), xRadius: 11, yRadius: 11).fill()
+    }
+}
+
+@MainActor
 public final class BatchList: NSScrollView, NSTableViewDataSource, NSTableViewDelegate {
     private let table = BatchNavigationTable()
     private var updating = false
@@ -183,7 +205,8 @@ public final class BatchList: NSScrollView, NSTableViewDataSource, NSTableViewDe
     public var selectedIndex: Int? { entries.indices.contains(table.selectedRow) ? table.selectedRow : nil }
     public init(entries: [BatchEntry] = []) {
         super.init(frame: .zero)
-        table.headerView = nil; table.style = .sourceList; table.rowHeight = 76; table.backgroundColor = .clear
+        table.headerView = nil; table.style = .plain; table.rowHeight = FraloStyle.Workbench.rowHeight; table.backgroundColor = .clear
+        table.intercellSpacing = NSSize(width: 0, height: 4)
         table.allowsMultipleSelection = false; table.allowsEmptySelection = false
         let column = NSTableColumn(identifier: .init("source")); table.addTableColumn(column)
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
@@ -211,11 +234,13 @@ public final class BatchList: NSScrollView, NSTableViewDataSource, NSTableViewDe
     }
     public func numberOfRows(in tableView: NSTableView) -> Int { entries.count }
     public func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? { ThumbnailRow(entry: entries[row]) }
+    public func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? { BatchSelectionRow() }
     public func tableViewSelectionDidChange(_ notification: Notification) { if !updating, let selectedIndex { onSelection?(selectedIndex) } }
 }
 
 @MainActor
 public final class CanvasSurface: NSView {
+    public var showsElevation = false { didSet { needsDisplay = true } }
     public var image: NSImage? {
         didSet {
             needsDisplay = true
@@ -259,6 +284,13 @@ public final class CanvasSurface: NSView {
         guard let image else { return }
         let rect = imageRect
         guard rect.width > 0, rect.height > 0 else { return }
+        if showsElevation {
+            NSGraphicsContext.saveGraphicsState()
+            let shadow = NSShadow(); shadow.shadowColor = NSColor.black.withAlphaComponent(0.17)
+            shadow.shadowBlurRadius = 16; shadow.shadowOffset = NSSize(width: 0, height: -5); shadow.set()
+            NSColor.black.withAlphaComponent(0.12).setFill(); rect.fill()
+            NSGraphicsContext.restoreGraphicsState()
+        }
         NSGraphicsContext.saveGraphicsState()
         NSBezierPath(rect: rect).addClip()
         // Preview backing only. Its colors must never enter the exported image.
@@ -274,6 +306,10 @@ public final class CanvasSurface: NSView {
         image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true,
                    hints: [.interpolation: NSImageInterpolation.high])
         NSGraphicsContext.restoreGraphicsState()
+        if showsElevation {
+            NSColor.black.withAlphaComponent(0.09).setStroke()
+            let border = NSBezierPath(rect: rect); border.lineWidth = 0.5; border.stroke()
+        }
         if centerGuideX || centerGuideY {
             NSColor.controlAccentColor.withAlphaComponent(0.6).setStroke()
             let path = NSBezierPath(); path.lineWidth = 1
@@ -300,11 +336,20 @@ public final class ViewToolbar: NSView {
     public let surface = MaterialSurface(.panel, radius: 18)
     public let zoom = ChoiceMenu(["适应窗口", "100%", "50%"], label: "查看倍率")
     public let dimensions = FraloStyle.text("2400 × 1800", role: .detail, secondary: true)
-    public let preview = ActionButton("成品预览", role: .quiet, size: .compact)
+    public let composition = ChoiceMenu(["4:3"], label: "画布比例")
+    public var showsComposition = false { didSet { composition.isHidden = !showsComposition; dimensions.isHidden = showsComposition } }
+    public let preview = ActionButton("成品预览", role: .quiet, symbol: "photo")
     public init() {
         super.init(frame: .zero)
         surface.translatesAutoresizingMaskIntoConstraints = false; addSubview(surface)
-        let row = FraloStyle.stack([zoom, FraloStyle.divider(), dimensions, preview], axis: .horizontal, spacing: 12)
+        zoom.showsSurface = false; composition.showsSurface = false; composition.isHidden = true
+        zoom.leadingSymbol = "display"
+        func divider() -> NSView {
+            let view = NSView(); view.wantsLayer = true; view.layer?.backgroundColor = NSColor.separatorColor.withAlphaComponent(0.4).cgColor
+            view.widthAnchor.constraint(equalToConstant: 1).isActive = true; view.heightAnchor.constraint(equalToConstant: 22).isActive = true
+            return view
+        }
+        let row = FraloStyle.stack([zoom, divider(), dimensions, composition, divider(), preview], axis: .horizontal, spacing: 10)
         row.translatesAutoresizingMaskIntoConstraints = false; addSubview(row)
         NSLayoutConstraint.activate([
             surface.leadingAnchor.constraint(equalTo: leadingAnchor), surface.trailingAnchor.constraint(equalTo: trailingAnchor),
