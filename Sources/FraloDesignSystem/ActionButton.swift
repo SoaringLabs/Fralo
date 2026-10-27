@@ -124,11 +124,9 @@ public class ActionButton: NSButton {
         var hasSurface = true
         switch role {
         case .primary:
-            fill = NSColor.controlAccentColor.blended(withFraction: 0.10, of: .black) ?? .controlAccentColor
-            if isHovered { fill = fill.blended(withFraction: 0.04, of: .white) ?? fill }
-            if pressed { fill = fill.blended(withFraction: 0.13, of: .black) ?? fill }
+            let colors = Self.primaryColors(hovered: isHovered, pressed: pressed)
+            fill = colors.background; ink = colors.foreground
             edge = fill.blended(withFraction: 0.18, of: .black) ?? fill
-            ink = Self.contrastingText(on: fill)
         case .secondary:
             if isHovered { fill = fill.blended(withFraction: 0.06, of: .labelColor) ?? fill }
             if pressed { fill = fill.blended(withFraction: 0.12, of: .labelColor) ?? fill }
@@ -159,7 +157,8 @@ public class ActionButton: NSButton {
             edge.setStroke(); path.lineWidth = contrast ? 1.25 : 0.5; path.stroke()
         }
         if !drawsSurface && isEnabled && (isHovered || pressed) {
-            (pressed ? NSColor.black.withAlphaComponent(0.12) : NSColor.white.withAlphaComponent(0.10)).setFill()
+            let feedback: NSColor = role == .primary ? (ink == .white ? .black : .white) : .black
+            feedback.withAlphaComponent(pressed ? 0.13 : 0.06).setFill()
             path.fill()
         }
         let slot = iconSlot
@@ -184,6 +183,14 @@ public class ActionButton: NSButton {
                 tinted.draw(in: rect); NSGraphicsContext.restoreGraphicsState()
             }
         }
+    }
+    static func primaryColors(accent: NSColor = .controlAccentColor, hovered: Bool = false, pressed: Bool = false) -> (background: NSColor, foreground: NSColor) {
+        let base = accent.blended(withFraction: 0.10, of: .black) ?? accent
+        // Choose foreground from the resting surface once; interaction deepens its contrast.
+        let foreground = contrastingText(on: base)
+        let feedback: NSColor = foreground == .white ? .black : .white
+        let fill = base.blended(withFraction: pressed ? 0.13 : hovered ? 0.06 : 0, of: feedback) ?? base
+        return (fill, foreground)
     }
     private static func contrastingText(on background: NSColor) -> NSColor {
         guard let rgb = background.usingColorSpace(.sRGB) else { return .white }

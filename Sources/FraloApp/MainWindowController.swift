@@ -18,7 +18,6 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private let center = NSViewController()
     private let list = BatchList()
     private let viewing = ViewToolbar()
-    private let batchScope = FraloStyle.text("样式应用于全部 0 张", role: .caption, secondary: true)
     private let exportAction = ExportAction(count: 0)
     private let batchCount = FraloStyle.text("图片 · 0", role: .heading)
     private let documentTitle = FraloStyle.text("Fralo", role: .body)
@@ -92,9 +91,9 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         exportAction.onExportCurrent = { [weak self] in self?.exportCurrent(nil) }
         let inspectorBody = buildInspector()
         dimensions.alignment = .center
-        let right = FloatingPanel(header: FraloStyle.stack([FraloStyle.text("出图设置", role: .heading), inspectorUI.mode, batchScope], spacing: 8, fillWidth: true),
+        let right = FloatingPanel(header: FraloStyle.stack([FraloStyle.text("出图设置", role: .heading), inspectorUI.mode], spacing: 8, fillWidth: true),
                                   body: inspectorBody,
-                                  footer: FraloStyle.stack([FraloStyle.divider(), inspectorUI.exportSettings, dimensions, exportAction], spacing: 10, fillWidth: true), bodySpacing: 18)
+                                  footer: FraloStyle.stack([FraloStyle.divider(), exportAction], spacing: 10, fillWidth: true), bodySpacing: 18)
         workbench = WorkbenchView(left: left, right: right, content: center.view)
         workbench.collapsed = preferences.bool(forKey: "sidebarCollapsed")
         workbench.rail.expand.onPress = { [weak self] in self?.toggleSidebar(nil) }
@@ -369,30 +368,36 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
                 let display = snapshot.format == .jpeg ? try ImageInput(data: CompositionRenderer.data(frame.image, settings: snapshot), name: "preview.jpg").decode() : frame.image
                 return (frame, display, try input.dimensions(), try backdrop.map { try ImageInput(data: $0, name: "background.png").dimensions() })
             } }
-            DispatchQueue.main.async {
-                guard let self, self.previewRequest == generation else { return }
-                self.viewing.finishPreviewUpdate()
-                switch result {
-                case .success(let (frame, display, sourceSize, backgroundSize)):
-                    self.backgroundImageSize = backgroundSize
-                    if let row = self.items.firstIndex(where: { $0.input.id == input.id }), self.items[row].error != nil { self.items[row].error = nil; self.refreshList() }
-                    self.inspectorUI.sourceInfo.stringValue = "\(input.name)\n\(Int(sourceSize.width)) × \(Int(sourceSize.height))"
-                    self.dimensions.toolTip = "原始图片：" + self.inspectorUI.sourceInfo.stringValue
-                    self.inspectorUI.outputInfo.stringValue = "\(snapshot.format == .png ? "PNG" : "JPEG") · \(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height))"
-                    self.rendered = frame; self.renderedID = input.id; self.canvas.image = NSImage(cgImage: display, size: frame.pixelSize)
-                    self.canvas.showsElevation = snapshot.mode == .background
-                    self.canvas.showsTransparencyGrid = snapshot.mode == .background
-                    self.dimensions.stringValue = "\(snapshot.format == .png ? "PNG" : "JPEG") · \(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height))"
-                    self.empty.isHidden = true; self.layoutPreview()
-                case .failure(let error):
-                    self.canvas.image = nil; self.empty.isHidden = false; self.emptyMessage.stringValue = "无法生成成品"
-                    self.emptyAction.title = "重试预览"; self.emptyAction.onPress = { [weak self] in self?.scheduleThumbnails(); self?.requestPreview() }
-                    self.emptyDetail.stringValue = error.localizedDescription
-                    self.previewScroll.isHidden = true; self.footer.isHidden = true; self.dimensions.stringValue = "无法确定"
-                    if let i = self.items.firstIndex(where: { $0.input.id == input.id }) { self.items[i].error = error.localizedDescription; self.refreshList() }
+            // NSMenu runs a nested event-tracking loop, which does not drain main-queue work.
+            RunLoop.main.perform(inModes: [.default, .eventTracking, .modalPanel]) {
+                MainActor.assumeIsolated {
+                    guard let self, self.previewRequest == generation else { return }
+                    self.viewing.finishPreviewUpdate()
+                    switch result {
+                    case .success(let (frame, display, sourceSize, backgroundSize)):
+                        self.backgroundImageSize = backgroundSize
+                        if let row = self.items.firstIndex(where: { $0.input.id == input.id }), self.items[row].error != nil { self.items[row].error = nil; self.refreshList() }
+                        self.inspectorUI.sourceInfo.stringValue = "\(input.name)\n\(Int(sourceSize.width)) × \(Int(sourceSize.height))"
+                        self.dimensions.toolTip = "原始图片：" + self.inspectorUI.sourceInfo.stringValue
+                        self.inspectorUI.outputInfo.stringValue = "\(snapshot.format == .png ? "PNG" : "JPEG") · \(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height))"
+                        self.rendered = frame; self.renderedID = input.id; self.canvas.image = NSImage(cgImage: display, size: frame.pixelSize)
+                        self.canvas.setAccessibilityLabel("成品画布，" + input.name)
+                        self.canvas.showsElevation = snapshot.mode == .background
+                        self.canvas.showsTransparencyGrid = snapshot.mode == .background
+                        self.dimensions.stringValue = "\(snapshot.format == .png ? "PNG" : "JPEG") · \(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height))"
+                        self.empty.isHidden = true; self.layoutPreview()
+                    case .failure(let error):
+                        self.canvas.image = nil; self.empty.isHidden = false; self.emptyMessage.stringValue = "无法生成成品"
+                        self.emptyAction.title = "重试预览"; self.emptyAction.onPress = { [weak self] in self?.scheduleThumbnails(); self?.requestPreview() }
+                        self.emptyDetail.stringValue = error.localizedDescription
+                        self.previewScroll.isHidden = true; self.footer.isHidden = true; self.dimensions.stringValue = "无法确定"
+                        if let i = self.items.firstIndex(where: { $0.input.id == input.id }) { self.items[i].error = error.localizedDescription; self.refreshList() }
+                    }
+                    self.updateActions()
+                    self.window?.displayIfNeeded()
                 }
-                self.updateActions()
             }
+            CFRunLoopWakeUp(CFRunLoopGetMain())
         }
         renderWork = work; renderQueue.async(execute: work)
     }
@@ -517,7 +522,6 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         addButton.isEnabled = !isExporting
         workbench.rail.add.isEnabled = !isExporting
         batchCount.stringValue = "图片 · \(items.count)"
-        batchScope.stringValue = "样式应用于全部 \(items.count) 张"
         exportAction.count = items.count; exportAction.isEnabled = !isExporting
         workbench.rail.update(index: selectedIndex, count: items.count)
         copyButton.isEnabled = rendered != nil && !isExporting

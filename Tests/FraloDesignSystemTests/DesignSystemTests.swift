@@ -3,23 +3,78 @@ import XCTest
 @testable import FraloDesignSystem
 
 final class DesignSystemTests: XCTestCase {
-    @MainActor func testPanelIndicatorScrollsAndReservesAStableGutter() async {
+    @MainActor func testPercentageDisplayFitsWithoutQuantizingUneditedSliderValues() async {
+        var edits: [Double] = []
+        let value = 82.50456574675324
+        let field = ValueField(label: "质量", value: value, range: 10...100) { edits.append($0) }
+        XCTAssertEqual(field.stringValue, "82.5")
+        XCTAssertTrue(field.commit()); XCTAssertEqual(field.value, value); XCTAssertTrue(edits.isEmpty)
+        field.stringValue = "81.25"; XCTAssertTrue(field.commit())
+        XCTAssertEqual(edits, [81.25]); XCTAssertEqual(field.value, 81.25)
+        XCTAssertTrue(field.commit()); XCTAssertEqual(edits, [81.25])
+        field.restore(100); XCTAssertEqual(field.stringValue, "100")
+        let widest = ValueField(label: "缩放", value: 399.9, range: 100...400)
+        widest.frame = NSRect(x: 0, y: 0, width: 56, height: 24)
+        let textWidth = (widest.stringValue as NSString).size(withAttributes: [.font: widest.font!]).width
+        XCTAssertGreaterThanOrEqual(widest.cell!.drawingRect(forBounds: widest.bounds).width, textWidth)
+    }
+
+    @MainActor func testPrimaryPaletteKeepsForegroundAndTextContrastAcrossStates() async throws {
+        func luminance(_ color: NSColor) throws -> CGFloat {
+            let rgb = try XCTUnwrap(color.usingColorSpace(.sRGB))
+            func linear(_ x: CGFloat) -> CGFloat { x <= 0.04045 ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4) }
+            return 0.2126 * linear(rgb.redComponent) + 0.7152 * linear(rgb.greenComponent) + 0.0722 * linear(rgb.blueComponent)
+        }
+        for accent in [NSColor.systemBlue, .systemRed, .systemYellow, .systemPurple, .black, .white] {
+            let resting = ActionButton.primaryColors(accent: accent)
+            for (hovered, pressed) in [(false, false), (true, false), (true, true)] {
+                let colors = ActionButton.primaryColors(accent: accent, hovered: hovered, pressed: pressed)
+                XCTAssertEqual(colors.foreground, resting.foreground)
+                let a = try luminance(colors.background), b = try luminance(colors.foreground)
+                XCTAssertGreaterThanOrEqual((max(a, b) + 0.05) / (min(a, b) + 0.05), 4.5)
+            }
+        }
+    }
+
+    @MainActor func testExportHoverKeepsItsTextForeground() async throws {
+        _ = NSApplication.shared
+        let button = ActionButton("导出全部 · 11 张", role: .primary, symbol: "square.and.arrow.up")
+        button.appearance = NSAppearance(named: .aqua)
+        button.frame = NSRect(x: 0, y: 0, width: 300, height: 40)
+        func lightTextPixels() throws -> Int {
+            let bitmap = try XCTUnwrap(button.bitmapImageRepForCachingDisplay(in: button.bounds))
+            button.cacheDisplay(in: button.bounds, to: bitmap)
+            var count = 0
+            let scale = bitmap.pixelsWide / 300
+            for y in (10 * scale)..<(30 * scale) { for x in (60 * scale)..<(240 * scale) {
+                if let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB),
+                   color.redComponent > 0.88, color.greenComponent > 0.88, color.blueComponent > 0.88 { count += 1 }
+            } }
+            return count
+        }
+        let before = try lightTextPixels()
+        XCTAssertGreaterThan(before, 30)
+        let enter = try XCTUnwrap(NSEvent.enterExitEvent(with: .mouseEntered, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: 0, context: nil, eventNumber: 1, trackingNumber: 1, userData: nil))
+        button.mouseEntered(with: enter)
+        XCTAssertGreaterThanOrEqual(try lightTextPixels(), Int(Double(before) * 0.9), "Hover must not turn white text and icons black")
+    }
+
+    @MainActor func testHiddenPanelIndicatorsKeepTheSameViewportWidth() async {
         _ = NSApplication.shared
         final class FlippedDocument: NSView { override var isFlipped: Bool { true } }
         let scroll = PanelScrollView(frame: NSRect(x: 0, y: 0, width: 320, height: 240))
-        let document = FlippedDocument(frame: NSRect(x: 0, y: 0, width: 308, height: 1000))
-        scroll.documentView = document; scroll.tile()
+        let document = FlippedDocument(frame: NSRect(x: 0, y: 0, width: 320, height: 1000))
+        scroll.documentView = document; scroll.scrollerStyle = .legacy; scroll.tile()
         let width = scroll.contentView.bounds.width
-        XCTAssertFalse(scroll.positionIndicator.isHidden)
-        XCTAssertTrue(scroll.positionIndicator.isEnabled)
-        scroll.positionIndicator.doubleValue = 0.75
-        scroll.positionIndicator.sendAction(scroll.positionIndicator.action, to: scroll)
-        XCTAssertEqual(scroll.contentView.bounds.minY, 570, accuracy: 1)
+        XCTAssertEqual(width, 320)
+        scroll.contentView.scroll(to: NSPoint(x: 0, y: 500)); scroll.reflectScrolledClipView(scroll.contentView)
+        XCTAssertEqual(scroll.contentView.bounds.minY, 500)
         for height: CGFloat in [100, 1200, 150, 1000] {
             document.setFrameSize(NSSize(width: width, height: height)); scroll.tile()
             XCTAssertEqual(scroll.contentView.bounds.width, width)
-            XCTAssertEqual(scroll.positionIndicator.isHidden, height <= 240)
-            XCTAssertEqual(scroll.positionIndicator.isEnabled, height > 240)
+            XCTAssertFalse(scroll.hasVerticalScroller); XCTAssertFalse(scroll.hasHorizontalScroller)
+            XCTAssertTrue(scroll.subviews.compactMap { $0 as? NSScroller }.isEmpty)
         }
     }
 

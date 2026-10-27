@@ -33,13 +33,13 @@ public final class VisualChoiceGroup: NSControl {
         return NSSize(width: 280, height: CGFloat(rows) * rowHeight + CGFloat(max(0, rows - 1)) * 8)
     }
     public init(_ items: [VisualChoiceItem], label: String, selected: Int? = 0,
-                layout: Layout = .tiles(columns: 2, height: 112), onChange: ((Int) -> Void)? = nil) {
+                layout: Layout = .tiles(columns: 2, height: 112), captionsBelow: Bool = false, onChange: ((Int) -> Void)? = nil) {
         precondition(!items.isEmpty)
         arrangement = layout; selection = selected.flatMap { items.indices.contains($0) ? $0 : nil }; self.onChange = onChange
         super.init(frame: .zero)
         setAccessibilityElement(true); setAccessibilityRole(.radioGroup); setAccessibilityLabel(label)
         for (index, item) in items.enumerated() {
-            let card = VisualChoiceCard(item: item, horizontal: { if case .row = layout { return true }; return false }())
+            let card = VisualChoiceCard(item: item, horizontal: { if case .row = layout { return true }; return false }(), captionsBelow: captionsBelow)
             card.tag = index; card.target = self; card.action = #selector(pressed(_:))
             cards.append(card); addSubview(card)
         }
@@ -85,7 +85,7 @@ public final class VisualChoiceGroup: NSControl {
         default: super.keyDown(with: event)
         }
     }
-    public override var focusRingMaskBounds: NSRect { selection.map { cards[$0].frame } ?? bounds }
+    public override var focusRingMaskBounds: NSRect { selection.map { cards[$0].convert(cards[$0].surfaceBounds, to: self) } ?? bounds }
     public override func drawFocusRingMask() { NSBezierPath(roundedRect: focusRingMaskBounds.insetBy(dx: 2, dy: 2), xRadius: 12, yRadius: 12).fill() }
 }
 
@@ -93,6 +93,7 @@ public final class VisualChoiceGroup: NSControl {
 private final class VisualChoiceCard: NSButton {
     private let item: VisualChoiceItem
     private let horizontal: Bool
+    private let captionsBelow: Bool
     private var hovered = false
     private var tracking: NSTrackingArea?
     var artwork: NSImage? { didSet { needsDisplay = true } }
@@ -100,8 +101,9 @@ private final class VisualChoiceCard: NSButton {
     var preferences = DesignPreferences() { didSet { needsDisplay = true } }
     override var isEnabled: Bool { didSet { needsDisplay = true } }
     override var isFlipped: Bool { true }
-    init(item: VisualChoiceItem, horizontal: Bool) {
-        self.item = item; self.horizontal = horizontal; artwork = item.image
+    var surfaceBounds: NSRect { NSRect(x: 0, y: 0, width: bounds.width, height: bounds.height - (captionsBelow ? 24 : 0)) }
+    init(item: VisualChoiceItem, horizontal: Bool, captionsBelow: Bool) {
+        self.item = item; self.horizontal = horizontal; self.captionsBelow = captionsBelow && !horizontal; artwork = item.image
         super.init(frame: .zero)
         title = item.title; setButtonType(.pushOnPushOff); isBordered = false; refusesFirstResponder = true
         setAccessibilityElement(true); setAccessibilityRole(.radioButton)
@@ -119,7 +121,7 @@ private final class VisualChoiceCard: NSButton {
     override func mouseExited(with event: NSEvent) { hovered = false; needsDisplay = true }
     override func draw(_ dirtyRect: NSRect) {
         let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        let rect = bounds.insetBy(dx: 1, dy: 1)
+        let rect = surfaceBounds.insetBy(dx: 1, dy: 1)
         let path = NSBezierPath(roundedRect: rect, xRadius: 12, yRadius: 12)
         let pressed = cell?.isHighlighted == true && isEnabled
         let neutral = NSColor(white: dark ? 1 : 0, alpha: pressed ? 0.10 : hovered && isEnabled ? 0.075 : 0.035)
@@ -128,6 +130,7 @@ private final class VisualChoiceCard: NSButton {
         (accented ? NSColor.controlAccentColor.withAlphaComponent(0.90) : NSColor.labelColor.withAlphaComponent(preferences.effectiveIncreaseContrast ? 0.65 : 0.09)).setStroke()
         path.lineWidth = accented || preferences.effectiveIncreaseContrast ? 1.5 : 0.5; path.stroke()
         let imageArea = horizontal ? NSRect(x: 14, y: 10, width: 56, height: bounds.height - 20)
+            : captionsBelow ? surfaceBounds.insetBy(dx: 12, dy: 12)
             : NSRect(x: 12, y: 10, width: bounds.width - 24, height: max(20, bounds.height - 50))
         if let image = artwork ?? NSImage(systemSymbolName: item.symbol, accessibilityDescription: nil)?.withSymbolConfiguration(.init(paletteColors: [.secondaryLabelColor])) {
             let scale = min(imageArea.width / max(1, image.size.width), imageArea.height / max(1, image.size.height))
@@ -138,7 +141,7 @@ private final class VisualChoiceCard: NSButton {
         let textX: CGFloat = horizontal ? 84 : 8
         let textWidth = bounds.width - textX - (horizontal ? 34 : 8)
         let paragraph = NSMutableParagraphStyle(); paragraph.alignment = horizontal ? .left : .center; paragraph.lineBreakMode = .byTruncatingTail
-        let y = horizontal ? bounds.midY - 16 : bounds.height - 36
+        let y = horizontal ? bounds.midY - 16 : captionsBelow ? surfaceBounds.maxY + 5 : bounds.height - 36
         (item.title as NSString).draw(in: NSRect(x: textX, y: y, width: max(0, textWidth), height: 18),
             withAttributes: [.font: NSFont.systemFont(ofSize: horizontal ? 14 : 12, weight: chosen ? .semibold : .medium), .foregroundColor: isEnabled ? NSColor.labelColor : .disabledControlTextColor, .paragraphStyle: paragraph])
         (item.detail as NSString).draw(in: NSRect(x: textX, y: y + 18, width: max(0, textWidth), height: 15),

@@ -48,12 +48,13 @@ final class CompositionInspector: NSView {
         }
         configure(backgroundSection, views: [FraloStyle.text("背景与画布", role: .heading), backgroundType, backgroundDetails])
         let deviceSection = FormSection("设备", views: [devicePicker, deviceDetails])
-        let body = FraloStyle.stack([deviceSection, backgroundSection], spacing: 24, fillWidth: true)
+        configure(exportSettings, views: [FraloStyle.text("导出", role: .heading), formatPicker, exportDetails, outputInfo])
+        outputInfo.alignment = .center
+        let body = FraloStyle.stack([deviceSection, backgroundSection, FraloStyle.divider(), exportSettings], spacing: 24, fillWidth: true)
         let scroll = ScrollContent.make(body, inset: 0)
         scroll.translatesAutoresizingMaskIntoConstraints = false; addSubview(scroll)
         NSLayoutConstraint.activate([scroll.leadingAnchor.constraint(equalTo: leadingAnchor), scroll.trailingAnchor.constraint(equalTo: trailingAnchor),
                                      scroll.topAnchor.constraint(equalTo: topAnchor), scroll.bottomAnchor.constraint(equalTo: bottomAnchor)])
-        configure(exportSettings, views: [FraloStyle.text("导出", role: .heading), formatPicker, exportDetails])
         rebuildDevice(); rebuildBackground(); rebuildExport()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
@@ -109,12 +110,12 @@ final class CompositionInspector: NSView {
         modelCards = nil; orientationCards = nil
         var views: [NSView] = []
         if settings.display == .browser {
-            let cards = VisualChoiceGroup([.init("Safari", symbol: "safari"), .init("Chrome", symbol: "globe")], label: "浏览器外观", selected: settings.browser == .safari ? 0 : 1) { [weak self] index in self?.editDevice { $0.browser = index == 0 ? .safari : .chrome } }
+            let cards = VisualChoiceGroup([.init("Safari", symbol: "safari"), .init("Chrome", symbol: "globe")], label: "浏览器外观", selected: settings.browser == .safari ? 0 : 1, captionsBelow: true) { [weak self] index in self?.editDevice { $0.browser = index == 0 ? .safari : .chrome } }
             modelCards = cards; views.append(cards)
             views.append(labeled("窗口比例", ChoiceMenu(WindowRatio.allCases.map(\.rawValue), label: "浏览器窗口比例", selected: WindowRatio.allCases.firstIndex(of: settings.windowRatio)!) { [weak self] index in self?.editDevice { $0.windowRatio = WindowRatio.allCases[index] } }))
         } else {
             views.append(FraloStyle.text(settings.display == .phone ? "iPhone · 标准外框" : "iPad · 标准外框", role: .detail, secondary: true))
-            let orientation = VisualChoiceGroup([.init("竖屏", symbol: "rectangle.portrait"), .init("横屏", symbol: "rectangle")], label: "方向", selected: settings.orientation == .portrait ? 0 : 1) { [weak self] index in
+            let orientation = VisualChoiceGroup([.init("竖屏", symbol: "rectangle.portrait"), .init("横屏", symbol: "rectangle")], label: "方向", selected: settings.orientation == .portrait ? 0 : 1, captionsBelow: true) { [weak self] index in
                 self?.editDevice { $0.orientation = index == 0 ? .portrait : .landscape }; self?.refreshArtwork()
             }
             orientationCards = orientation; views.append(labeled("方向", orientation))

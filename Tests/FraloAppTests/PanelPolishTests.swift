@@ -15,6 +15,10 @@ final class PanelPolishTests: XCTestCase {
         let window = try XCTUnwrap(controller.window), root = try XCTUnwrap(window.contentView as? WorkbenchView)
         let inspector = try XCTUnwrap(root.right.body as? CompositionInspector)
         let scroll = try XCTUnwrap(inspector.subviews.first as? NSScrollView)
+        let document = try XCTUnwrap(scroll.documentView)
+        XCTAssertTrue(inspector.exportSettings.isDescendant(of: document), "Export format and JPEG parameters must scroll with the other settings")
+        XCTAssertTrue(inspector.outputInfo.isDescendant(of: document), "The output summary belongs to the scrolling settings")
+        XCTAssertFalse(inspector.mode.isDescendant(of: document), "The mode selector stays pinned above the scrolling form")
         // Reproduce the user's always-visible native scrollbar preference without changing the OS.
         scroll.scrollerStyle = .legacy
         window.setContentSize(NSSize(width: 1400, height: 1000)); root.layoutSubtreeIfNeeded()
@@ -71,6 +75,11 @@ final class PanelPolishTests: XCTestCase {
         }
         let before = try illustration()
         list.select(1)
+        let deadline = Date(timeIntervalSinceNow: 1.5)
+        while canvas.image === first && Date() < deadline {
+            RunLoop.current.run(mode: .eventTracking, before: Date(timeIntervalSinceNow: 0.02))
+        }
+        XCTAssertFalse(canvas.image === first, "The canvas must update while a contextual menu is tracking, before it closes")
         for _ in 0..<150 where canvas.image === first { try await Task.sleep(nanoseconds: 20_000_000) }
         XCTAssertFalse(canvas.image === first, "The real preview still follows the selected input")
         XCTAssertEqual(try illustration(), before, "The inspector demo must not follow the selected input")

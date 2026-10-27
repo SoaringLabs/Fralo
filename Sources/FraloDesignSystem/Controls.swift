@@ -124,7 +124,7 @@ public final class SliderRow: NSStackView {
         let suffix = FraloStyle.text("%", role: .detail, secondary: true)
         let row = FraloStyle.stack([slider, valueField, suffix], axis: .horizontal, spacing: 5)
         addArrangedSubview(row); row.widthAnchor.constraint(equalTo: widthAnchor).isActive = true
-        valueLabel.alignment = .right; valueLabel.widthAnchor.constraint(equalToConstant: 48).isActive = true
+        valueLabel.alignment = .right; valueLabel.widthAnchor.constraint(equalToConstant: 56).isActive = true
         valueLabel.setContentHuggingPriority(.required, for: .horizontal)
         valueLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
         slider.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -150,22 +150,28 @@ public final class ValueField: NSTextField, NSTextFieldDelegate {
     public init(label: String, value: Double, range: ClosedRange<Double>, onCommit: ((Double) -> Void)? = nil) {
         self.range = range; self.value = min(range.upperBound, max(range.lowerBound, value)); self.onCommit = onCommit
         super.init(frame: .zero)
-        stringValue = String(format: "%g", self.value); delegate = self; setAccessibilityLabel(label)
-        FraloStyle.configure(self); bezelStyle = .roundedBezel
+        stringValue = Self.display(self.value); delegate = self; setAccessibilityLabel(label)
+        FraloStyle.configure(self); font = .monospacedDigitSystemFont(ofSize: 13, weight: .regular); bezelStyle = .roundedBezel
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     public func restore(_ next: Double) {
         guard next.isFinite else { return }; value = min(range.upperBound, max(range.lowerBound, next))
-        stringValue = String(format: "%g", value)
+        stringValue = Self.display(value)
     }
     @discardableResult public func commit() -> Bool {
         guard isEnabled, let parsed = Double(stringValue), parsed.isFinite, range.contains(parsed) else {
-            stringValue = String(format: "%g", value); NSAccessibility.post(element: self, notification: .valueChanged); return false
+            stringValue = Self.display(value); NSAccessibility.post(element: self, notification: .valueChanged); return false
         }
+        // Merely leaving the rounded display must not quantize an untouched slider value.
+        if stringValue == Self.display(value) { return true }
         let changed = parsed != value; restore(parsed)
         if changed { onCommit?(parsed) }; return true
     }
     public func controlTextDidEndEditing(_ obj: Notification) { _ = commit() }
+    private static func display(_ value: Double) -> String {
+        let text = String(format: "%.1f", value)
+        return text.hasSuffix(".0") ? String(text.dropLast(2)) : text
+    }
 }
 
 @MainActor
@@ -261,8 +267,8 @@ public final class ExportAction: NSStackView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     private func refresh() {
         primary.isEnabled = isEnabled && count > 0; disclosure.isEnabled = primary.isEnabled
-        let accent = NSColor.controlAccentColor.blended(withFraction: 0.10, of: .black) ?? .controlAccentColor
         effectiveAppearance.performAsCurrentDrawingAppearance {
+            let accent = ActionButton.primaryColors().background
             layer?.backgroundColor = (primary.isEnabled ? accent : NSColor.quaternaryLabelColor).cgColor
         }
     }
