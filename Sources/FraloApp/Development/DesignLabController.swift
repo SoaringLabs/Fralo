@@ -10,6 +10,8 @@ final class DesignLabState {
     var selectedPage = 0
     var materialIndex = 0
     var blendingIndex = 0
+    var materialOpacity = 100.0
+    var materialTint = 0.0
     var scenario = ScenarioState()
     let samples: LabSamples
     init(samples: LabSamples? = nil) { self.samples = samples ?? LabSamples() }
@@ -32,6 +34,7 @@ final class DesignLabController: NSWindowController {
         window.title = "Fralo · 设计实验室"
         window.identifier = .init("FraloDesignLab")
         window.contentMinSize = NSSize(width: 1040, height: 680)
+        window.isOpaque = false; window.backgroundColor = .clear
         window.isReleasedWhenClosed = false; window.autorecalculatesKeyViewLoop = true; window.center()
         rebuild()
         observer = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
@@ -45,7 +48,7 @@ final class DesignLabController: NSWindowController {
     func rebuild() {
         guard let window else { return }
         window.appearance = state.appearance == 1 ? NSAppearance(named: .aqua) : state.appearance == 2 ? NSAppearance(named: .darkAqua) : nil
-        let root = NeutralSurface(); root.setAccessibilityIdentifier("design-lab-root")
+        let root = LabRootSurface(); root.setAccessibilityIdentifier("design-lab-root")
         let title = FraloStyle.text("设计实验室", role: .title)
         let subtitle = FraloStyle.text("开发构建 · 稳定组件与实验候选分开验证 · 不修改用户批次或设置", role: .detail, secondary: true)
         let heading = FraloStyle.stack([title, subtitle], spacing: 4)
@@ -59,7 +62,8 @@ final class DesignLabController: NSWindowController {
             toggle("模拟增强对比度", value: state.preferences.increaseContrast) { $0.preferences.increaseContrast = $1 },
             NSView(), ActionButton("重置实验", role: .quiet) { [weak self] in
                 self?.state.preferences = .init(); self?.state.appearance = 0; self?.state.scenario = .init()
-                self?.state.materialIndex = 0; self?.state.blendingIndex = 0; self?.rebuild()
+                self?.state.materialIndex = 0; self?.state.blendingIndex = 0
+                self?.state.materialOpacity = 100; self?.state.materialTint = 0; self?.rebuild()
             }
         ], axis: .horizontal, spacing: 16)
         scenarioView = ScenarioWorkbench(state: state)
@@ -71,7 +75,14 @@ final class DesignLabController: NSWindowController {
         ]
         tabs = InspectorTabs(pages)
         tabs.selectTabViewItem(at: state.selectedPage)
-        tabs.onSelection = { [weak self] in self?.state.selectedPage = $0 }
+        root.transparent = state.selectedPage == 2 && !state.preferences.effectiveReduceTransparency
+        tabs.drawsBackground = !root.transparent
+        tabs.onSelection = { [weak self, weak root] index in
+            guard let self, let root else { return }
+            self.state.selectedPage = index
+            root.transparent = index == 2 && !self.state.preferences.effectiveReduceTransparency
+            self.tabs.drawsBackground = !root.transparent
+        }
         refreshStatus()
         for view in [top, preferences, tabs!, systemStatus] { view.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(view) }
         NSLayoutConstraint.activate([
@@ -99,6 +110,17 @@ final class DesignLabController: NSWindowController {
         systemStatus.stringValue = "系统实际设置：降低透明度 \(workspace.accessibilityDisplayShouldReduceTransparency ? "开" : "关") · 减少动态效果 \(workspace.accessibilityDisplayShouldReduceMotion ? "开" : "关") · 增强对比度 \(workspace.accessibilityDisplayShouldIncreaseContrast ? "开" : "关")。模拟仅加强当前设置，正式材质随系统变化。"
     }
     func selectPage(_ index: Int) { tabs.selectTabViewItem(at: index); window?.contentView?.layoutSubtreeIfNeeded() }
+}
+
+/// Only Materials exposes the desktop. Other lab pages retain their neutral surface.
+@MainActor
+private final class LabRootSurface: NSView {
+    var transparent = false { didSet { needsDisplay = true } }
+    override var isOpaque: Bool { !transparent }
+    override func draw(_ dirtyRect: NSRect) {
+        if !transparent { NSColor.windowBackgroundColor.setFill(); bounds.fill() }
+    }
+    override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); needsDisplay = true }
 }
 
 #endif

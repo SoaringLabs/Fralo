@@ -107,10 +107,20 @@ final class MaterialExperiment: NSView {
     let panel = MaterialSurface(.panel, radius: 18)
     let canvas = CanvasSurface()
     let status = FraloStyle.text("", role: .detail, secondary: true)
+    let opacity = SliderRow("材质层不透明度", range: 0...100, value: 100)
+    let tint = SliderRow("背景遮罩浓度", range: 0...100, value: 0)
+    let tintOverlay = NSView()
     private let state: DesignLabState
     init(state: DesignLabState) {
         self.state = state; super.init(frame: .zero)
         workspace.preferences = state.preferences; panel.preferences = state.preferences
+        tintOverlay.wantsLayer = true
+        tintOverlay.translatesAutoresizingMaskIntoConstraints = false
+        workspace.addSubview(tintOverlay)
+        NSLayoutConstraint.activate([
+            tintOverlay.leadingAnchor.constraint(equalTo: workspace.leadingAnchor), tintOverlay.trailingAnchor.constraint(equalTo: workspace.trailingAnchor),
+            tintOverlay.topAnchor.constraint(equalTo: workspace.topAnchor), tintOverlay.bottomAnchor.constraint(equalTo: workspace.bottomAnchor)
+        ])
         canvas.image = state.samples.backgrounds.first
         let materials: [(String, NSVisualEffectView.Material)] = [("窗口背后背景", .underWindowBackground), ("页面背后背景", .underPageBackground), ("侧栏材质", .sidebar)]
         workspace.material = materials[state.materialIndex].1
@@ -122,25 +132,54 @@ final class MaterialExperiment: NSView {
             self?.state.blendingIndex = index; self?.workspace.effect.blendingMode = index == 0 ? .behindWindow : .withinWindow; self?.updateStatus()
         }
         blend.preferences = state.preferences
+        opacity.onChange = { [weak self] value in self?.state.materialOpacity = value; self?.refreshTranslucency() }
+        tint.onChange = { [weak self] value in self?.state.materialTint = value; self?.refreshTranslucency() }
+        let presets = FraloStyle.stack([
+            ActionButton("更通透", size: .compact) { [weak self] in self?.setTranslucency(opacity: 65, tint: 0) },
+            ActionButton("更柔实", size: .compact) { [weak self] in self?.setTranslucency(opacity: 100, tint: 35) },
+            ActionButton("实色参考", size: .compact) { [weak self] in self?.setTranslucency(opacity: 100, tint: 100) }
+        ], axis: .horizontal, spacing: 8)
+        let reset = ActionButton("恢复原生效果") { [weak self] in self?.setTranslucency(opacity: 100, tint: 0) }
         let controls = FraloStyle.stack([FraloStyle.text("实验候选", role: .heading), choice, blend,
-            FraloStyle.paragraph("这里只修改当前实验视图。将窗口移到不同桌面色调前，观察模糊透色；中央图片应保持原色。")], spacing: 14)
+            FraloStyle.text("背景通透感", role: .heading), presets, opacity, tint, reset,
+            FraloStyle.paragraph("材质层 100% 是完整原生效果，仍然透色；降低数值会淡化模糊层。遮罩越浓，背景越实。数值不是系统模糊强度。"),
+            FraloStyle.paragraph("仅作用于左侧样例周围的工作区；图片和菜单保持清晰。切换窗口焦点可比较原生状态。降低透明度开启时暂停调节。")], spacing: 14)
+        for view in [opacity, tint, blend] { view.widthAnchor.constraint(equalTo: controls.widthAnchor).isActive = true }
         let header = FraloStyle.stack([FraloStyle.text("原生材质实验", role: .title), FraloStyle.paragraph("标准材质、真实窗口合成与不透桌面的成品。不是用固定渐变假装系统玻璃。")], spacing: 8)
         for view in [header, workspace, status] { view.translatesAutoresizingMaskIntoConstraints = false; addSubview(view) }
         for view in [canvas, panel] { view.translatesAutoresizingMaskIntoConstraints = false; workspace.addSubview(view) }
-        controls.translatesAutoresizingMaskIntoConstraints = false; panel.addSubview(controls)
+        let scroll = ScrollContent.make(controls)
+        scroll.translatesAutoresizingMaskIntoConstraints = false; panel.addSubview(scroll)
         NSLayoutConstraint.activate([
             header.topAnchor.constraint(equalTo: topAnchor, constant: 24), header.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 24), header.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -24),
             workspace.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 20), workspace.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 24), workspace.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -24), workspace.bottomAnchor.constraint(equalTo: status.topAnchor, constant: -12),
             status.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 24), status.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -24), status.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -20),
-            panel.topAnchor.constraint(equalTo: workspace.topAnchor, constant: 24), panel.bottomAnchor.constraint(equalTo: workspace.bottomAnchor, constant: -24), panel.trailingAnchor.constraint(equalTo: workspace.trailingAnchor, constant: -24), panel.widthAnchor.constraint(equalToConstant: 270),
+            panel.topAnchor.constraint(equalTo: workspace.topAnchor, constant: 24), panel.bottomAnchor.constraint(equalTo: workspace.bottomAnchor, constant: -24), panel.trailingAnchor.constraint(equalTo: workspace.trailingAnchor, constant: -24), panel.widthAnchor.constraint(equalToConstant: 310),
             canvas.topAnchor.constraint(equalTo: workspace.topAnchor, constant: 24), canvas.bottomAnchor.constraint(equalTo: workspace.bottomAnchor, constant: -24), canvas.leadingAnchor.constraint(equalTo: workspace.leadingAnchor, constant: 24), canvas.trailingAnchor.constraint(equalTo: panel.leadingAnchor, constant: -16),
-            controls.leadingAnchor.constraint(equalTo: panel.leadingAnchor, constant: 16), controls.trailingAnchor.constraint(equalTo: panel.trailingAnchor, constant: -16), controls.topAnchor.constraint(equalTo: panel.topAnchor, constant: 20)
+            scroll.leadingAnchor.constraint(equalTo: panel.leadingAnchor), scroll.trailingAnchor.constraint(equalTo: panel.trailingAnchor), scroll.topAnchor.constraint(equalTo: panel.topAnchor), scroll.bottomAnchor.constraint(equalTo: panel.bottomAnchor)
         ])
-        updateStatus()
+        refreshTranslucency()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+    override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); refreshTranslucency() }
+    func setTranslucency(opacity: Double, tint: Double) {
+        guard opacity.isFinite, tint.isFinite else { return }
+        state.materialOpacity = min(100, max(0, opacity)); state.materialTint = min(100, max(0, tint))
+        refreshTranslucency()
+    }
+    private func refreshTranslucency() {
+        let fallback = workspace.isUsingOpaqueFallback
+        opacity.value = state.materialOpacity; tint.value = state.materialTint
+        opacity.isEnabled = !fallback; tint.isEnabled = !fallback
+        workspace.effect.alphaValue = fallback ? 1 : state.materialOpacity / 100
+        tintOverlay.isHidden = fallback
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            tintOverlay.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(state.materialTint / 100).cgColor
+        }
+        updateStatus()
+    }
     private func updateStatus() {
-        status.stringValue = "仅实验候选 · 材质 \(workspace.material.rawValue) · 混合 \(workspace.effect.blendingMode.rawValue) · 不透明回退 \(workspace.isUsingOpaqueFallback ? "开启" : "关闭") · 成品图片不随候选材质改变"
+        status.stringValue = "仅实验 · 材质层 \(Int(state.materialOpacity))% · 遮罩 \(Int(state.materialTint))% · \(workspace.isUsingOpaqueFallback ? "降低透明度：调节暂停" : "原生材质随窗口焦点变化") · 不影响成品或正式默认值"
     }
 }
 

@@ -5,6 +5,40 @@ import FraloCore
 @testable import FraloApp
 
 final class DevelopmentTests: XCTestCase {
+    @MainActor func testMaterialExperimentRetainsValuesWithoutFadingArtworkAndHonorsFallback() async throws {
+        _ = NSApplication.shared
+        let controller = DesignLabController()
+        defer { controller.window?.close() }
+        controller.selectPage(2)
+        XCTAssertFalse(try XCTUnwrap(controller.window).isOpaque)
+        XCTAssertEqual(controller.window?.backgroundColor.alphaComponent, 0)
+        let experiment = try XCTUnwrap(controller.materialView)
+        let pixels = experiment.canvas.image?.tiffRepresentation
+        experiment.setTranslucency(opacity: 65, tint: 35)
+        XCTAssertEqual(experiment.workspace.effect.alphaValue, 0.65, accuracy: 0.001)
+        XCTAssertEqual(experiment.canvas.alphaValue, 1)
+        XCTAssertEqual(experiment.panel.alphaValue, 1)
+        XCTAssertEqual(experiment.canvas.image?.tiffRepresentation, pixels)
+        controller.rebuild()
+        XCTAssertEqual(controller.state.selectedPage, 2)
+        XCTAssertEqual(controller.materialView.opacity.value, 65)
+        XCTAssertEqual(controller.materialView.tint.value, 35)
+        controller.state.preferences.reduceTransparency = true; controller.rebuild()
+        XCTAssertTrue(controller.materialView.workspace.isUsingOpaqueFallback)
+        XCTAssertTrue(controller.materialView.tintOverlay.isHidden)
+        XCTAssertFalse(controller.materialView.opacity.isEnabled)
+        XCTAssertFalse(controller.materialView.tint.isEnabled)
+        XCTAssertTrue(try XCTUnwrap(controller.window?.contentView).isOpaque)
+        controller.state.preferences.reduceTransparency = false; controller.rebuild()
+        // Actual system accessibility settings retain precedence over local simulation.
+        if !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency {
+            XCTAssertEqual(controller.materialView.workspace.effect.alphaValue, 0.65, accuracy: 0.001)
+        }
+        controller.materialView.setTranslucency(opacity: 100, tint: 0)
+        XCTAssertEqual(controller.materialView.opacity.value, 100)
+        XCTAssertEqual(controller.materialView.tint.value, 0)
+    }
+
     @MainActor func testLargeBatchViewportFillsPanelAndResizes() async {
         _ = NSApplication.shared
         let state = DesignLabState(); state.scenario.count = 100

@@ -26,6 +26,10 @@ This builds Debug, creates a separate `Fralo Design Lab.app` with bundle identif
 
 The appearance selector changes this window only. Preview checkboxes strengthen accessibility behavior locally; the footer separately reports actual OS settings. System-setting changes also refresh the lab. Reset restores local experiment values, not user product settings.
 
+Materials includes a Debug-only **背景通透感** experiment. **材质层不透明度** fades only the native background effect (100% retains the original native material; 0% removes its blur/tint). **背景遮罩浓度** adds a semantic window-background tint above that effect (0–100%). These percentages are not a native blur-radius or transparency-strength API. Quick comparisons are 更通透 (65/0), 更柔实 (100/35), 实色参考 (100/100), and 恢复原生效果 (100/0). Values survive tab/appearance changes during this lab session; global reset restores 100/0. Nothing is saved to product settings or exported artwork.
+
+The lab window has a clear nonopaque base. Only Materials removes its neutral root/tab fill so the experimental region can composite with the actual desktop; other pages retain their neutral surface. The image and inspector do not inherit the effect layer's opacity. Reduced-transparency settings disable the sliders, hide the experimental tint and restore the opaque fallback, while retaining the selected values for later comparison. Use a varied desktop backdrop and compare focused/unfocused states; native desktop composition still needs direct observation.
+
 In Scenarios, the image list fills the space between the fixed panel header and footer and grows with the window. Each inspector page owns one scroll view; the mode selector, tabs and export footer remain visible. Native overlay scrollers hide automatically without a persistent white gutter. Short settings pages do not force overflow.
 
 ## Shared button style
