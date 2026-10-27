@@ -68,6 +68,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let app = NSMenu(); let appItem = NSMenuItem(); appItem.submenu = app; bar.addItem(appItem)
         let about = app.addItem(withTitle: "关于 Fralo", action: #selector(showAbout(_:)), keyEquivalent: "")
         about.target = self
+        let settings = app.addItem(withTitle: "设置…", action: #selector(MainWindowController.showSettings(_:)), keyEquivalent: ",")
+        settings.target = controller; settings.keyEquivalentModifierMask = .command
+        app.addItem(.separator())
         let check = app.addItem(withTitle: "检查更新…", action: #selector(UpdateController.checkForUpdates(_:)), keyEquivalent: "")
         check.target = updateController
         let automatic = app.addItem(withTitle: "自动检查更新（每天）", action: #selector(UpdateController.toggleAutomaticChecks(_:)), keyEquivalent: "")

@@ -12,7 +12,8 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private var inspectorUI: CompositionInspector!
     private let preferences: UserDefaults
     private let pasteboard: NSPasteboard
-    private var appearanceChoice = "system"
+    private(set) var appearanceChoice = AppAppearance.system
+    private(set) var settingsController: AppearanceSettingsWindowController?
     private var workbench: WorkbenchView!
     private let center = NSViewController()
     private let list = BatchList()
@@ -188,7 +189,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(toolbar) }
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.init("brand"), .flexibleSpace, .init("documentTitle"), .flexibleSpace, .init("copy"), .init("more")]
+        [.init("brand"), .flexibleSpace, .init("documentTitle"), .flexibleSpace, .init("copy"), .init("settings"), .init("more")]
     }
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         let item = NSToolbarItem(itemIdentifier: identifier)
@@ -204,6 +205,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
             menu.addItem(actionItem("添加图片…", #selector(addImages(_:))))
             menu.addItem(actionItem("导入文件夹…", #selector(addFolder(_:))))
             menu.addItem(actionItem("粘贴图片", #selector(pasteImage(_:))))
+            menu.addItem(actionItem("设置…", #selector(showSettings(_:))))
             let appearance = NSMenuItem(title: "外观", action: nil, keyEquivalent: ""); appearance.submenu = appearanceMenu(); menu.addItem(appearance)
             menu.addItem(.separator()); menu.addItem(actionItem("移除当前图片", #selector(removeSelected(_:))))
             let button = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 24, height: 28), pullsDown: true)
@@ -223,6 +225,9 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         case "copy":
             copyButton.onPress = { [weak self] in self?.copyCurrent(nil) }
             item.view = copyButton; item.label = "复制当前图片"
+        case "settings":
+            item.view = IconButton("gearshape", label: "设置") { [weak self] in self?.showSettings(nil) }
+            item.label = "设置"
         default: return nil
         }
         return item
@@ -232,20 +237,29 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; return item
     }
     func selectAppearance(_ value: String, persist: Bool = true) {
-        guard ["system", "light", "dark"].contains(value) else { return }
-        appearanceChoice = value
-        window?.appearance = value == "dark" ? NSAppearance(named: .darkAqua) : value == "light" ? NSAppearance(named: .aqua) : nil
+        guard let choice = AppAppearance(rawValue: value) else { return }
+        appearanceChoice = choice
+        window?.appearance = choice.appearance
+        settingsController?.set(choice)
         if persist { preferences.set(value, forKey: "workbenchAppearance") }
     }
     func appearanceMenu() -> NSMenu {
         let menu = NSMenu(title: "外观")
-        for (value, title) in [("system", "跟随系统"), ("light", "浅色"), ("dark", "深色")] {
-            let item = actionItem(title, #selector(changeAppearance(_:))); item.representedObject = value
-            item.state = appearanceChoice == value ? .on : .off; menu.addItem(item)
+        for choice in AppAppearance.allCases {
+            let item = actionItem(choice.title, #selector(changeAppearance(_:))); item.representedObject = choice.rawValue
+            item.state = appearanceChoice == choice ? .on : .off; menu.addItem(item)
         }
         return menu
     }
     @objc private func changeAppearance(_ sender: NSMenuItem) { if let value = sender.representedObject as? String { selectAppearance(value) } }
+    @objc func showSettings(_ sender: Any?) {
+        if settingsController == nil {
+            settingsController = AppearanceSettingsWindowController(selection: appearanceChoice) { [weak self] value in
+                self?.selectAppearance(value.rawValue)
+            }
+        }
+        settingsController?.set(appearanceChoice); settingsController?.present()
+    }
     @objc func toggleSidebar(_ sender: Any?) {
         workbench.setCollapsed(!workbench.collapsed, animated: true)
         preferences.set(workbench.collapsed, forKey: "sidebarCollapsed")
@@ -511,7 +525,8 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         if items.isEmpty { empty.isHidden = false; footer.isHidden = true; previewScroll.isHidden = true }
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        if menuItem.action == #selector(changeAppearance(_:)) { menuItem.state = (menuItem.representedObject as? String) == appearanceChoice ? .on : .off; return true }
+        if menuItem.action == #selector(showSettings(_:)) { return true }
+        if menuItem.action == #selector(changeAppearance(_:)) { menuItem.state = (menuItem.representedObject as? String) == appearanceChoice.rawValue ? .on : .off; return true }
         guard !isExporting else { return false }
         if menuItem.action == #selector(copyCurrent(_:)) { return rendered != nil || window?.firstResponder is NSTextView }
         if menuItem.action == #selector(exportCurrent(_:)) || menuItem.action == #selector(removeSelected(_:)) { return selectedIndex != nil }

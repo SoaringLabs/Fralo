@@ -84,3 +84,11 @@ The four roles are primary, secondary, quiet and destructive. Busy state preserv
 - [Reduced transparency](https://developer.apple.com/documentation/appkit/nsworkspace/accessibilitydisplayshouldreducetransparency)
 
 The deployment target remains macOS 14. Newer visual treatments are not a reason to raise that target without a separate decision.
+
+## Application appearance settings
+
+The independent **Fralo 设置** window reuses `VisualChoiceGroup` for system/light/dark appearance. Its small fixed-appearance workbench illustrations are decorative UI previews, not user artwork or screenshots. The selected card has a fine outline/checkmark without an extra focus halo; keyboard selection remains available. The settings window uses a native semantic window background.
+
+Open settings with the toolbar gear, **Fralo → 设置…**, or Command-comma. One typed `AppAppearance` value synchronizes the workbench, settings selection, both window appearances and existing quick menus. It retains the previous `workbenchAppearance` preference key and saves immediately; reopening settings reuses its window and restarting restores the stored choice. System mode clears both window overrides so they inherit macOS appearance. The Dev lab retains its independent appearance experiments.
+
+Changing appearance does not rerender artwork, rewrite composition/CLI settings or change export pixels. The workspace material recipe remains 100% native effect with no added overlay. Debug preview launch overrides are temporary and do not replace a user choice in storage; ordinary preview handoffs omit those overrides.
