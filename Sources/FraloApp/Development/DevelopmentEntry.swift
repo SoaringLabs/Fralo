@@ -21,6 +21,7 @@ final class DevelopmentEntry: NSObject {
     private var labMenu: NSMenu?
     private weak var mainWindow: NSWindow?
     private var materialProbe: WorkspaceMaterialProbe?
+    private var panelProbe: PanelRenderingProbe?
     private var observer: NSObjectProtocol?
     func install(in menu: NSMenu, mainWindow: NSWindow? = nil) {
         self.mainWindow = mainWindow; productMenu = menu
@@ -71,7 +72,13 @@ final class DevelopmentEntry: NSObject {
         controller?.showWindow(nil); controller?.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
-    func showMaterialProbeIfRequested(behind window: NSWindow?) {
+    func showRenderingProbesIfRequested(behind window: NSWindow?) {
+        if CommandLine.arguments.contains("--panel-render-check"), let window {
+            let report = CommandLine.arguments.first(where: { $0.hasPrefix("--panel-render-report=") }).map {
+                URL(fileURLWithPath: String($0.dropFirst("--panel-render-report=".count)))
+            }
+            panelProbe = PanelRenderingProbe(window: window, initial: .staticGlass, report: report)
+        }
         guard CommandLine.arguments.contains("--workspace-material-check"), let window else { return }
         materialProbe = WorkspaceMaterialProbe(window: window)
         window.makeKeyAndOrderFront(nil)

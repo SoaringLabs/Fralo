@@ -39,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pendingURLs.removeAll()
         #if FRALO_DEV
         if CommandLine.arguments.contains("--design-lab") { development.showLab() }
-        development.showMaterialProbeIfRequested(behind: controller.window)
+        development.showRenderingProbesIfRequested(behind: controller.window)
         #endif
     }
     func application(_ sender: NSApplication, openFiles filenames: [String]) {

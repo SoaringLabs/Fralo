@@ -2,9 +2,57 @@
 import AppKit
 import XCTest
 import FraloCore
+import FraloDesignSystem
 @testable import FraloApp
 
 final class DevelopmentTests: XCTestCase {
+    @MainActor func testPanelRenderingComparisonsChangeOneFactorAndRestoreBaseline() async throws {
+        _ = NSApplication.shared
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = SettingsStore(url: folder.appendingPathComponent("settings.json"))
+        try CompositionStore(legacy: store).save(CompositionSettings())
+        let before = try CompositionStore(legacy: store).load()
+        let suite = "panel-probe-\(UUID())"; let preferences = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { preferences.removePersistentDomain(forName: suite) }
+        let controller = MainWindowController(store: store, preferences: preferences, restoreWindow: false)
+        let window = try XCTUnwrap(controller.window); defer { window.close() }
+        let root = try XCTUnwrap(window.contentView as? WorkbenchView)
+        // Seed a nonzero baseline so C proves it removes a shadow, rather than comparing zero with zero.
+        root.right.layer?.shadowOpacity = 0.17
+        let probe = PanelRenderingProbe(window: window, showsControls: false)
+        defer { probe.stop() }
+        let originalClipping = root.right.surface.layer?.masksToBounds
+        let originalShadow = root.right.layer?.shadowOpacity
+        let workspaceMaterial = root.workspace.material
+        let workspaceAlpha = root.workspace.effect.alphaValue
+        func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
+        if #available(macOS 27.0, *) {
+            let glass = try XCTUnwrap(descendants(root.right).compactMap { $0 as? NSGlassEffectView }.first)
+            let interactive = glass.effectIsInteractive
+            probe.select(.staticGlass)
+            XCTAssertFalse(glass.effectIsInteractive)
+            XCTAssertEqual(root.right.surface.layer?.masksToBounds, originalClipping)
+            XCTAssertEqual(root.right.layer?.shadowOpacity, originalShadow)
+            probe.select(.nativeShadow)
+            XCTAssertEqual(glass.effectIsInteractive, interactive)
+            XCTAssertEqual(root.right.layer?.shadowOpacity, 0)
+            XCTAssertEqual(root.right.surface.layer?.masksToBounds, originalClipping)
+            probe.select(.clipped)
+            XCTAssertEqual(glass.effectIsInteractive, interactive)
+            XCTAssertEqual(root.right.layer?.shadowOpacity, originalShadow)
+            XCTAssertEqual(root.right.surface.layer?.masksToBounds, true)
+            probe.select(.baseline)
+            XCTAssertEqual(glass.effectIsInteractive, interactive)
+        }
+        XCTAssertEqual(root.right.surface.layer?.masksToBounds, originalClipping)
+        XCTAssertEqual(root.right.layer?.shadowOpacity, originalShadow)
+        XCTAssertEqual(root.workspace.material, workspaceMaterial)
+        XCTAssertEqual(root.workspace.effect.alphaValue, workspaceAlpha)
+        XCTAssertEqual(try CompositionStore(legacy: store).load(), before)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: store.url.path))
+    }
+
     @MainActor func testMaterialExperimentRetainsValuesWithoutFadingArtworkAndHonorsFallback() async throws {
         _ = NSApplication.shared
         let controller = DesignLabController()
