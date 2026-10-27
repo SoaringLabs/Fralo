@@ -4,6 +4,23 @@ import QuartzCore
 @testable import FraloDesignSystem
 
 final class SurfaceBoundaryTests: XCTestCase {
+    @MainActor func testPanelKeepsItsBackingAndDoesNotAnimateAsAnInteractiveControl() async throws {
+        _ = NSApplication.shared
+        let panel = MaterialSurface(.panel, radius: 24)
+        let backing = try XCTUnwrap(panel.subviews.dropFirst().first)
+        XCTAssertFalse(backing.isHidden)
+        for name: NSAppearance.Name in [.aqua, .darkAqua] {
+            panel.appearance = NSAppearance(named: name); panel.refresh()
+            XCTAssertGreaterThan(try XCTUnwrap(backing.layer?.backgroundColor).alpha, 0.8)
+        }
+        if #available(macOS 27.0, *) {
+            let glass = try XCTUnwrap(panel.subviews.compactMap { $0 as? NSGlassEffectView }.first)
+            XCTAssertFalse(glass.effectIsInteractive)
+        }
+        var preferences = DesignPreferences(); preferences.reduceTransparency = true
+        panel.preferences = preferences; XCTAssertTrue(panel.isUsingOpaqueFallback)
+    }
+
     @MainActor func testNativeGlassCannotPaintAnUnroundedChildOutlineOutsideItsSurface() async throws {
         guard #available(macOS 26.0, *) else { throw XCTSkip("Native glass is unavailable") }
         _ = NSApplication.shared

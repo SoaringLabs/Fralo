@@ -60,17 +60,17 @@ public final class MaterialSurface: NSView {
         clipsToBounds = true
         effectiveAppearance.performAsCurrentDrawingAppearance {
             layer?.cornerRadius = cornerRadius; layer?.masksToBounds = true
-            layer?.borderColor = (preferences.effectiveIncreaseContrast ? NSColor.separatorColor : NSColor.white.withAlphaComponent(0.30)).cgColor
+            layer?.borderColor = (preferences.effectiveIncreaseContrast ? NSColor.separatorColor : NSColor.labelColor.withAlphaComponent(0.14)).cgColor
             layer?.borderWidth = role == .panel ? (preferences.effectiveIncreaseContrast ? 1 : 0.5) : 0
             fallbackView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
             fallbackView.layer?.cornerRadius = cornerRadius
-            panelTint.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.18).cgColor
+            panelTint.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.82).cgColor
         }
         if #available(macOS 26.0, *), let glass = nativeGlass as? NSGlassEffectView {
             glass.cornerRadius = cornerRadius
-            if #available(macOS 27.0, *) { glass.effectIsInteractive = !preferences.effectiveReduceMotion }
+            if #available(macOS 27.0, *) { glass.effectIsInteractive = false }
         }
-        panelTint.isHidden = role != .panel || nativeGlass != nil
+        panelTint.isHidden = role != .panel
         fallbackView.isHidden = !preferences.effectiveReduceTransparency
         effect.isHidden = !fallbackView.isHidden || nativeGlass != nil
     }
@@ -145,7 +145,8 @@ public final class FloatingPanel: NSView {
 @MainActor
 public final class CollapsedRail: NSView {
     public let surface = MaterialSurface(.panel, radius: 18)
-    public let expand = IconButton("sidebar.left", label: "展开图片列表")
+    public let expand = IconButton("chevron.right", label: "展开图片列表")
+    public let list = BatchList(compact: true)
     public let add = IconButton("plus", label: "添加图片")
     public let previous = IconButton("chevron.up", label: "上一张图片")
     public let next = IconButton("chevron.down", label: "下一张图片")
@@ -153,19 +154,23 @@ public final class CollapsedRail: NSView {
     public init() {
         super.init(frame: .zero)
         surface.translatesAutoresizingMaskIntoConstraints = false; addSubview(surface)
-        let bottom = FraloStyle.stack([add, previous, next, position], spacing: 4); bottom.alignment = .centerX
+        let bottom = FraloStyle.stack([previous, next, position], spacing: 4); bottom.alignment = .centerX
+        let top = FraloStyle.stack([expand, add], spacing: 8); top.alignment = .centerX
         let host = surface.contentView
-        for view in [expand, bottom] { view.translatesAutoresizingMaskIntoConstraints = false; host.addSubview(view) }
+        for view in [top, list, bottom] { view.translatesAutoresizingMaskIntoConstraints = false; host.addSubview(view) }
         NSLayoutConstraint.activate([
             surface.leadingAnchor.constraint(equalTo: leadingAnchor), surface.trailingAnchor.constraint(equalTo: trailingAnchor),
             surface.topAnchor.constraint(equalTo: topAnchor), surface.bottomAnchor.constraint(equalTo: bottomAnchor),
-            expand.topAnchor.constraint(equalTo: host.topAnchor, constant: 12), expand.centerXAnchor.constraint(equalTo: host.centerXAnchor),
+            top.topAnchor.constraint(equalTo: host.topAnchor, constant: 12), top.centerXAnchor.constraint(equalTo: host.centerXAnchor),
+            list.topAnchor.constraint(equalTo: top.bottomAnchor, constant: 12), list.bottomAnchor.constraint(equalTo: bottom.topAnchor, constant: -12),
+            list.leadingAnchor.constraint(equalTo: host.leadingAnchor, constant: 6), list.trailingAnchor.constraint(equalTo: host.trailingAnchor, constant: -6),
             bottom.bottomAnchor.constraint(equalTo: host.bottomAnchor, constant: -12), bottom.centerXAnchor.constraint(equalTo: host.centerXAnchor)
         ])
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     public func update(index: Int?, count: Int) {
         position.stringValue = "\(index.map { $0 + 1 } ?? 0)/\(count)"
+        if let index, list.selectedIndex != index { list.select(index) }
         previous.isEnabled = (index ?? 0) > 0
         next.isEnabled = index.map { $0 + 1 < count } ?? false
     }
@@ -184,24 +189,29 @@ public struct BatchEntry {
 
 @MainActor
 public final class ThumbnailRow: NSTableCellView {
-    public init(entry: BatchEntry) {
+    public init(entry: BatchEntry, compact: Bool = false) {
         super.init(frame: .zero)
-        let image = NSImageView(); image.image = entry.image ?? NSImage(systemSymbolName: entry.failed ? "exclamationmark.triangle" : "photo", accessibilityDescription: nil)
+        let image = NSImageView()
+        image.image = entry.image ?? NSImage(systemSymbolName: entry.failed ? "exclamationmark.triangle" : "photo", accessibilityDescription: nil)
         image.imageScaling = .scaleProportionallyUpOrDown
+        image.contentTintColor = entry.failed ? .systemRed : .secondaryLabelColor
         image.translatesAutoresizingMaskIntoConstraints = false
-        let title = FraloStyle.text(entry.title); title.font = .systemFont(ofSize: 13, weight: .medium)
-        let detail = FraloStyle.text(entry.detail, role: .caption, secondary: true)
-        detail.isHidden = entry.detail.isEmpty
-        if entry.failed { detail.textColor = .systemRed }
-        let text = FraloStyle.stack([title, detail], spacing: 4); text.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(image); addSubview(text)
+        addSubview(image)
+        let inset: CGFloat = compact ? 7 : 12
         NSLayoutConstraint.activate([
-            image.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8), image.centerYAnchor.constraint(equalTo: centerYAnchor),
-            image.widthAnchor.constraint(equalToConstant: 72), image.heightAnchor.constraint(equalToConstant: 66),
-            text.leadingAnchor.constraint(equalTo: image.trailingAnchor, constant: 8), text.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8), text.centerYAnchor.constraint(equalTo: centerYAnchor)
+            image.leadingAnchor.constraint(equalTo: leadingAnchor, constant: inset),
+            image.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -inset),
+            image.topAnchor.constraint(equalTo: topAnchor, constant: inset),
+            image.bottomAnchor.constraint(equalTo: bottomAnchor, constant: entry.failed && !compact ? -28 : -inset)
         ])
-        textField = title; imageView = image
-        toolTip = entry.title
+        if entry.failed && !compact {
+            let detail = FraloStyle.text("无法读取", role: .detail); detail.textColor = .systemRed
+            detail.translatesAutoresizingMaskIntoConstraints = false; addSubview(detail)
+            NSLayoutConstraint.activate([detail.centerXAnchor.constraint(equalTo: centerXAnchor), detail.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8)])
+            textField = detail
+        }
+        imageView = image
+        toolTip = entry.title + (entry.failed ? " · 无法读取" : "")
         setAccessibilityLabel(entry.title + (entry.failed ? "，加载失败" : ""))
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
@@ -218,11 +228,19 @@ private final class BatchNavigationTable: NSTableView {
 
 @MainActor
 private final class BatchSelectionRow: NSTableRowView {
+    override func drawBackground(in dirtyRect: NSRect) {
+        NSColor.controlBackgroundColor.withAlphaComponent(0.55).setFill()
+        NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 5), xRadius: 11, yRadius: 11).fill()
+        NSColor.labelColor.withAlphaComponent(0.10).setStroke()
+        let edge = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 5), xRadius: 11, yRadius: 11)
+        edge.lineWidth = 0.5; edge.stroke()
+    }
     override var isEmphasized: Bool { get { true } set {} }
     override var interiorBackgroundStyle: NSView.BackgroundStyle { .normal }
     override func drawSelection(in dirtyRect: NSRect) {
         NSColor.controlAccentColor.withAlphaComponent(0.17).setFill()
-        NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 2), xRadius: 11, yRadius: 11).fill()
+        let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 5), xRadius: 11, yRadius: 11)
+        path.fill(); NSColor.controlAccentColor.setStroke(); path.lineWidth = 1.5; path.stroke()
     }
 }
 
@@ -230,16 +248,18 @@ private final class BatchSelectionRow: NSTableRowView {
 public final class BatchList: NSScrollView, NSTableViewDataSource, NSTableViewDelegate {
     private let table = BatchNavigationTable()
     private var updating = false
+    private let compact: Bool
     public var onDelete: (() -> Void)?
     public private(set) var entries: [BatchEntry] = []
     public var onSelection: ((Int) -> Void)?
     public var selectedIndex: Int? { entries.indices.contains(table.selectedRow) ? table.selectedRow : nil }
-    public init(entries: [BatchEntry] = []) {
+    public init(entries: [BatchEntry] = [], compact: Bool = false) {
+        self.compact = compact
         super.init(frame: .zero)
-        table.headerView = nil; table.style = .plain; table.rowHeight = FraloStyle.Workbench.rowHeight; table.backgroundColor = .clear
-        table.intercellSpacing = NSSize(width: 0, height: 4)
+        table.headerView = nil; table.style = .plain; table.rowHeight = compact ? 72 : FraloStyle.Workbench.rowHeight; table.backgroundColor = .clear
+        table.intercellSpacing = NSSize(width: 0, height: compact ? 6 : 10)
         table.allowsMultipleSelection = false; table.allowsEmptySelection = false
-        let column = NSTableColumn(identifier: .init("source")); table.addTableColumn(column)
+        let column = NSTableColumn(identifier: .init("source")); column.minWidth = 0; table.addTableColumn(column)
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.dataSource = self; table.delegate = self
         table.onDelete = { [weak self] in self?.onDelete?() }
@@ -248,6 +268,12 @@ public final class BatchList: NSScrollView, NSTableViewDataSource, NSTableViewDe
         update(entries)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+    public override func layout() {
+        super.layout()
+        let width = max(1, contentView.bounds.width)
+        if abs(table.frame.width - width) > 0.5 { table.setFrameSize(NSSize(width: width, height: table.frame.height)) }
+        if let column = table.tableColumns.first, abs(column.width - width) > 0.5 { column.width = width }
+    }
     public func update(_ entries: [BatchEntry]) {
         updating = true; defer { updating = false }
         let oldID = selectedIndex.map { self.entries[$0].id }
@@ -264,7 +290,7 @@ public final class BatchList: NSScrollView, NSTableViewDataSource, NSTableViewDe
         select(min(entries.count - 1, max(0, (selectedIndex ?? 0) + delta)))
     }
     public func numberOfRows(in tableView: NSTableView) -> Int { entries.count }
-    public func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? { ThumbnailRow(entry: entries[row]) }
+    public func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? { ThumbnailRow(entry: entries[row], compact: compact) }
     public func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? { BatchSelectionRow() }
     public func tableViewSelectionDidChange(_ notification: Notification) { if !updating, let selectedIndex { onSelection?(selectedIndex) } }
 }

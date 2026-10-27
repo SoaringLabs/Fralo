@@ -7,6 +7,8 @@ public final class ValuePicker: NSControl {
     private let indicator = NSView()
     private var buttons: [NSButton] = []
     private var symbols: [String] = []
+    private var isAnimatingSelection = false
+    private var animationGeneration = 0
     private var selection: Int
     public var controlHeight: CGFloat = FraloStyle.Workbench.controlHeight {
         didSet { invalidateIntrinsicContentSize(); select(selection, animated: false, notify: false); needsLayout = true; needsDisplay = true }
@@ -15,7 +17,7 @@ public final class ValuePicker: NSControl {
     public var onChange: ((Int) -> Void)?
     public var selectedIndex: Int {
         get { selection }
-        set { select(newValue, animated: false, notify: false) }
+        set { if newValue != selection { select(newValue, animated: false, notify: false) } }
     }
     public override var isEnabled: Bool {
         didSet { buttons.forEach { $0.isEnabled = isEnabled }; needsDisplay = true }
@@ -45,7 +47,7 @@ public final class ValuePicker: NSControl {
         }
         setAccessibilityElement(true); setAccessibilityRole(.radioGroup)
         setAccessibilityLabel(label); setAccessibilityChildren(buttons)
-        focusRingType = .none
+        focusRingType = .exterior
         select(selection, animated: false, notify: false)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
@@ -57,7 +59,7 @@ public final class ValuePicker: NSControl {
         for (index, button) in buttons.enumerated() {
             button.frame = NSRect(x: CGFloat(index) * width, y: 0, width: width, height: bounds.height)
         }
-        indicator.frame = indicatorFrame
+        if !isAnimatingSelection { indicator.frame = indicatorFrame }
     }
     private var indicatorFrame: NSRect {
         let width = bounds.width / CGFloat(buttons.count)
@@ -80,7 +82,13 @@ public final class ValuePicker: NSControl {
     public override func drawFocusRingMask() { NSBezierPath(roundedRect: bounds, xRadius: 15, yRadius: 15).fill() }
     public override var focusRingMaskBounds: NSRect { bounds }
 
+    public override func becomeFirstResponder() -> Bool {
+        let accepted = super.becomeFirstResponder()
+        if NSApp.currentEvent?.type == .keyDown { focusRingType = .exterior }
+        return accepted
+    }
     @objc private func chooseButton(_ sender: NSButton) {
+        focusRingType = .none
         window?.makeFirstResponder(self)
         select(sender.tag, animated: true, notify: true)
     }
@@ -103,17 +111,26 @@ public final class ValuePicker: NSControl {
             }
             button.setAccessibilityValue(index == selection ? 1 : 0)
         }
+        animationGeneration += 1
+        let generation = animationGeneration
         if animated && changed && window != nil {
-            NSAnimationContext.runAnimationGroup { context in
+            isAnimatingSelection = true
+            NSAnimationContext.runAnimationGroup({ context in
                 context.duration = FraloMotion.duration(.selection, preferences: preferences)
                 context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 indicator.animator().frame = indicatorFrame
-            }
-        } else { indicator.frame = indicatorFrame }
+            }, completionHandler: { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, self.animationGeneration == generation else { return }
+                    self.isAnimatingSelection = false; self.needsLayout = true
+                }
+            })
+        } else { isAnimatingSelection = false; indicator.frame = indicatorFrame }
         if changed { NSAccessibility.post(element: self, notification: .valueChanged) }
         if changed && notify { onChange?(selection); sendAction(action, to: target) }
     }
     public override func keyDown(with event: NSEvent) {
+        focusRingType = .exterior
         switch event.keyCode {
         case 48:
             if event.modifierFlags.contains(.shift) { window?.selectKeyView(preceding: self) }

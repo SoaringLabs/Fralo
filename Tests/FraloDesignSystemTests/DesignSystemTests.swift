@@ -67,6 +67,48 @@ final class DesignSystemTests: XCTestCase {
         XCTAssertEqual(row.value, 100)
     }
 
+    @MainActor func testPercentageInputUpdatesSliderAndRejectsInvalidOrDisabledEdits() async {
+        var edits: [Double] = []
+        let row = SliderRow("透明度", range: 0...100, value: 80) { edits.append($0) }
+        row.valueField.stringValue = "37.5"; XCTAssertTrue(row.valueField.commit())
+        XCTAssertEqual(row.value, 37.5); XCTAssertEqual(edits, [37.5])
+        row.valueField.stringValue = "101"; XCTAssertFalse(row.valueField.commit())
+        XCTAssertEqual(row.value, 37.5); XCTAssertEqual(edits, [37.5])
+        row.value = 100
+        row.valueField.stringValue = "37.5"; XCTAssertTrue(row.valueField.commit())
+        XCTAssertEqual(row.value, 37.5, "Dragging the slider must also update the field's committed baseline")
+        row.isEnabled = false; row.valueField.stringValue = "20"
+        XCTAssertFalse(row.valueField.commit()); XCTAssertEqual(row.value, 37.5)
+    }
+
+    @MainActor func testCompactThumbnailColumnFitsTheRailViewport() async throws {
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 80, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; defer { window.close() }
+        let list = BatchList(entries: [BatchEntry(id: "1", title: "sample.png")], compact: true)
+        list.frame = NSRect(x: 6, y: 20, width: 68, height: 300); window.contentView?.addSubview(list)
+        window.contentView?.layoutSubtreeIfNeeded()
+        let table = try XCTUnwrap(list.documentView as? NSTableView)
+        XCTAssertEqual(table.tableColumns[0].width, list.contentView.bounds.width, accuracy: 0.5)
+        XCTAssertEqual(table.frame.width, list.contentView.bounds.width, accuracy: 0.5)
+    }
+
+    @MainActor func testThumbnailBatchRetainsLongNamesFailuresAndSelectionThroughRefresh() async {
+        _ = NSApplication.shared
+        let name = String(repeating: "超长截图名称", count: 30) + ".png"
+        let entries = (0..<100).map { BatchEntry(id: String($0), title: name + String($0), failed: $0 == 40) }
+        for compact in [false, true] {
+            let list = BatchList(entries: entries, compact: compact)
+            list.select(40); list.moveSelection(by: 1); list.update(entries)
+            XCTAssertEqual(list.selectedIndex, 41)
+            let failed = ThumbnailRow(entry: entries[40], compact: compact)
+            XCTAssertTrue(failed.accessibilityLabel()?.contains("加载失败") == true)
+            XCTAssertTrue(failed.toolTip?.contains(name) == true)
+            let normal = ThumbnailRow(entry: entries[0], compact: compact)
+            XCTAssertNil(normal.textField, "The filename must not compete with the thumbnail")
+        }
+    }
+
     @MainActor func testFormSlidersUseAvailableWidthRegardlessOfTheirValue() async {
         let first = SliderRow("设备缩放", range: 20...100, value: 74)
         let second = SliderRow("设备透明度", range: 0...100, value: 100)
@@ -95,6 +137,10 @@ final class DesignSystemTests: XCTestCase {
         button?.performClick(nil)
         XCTAssertTrue(window.firstResponder === picker)
         XCTAssertEqual(picker.selectedIndex, 1)
+        XCTAssertEqual(picker.focusRingType, .none, "Pointer selection should not add a second large selection outline")
+        picker.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: 123)!)
+        XCTAssertEqual(picker.focusRingType, .exterior, "Keyboard use must expose a visible focus ring")
         window.close()
     }
 

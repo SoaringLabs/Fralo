@@ -50,7 +50,7 @@ final class WorkbenchView: NSView {
         let top: CGFloat = chrome + (compact ? 22 : 36)
         let bottom: CGFloat = compact ? 22 : 62
         let expandedWidth = min(268, max(206, bounds.width * 0.169))
-        let leftWidth: CGFloat = collapsed ? 56 : expandedWidth
+        let leftWidth: CGFloat = collapsed ? 80 : expandedWidth
         let rightWidth = min(400, max(316, bounds.width * 0.255))
         let height = max(0, bounds.height - top - bottom)
         let leftRect = NSRect(x: margin, y: top, width: leftWidth, height: height)
@@ -59,7 +59,7 @@ final class WorkbenchView: NSView {
         let end = previewing ? bounds.width - margin : rightRect.minX - gap
         let centerRect = NSRect(x: start, y: top, width: max(0, end - start), height: height + (compact ? 0 : 30))
         for (view, frame) in [(left as NSView, NSRect(x: margin, y: top, width: expandedWidth, height: height)),
-                              (rail as NSView, NSRect(x: margin, y: top, width: 56, height: height)), (right, rightRect), (content, centerRect)] {
+                              (rail as NSView, NSRect(x: margin, y: top, width: 80, height: height)), (right, rightRect), (content, centerRect)] {
             if animated { view.animator().frame = frame } else { view.frame = frame }
         }
     }

@@ -5,7 +5,7 @@ import FraloDesignSystem
 @testable import FraloApp
 
 final class InspectorArtworkTests: XCTestCase {
-    @MainActor func testDirectionRebuildPreservesKeyboardFocusAndEditsRealSettings() async throws {
+    @MainActor func testDirectionKeepsControlIdentityKeyboardFocusAndEditsRealSettings() async throws {
         _ = NSApplication.shared
         let inspector = CompositionInspector(settings: CompositionSettings())
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 360, height: 700), styleMask: [.titled], backing: .buffered, defer: false)
@@ -16,7 +16,7 @@ final class InspectorArtworkTests: XCTestCase {
         direction.choose(1)
         XCTAssertEqual(inspector.settings.orientation, .landscape)
         let restored = try XCTUnwrap(window.firstResponder as? VisualChoiceGroup)
-        XCTAssertFalse(restored === direction)
+        XCTAssertTrue(restored === direction, "Changing direction must preserve the control and its focus")
         XCTAssertEqual(restored.accessibilityLabel(), "方向")
         restored.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
             windowNumber: window.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: 123)!)

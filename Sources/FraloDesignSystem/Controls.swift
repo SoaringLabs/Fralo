@@ -100,12 +100,12 @@ public final class ChoiceMenu: NSPopUpButton {
 @MainActor
 public final class SliderRow: NSStackView {
     public let slider: NSSlider
-    public let valueLabel = FraloStyle.text("")
+    public let valueField: ValueField
+    public var valueLabel: NSTextField { valueField }
     public var onChange: ((Double) -> Void)?
-    private let format: (Double) -> String = { "\(Int($0.rounded()))%" }
     public var isEnabled: Bool {
         get { slider.isEnabled }
-        set { slider.isEnabled = newValue; valueLabel.textColor = newValue ? .labelColor : .disabledControlTextColor }
+        set { slider.isEnabled = newValue; valueField.isEnabled = newValue; valueLabel.textColor = newValue ? .labelColor : .disabledControlTextColor }
     }
     public var value: Double {
         get { slider.doubleValue }
@@ -115,13 +115,16 @@ public final class SliderRow: NSStackView {
         precondition(range.lowerBound.isFinite && range.upperBound.isFinite)
         slider = NSSlider(value: range.lowerBound, minValue: range.lowerBound, maxValue: range.upperBound, target: nil, action: nil)
         self.onChange = onChange
+        valueField = ValueField(label: title + "百分比", value: value, range: range)
         super.init(frame: .zero)
+        valueField.onCommit = { [weak self] in self?.setValue($0, notify: true) }
         orientation = .vertical; alignment = .leading; spacing = 6
         let label = FraloStyle.text(title); label.font = .systemFont(ofSize: 13, weight: .medium)
         addArrangedSubview(label)
-        let row = FraloStyle.stack([slider, valueLabel], axis: .horizontal, spacing: 8)
+        let suffix = FraloStyle.text("%", role: .detail, secondary: true)
+        let row = FraloStyle.stack([slider, valueField, suffix], axis: .horizontal, spacing: 5)
         addArrangedSubview(row); row.widthAnchor.constraint(equalTo: widthAnchor).isActive = true
-        valueLabel.alignment = .right; valueLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 48).isActive = true
+        valueLabel.alignment = .right; valueLabel.widthAnchor.constraint(equalToConstant: 48).isActive = true
         valueLabel.setContentHuggingPriority(.required, for: .horizontal)
         valueLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
         slider.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -133,10 +136,10 @@ public final class SliderRow: NSStackView {
     public func setValue(_ value: Double, notify: Bool) {
         guard value.isFinite, !notify || isEnabled else { return }
         let next = min(slider.maxValue, max(slider.minValue, value)); let changed = next != slider.doubleValue
-        slider.doubleValue = next; valueLabel.stringValue = format(next)
+        slider.doubleValue = next; valueField.restore(next)
         if notify && changed { onChange?(next) }
     }
-    @objc private func changed(_ sender: Any?) { valueLabel.stringValue = format(value); if isEnabled { onChange?(value) } }
+    @objc private func changed(_ sender: Any?) { valueField.restore(value); if isEnabled { onChange?(value) } }
 }
 
 @MainActor
@@ -147,15 +150,19 @@ public final class ValueField: NSTextField, NSTextFieldDelegate {
     public init(label: String, value: Double, range: ClosedRange<Double>, onCommit: ((Double) -> Void)? = nil) {
         self.range = range; self.value = min(range.upperBound, max(range.lowerBound, value)); self.onCommit = onCommit
         super.init(frame: .zero)
-        stringValue = String(self.value); delegate = self; setAccessibilityLabel(label)
-        FraloStyle.configure(self)
+        stringValue = String(format: "%g", self.value); delegate = self; setAccessibilityLabel(label)
+        FraloStyle.configure(self); bezelStyle = .roundedBezel
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+    public func restore(_ next: Double) {
+        guard next.isFinite else { return }; value = min(range.upperBound, max(range.lowerBound, next))
+        stringValue = String(format: "%g", value)
+    }
     @discardableResult public func commit() -> Bool {
         guard isEnabled, let parsed = Double(stringValue), parsed.isFinite, range.contains(parsed) else {
-            stringValue = String(value); NSAccessibility.post(element: self, notification: .valueChanged); return false
+            stringValue = String(format: "%g", value); NSAccessibility.post(element: self, notification: .valueChanged); return false
         }
-        let changed = parsed != value; value = parsed
+        let changed = parsed != value; restore(parsed)
         if changed { onCommit?(parsed) }; return true
     }
     public func controlTextDidEndEditing(_ obj: Notification) { _ = commit() }

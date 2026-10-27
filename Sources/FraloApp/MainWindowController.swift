@@ -33,6 +33,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private let footer = NSView()
     private var fitMenu: NSPopUpButton { viewing.zoom }
     private let dimensions = FraloStyle.text("尚无成品", role: .detail, secondary: true)
+    private let addButton = ActionButton("添加图片", symbol: "plus")
     private let copyButton = ActionButton("", role: .quiet, size: .compact, symbol: "doc.on.doc", label: "复制当前图片")
     private var rendered: RenderedComposition?
     private var renderedID: String?
@@ -79,11 +80,10 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private func buildInterface() {
         center.view = DropContainer()
         (center.view as? DropContainer)?.onDrop = { [weak self] in self?.importURLs($0) }
-        let collapse = ActionButton("", size: .compact, symbol: "chevron.down", label: "收起图片列表") { [weak self] in self?.toggleSidebar(nil) }
+        let collapse = ActionButton("", size: .compact, symbol: "chevron.left", label: "收起图片列表") { [weak self] in self?.toggleSidebar(nil) }
         let heading = FraloStyle.stack([batchCount, NSView(), collapse], axis: .horizontal, spacing: 4)
-        let add = ActionButton("添加图片", symbol: "plus.circle") { [weak self] in self?.addImages(nil) }
         let shortcut = FraloStyle.text("↑ ↓  切换图片", role: .caption, secondary: true); shortcut.alignment = .center
-        let leftFooter = FraloStyle.stack([add, shortcut], spacing: 14, fillWidth: true)
+        let leftFooter = FraloStyle.stack([shortcut], spacing: 14, fillWidth: true)
         let left = FloatingPanel(header: heading, body: list, footer: leftFooter)
         list.onSelection = { [weak self] _ in self?.selectionChanged() }
         list.onDelete = { [weak self] in self?.removeSelected(nil) }
@@ -93,12 +93,14 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         exportAction.onExportCurrent = { [weak self] in self?.exportCurrent(nil) }
         let inspectorBody = buildInspector()
         dimensions.alignment = .center
-        let right = FloatingPanel(header: FraloStyle.stack([FraloStyle.text("检查器", role: .heading), inspectorUI.mode, batchScope], spacing: 8, fillWidth: true),
+        let right = FloatingPanel(header: FraloStyle.stack([FraloStyle.text("出图设置", role: .heading), inspectorUI.mode, batchScope], spacing: 8, fillWidth: true),
                                   body: inspectorBody,
-                                  footer: FraloStyle.stack([FraloStyle.divider(), dimensions, exportAction], spacing: 12, fillWidth: true), bodySpacing: 18)
+                                  footer: FraloStyle.stack([FraloStyle.divider(), inspectorUI.exportSettings, dimensions, exportAction], spacing: 10, fillWidth: true), bodySpacing: 18)
         workbench = WorkbenchView(left: left, right: right, content: center.view)
         workbench.collapsed = preferences.bool(forKey: "sidebarCollapsed")
         workbench.rail.expand.onPress = { [weak self] in self?.toggleSidebar(nil) }
+        workbench.rail.list.onSelection = { [weak self] index in self?.list.select(index) }
+        workbench.rail.list.onDelete = { [weak self] in self?.removeSelected(nil) }
         workbench.rail.add.onPress = { [weak self] in self?.addImages(nil) }
         workbench.rail.previous.onPress = { [weak self] in self?.moveSelection(-1) }
         workbench.rail.next.onPress = { [weak self] in self?.moveSelection(1) }
@@ -189,7 +191,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(toolbar) }
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.init("brand"), .flexibleSpace, .init("documentTitle"), .flexibleSpace, .init("copy"), .init("settings"), .init("more")]
+        [.init("brand"), .init("add"), .flexibleSpace, .init("documentTitle"), .flexibleSpace, .init("copy"), .init("settings"), .init("more")]
     }
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         let item = NSToolbarItem(itemIdentifier: identifier)
@@ -198,6 +200,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
             let brand = FraloStyle.text("Fralo", role: .heading); item.view = brand; item.label = "Fralo"
         case "documentTitle":
             documentTitle.font = .systemFont(ofSize: 14, weight: .medium)
+            documentTitle.widthAnchor.constraint(lessThanOrEqualToConstant: 320).isActive = true
             item.view = documentTitle; item.label = "当前图片"
         case "more":
             let menu = NSMenu(); let title = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -216,12 +219,8 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
             let button = IconButton("sidebar.left", label: "显示或隐藏图片列表") { [weak self] in self?.toggleSidebar(nil) }
             item.view = button; item.label = "图片列表"
         case "add":
-            let menu = NSMenu(); menu.addItem(actionItem("添加图片", #selector(addImages(_:))))
-            menu.addItem(actionItem("选择图片…", #selector(addImages(_:))))
-            menu.addItem(actionItem("导入文件夹…", #selector(addFolder(_:))))
-            menu.addItem(actionItem("粘贴图片", #selector(pasteImage(_:))))
-            let button = NSPopUpButton(frame: .zero, pullsDown: true); button.menu = menu; button.bezelStyle = .texturedRounded
-            button.sizeToFit(); item.view = button; item.label = "添加图片"
+            addButton.onPress = { [weak self] in self?.addImages(nil) }
+            item.view = addButton; item.label = "添加图片"; item.visibilityPriority = .high
         case "copy":
             copyButton.onPress = { [weak self] in self?.copyCurrent(nil) }
             item.view = copyButton; item.label = "复制当前图片"
@@ -263,6 +262,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     @objc func toggleSidebar(_ sender: Any?) {
         workbench.setCollapsed(!workbench.collapsed, animated: true)
         preferences.set(workbench.collapsed, forKey: "sidebarCollapsed")
+        window?.makeFirstResponder(workbench.collapsed ? workbench.rail.list.documentView : list.documentView)
     }
     private func togglePreview() {
         if !workbench.previewing { previewRestoreFocus = window?.firstResponder }
@@ -274,6 +274,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private func selectionChanged() { zoom = nil; fitMenu.selectItem(at: 0); updateActions(); requestPreview() }
     private func refreshList() {
         list.update(items.map { BatchEntry(id: $0.input.id, title: $0.input.name, detail: $0.error == nil ? "" : "无法读取", image: $0.thumbnail, failed: $0.error != nil) })
+        workbench.rail.list.update(list.entries)
         workbench.rail.update(index: selectedIndex, count: items.count)
     }
     @objc private func batchMenu(_ sender: NSButton) {
@@ -381,6 +382,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
                     self.backgroundImageSize = backgroundSize
                     if let row = self.items.firstIndex(where: { $0.input.id == input.id }), self.items[row].error != nil { self.items[row].error = nil; self.refreshList() }
                     self.inspectorUI.sourceInfo.stringValue = "\(input.name)\n\(Int(sourceSize.width)) × \(Int(sourceSize.height))"
+                    self.dimensions.toolTip = "原始图片：" + self.inspectorUI.sourceInfo.stringValue
                     self.inspectorUI.outputInfo.stringValue = "\(snapshot.format == .png ? "PNG" : "JPEG") · \(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height))"
                     self.rendered = frame; self.renderedID = input.id; self.canvas.image = NSImage(cgImage: display, size: frame.pixelSize)
                     self.canvas.showsElevation = snapshot.mode == .background
@@ -411,7 +413,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         let document = NSSize(width: max(available.width, size.width + 8), height: max(available.height, size.height + 32))
         canvas.setFrameSize(document); canvas.zoom = factor
         viewing.dimensions.stringValue = "\(Int(pixels.width)) × \(Int(pixels.height))"
-        viewing.showsComposition = settings.mode == .background
+        viewing.showsComposition = false
         viewing.composition.selectItem(at: CanvasRatio.allCases.firstIndex(of: settings.canvas) ?? 1)
         viewing.composition.displayTitle = "\(settings.canvas.rawValue) · \(Int(pixels.width)) × \(Int(pixels.height))"
     }
@@ -517,6 +519,8 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     }
     private func updateActions() {
         inspectorUI?.setEditingEnabled(!isExporting)
+        addButton.isEnabled = !isExporting
+        workbench.rail.add.isEnabled = !isExporting
         batchCount.stringValue = "图片 · \(items.count)"
         batchScope.stringValue = "样式应用于全部 \(items.count) 张"
         exportAction.count = items.count; exportAction.isEnabled = !isExporting

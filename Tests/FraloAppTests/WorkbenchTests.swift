@@ -5,13 +5,11 @@ import FraloDesignSystem
 @testable import FraloApp
 
 final class WorkbenchTests: XCTestCase {
-    @MainActor func testFloatingInspectorKeepsNavigationAboveFormAndActionsFullWidth() async throws {
+    @MainActor func testGroupedInspectorKeepsExportVisibleAndDeviceSelectionAlive() async throws {
         _ = NSApplication.shared
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = SettingsStore(url: directory.appendingPathComponent("settings.json"))
-        var settings = CompositionSettings(); settings.display = .browser; settings.mode = .background
-        try CompositionStore(legacy: store).save(settings)
         let suite = "fralo-polish-\(UUID())"; let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let controller = MainWindowController(store: store, preferences: defaults, restoreWindow: false)
@@ -21,24 +19,41 @@ final class WorkbenchTests: XCTestCase {
         let inspector = try XCTUnwrap(root.right.body as? CompositionInspector)
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
         let export = try XCTUnwrap(descendants(root.right).compactMap { $0 as? ExportAction }.first)
-        let navigation = try XCTUnwrap(descendants(inspector).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == "设置页面" })
-        let device = try XCTUnwrap(descendants(inspector).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == "展示类型" })
-        for size in [NSSize(width: 1030, height: 640), NSSize(width: 1400, height: 838), NSSize(width: 1586, height: 945)] {
-            window.setContentSize(size); root.layoutSubtreeIfNeeded()
-            XCTAssertEqual(inspector.mode.bounds.width, root.right.bounds.width - FraloStyle.Workbench.panelInset * 2, accuracy: 1)
-            XCTAssertEqual(export.bounds.width, inspector.mode.bounds.width, accuracy: 1)
-            let nav = navigation.convert(navigation.bounds, to: inspector)
-            let form = device.convert(device.bounds, to: inspector)
-            if inspector.isFlipped { XCTAssertLessThan(nav.maxY, form.minY) }
-            else { XCTAssertGreaterThan(nav.minY, form.maxY) }
-            XCTAssertEqual(root.left.frame.minY, root.right.frame.minY, accuracy: 1)
-            XCTAssertEqual(root.left.frame.height, root.right.frame.height, accuracy: 1)
+        let device = inspector.devicePicker
+        XCTAssertTrue(descendants(inspector).compactMap { $0 as? InspectorTabs }.isEmpty)
+        func backgroundHeading() throws -> NSTextField {
+            try XCTUnwrap(descendants(inspector).compactMap { $0 as? NSTextField }.first { $0.stringValue == "背景与画布" })
         }
-        let tabs = try XCTUnwrap(descendants(inspector).compactMap { $0 as? InspectorTabs }.first)
-        tabs.selectTabViewItem(at: 2)
-        XCTAssertEqual(navigation.selectedIndex, 2, "Native page selection must update the visible navigation")
-        navigation.choose(0)
-        XCTAssertEqual(tabs.indexOfTabViewItem(try XCTUnwrap(tabs.selectedTabViewItem)), 0)
+        XCTAssertTrue(try backgroundHeading().isHiddenOrHasHiddenAncestor)
+        inspector.mode.choose(1)
+        XCTAssertFalse(try backgroundHeading().isHiddenOrHasHiddenAncestor)
+        for format in [0, 1] {
+            inspector.formatPicker.choose(format)
+            for size in [NSSize(width: 1030, height: 640), NSSize(width: 1400, height: 838), NSSize(width: 1586, height: 945)] {
+                window.setContentSize(size); root.layoutSubtreeIfNeeded()
+                XCTAssertEqual(inspector.mode.bounds.width, root.right.bounds.width - FraloStyle.Workbench.panelInset * 2, accuracy: 1)
+                XCTAssertEqual(export.bounds.width, inspector.mode.bounds.width, accuracy: 1)
+                XCTAssertGreaterThan(inspector.bounds.height, 80, "Settings must retain a usable scroll viewport even with JPEG options")
+                let actionFrame = export.convert(export.bounds, to: root.right)
+                XCTAssertGreaterThanOrEqual(actionFrame.minY, 0); XCTAssertLessThanOrEqual(actionFrame.maxY, root.right.bounds.height)
+                XCTAssertEqual(root.left.frame.minY, root.right.frame.minY, accuracy: 1)
+                XCTAssertEqual(root.left.frame.height, root.right.frame.height, accuracy: 1)
+            }
+        }
+        for index in [1, 2, 0] {
+            device.choose(index); root.layoutSubtreeIfNeeded()
+            XCTAssertTrue(inspector.devicePicker === device, "Replacing the picker interrupts its selection animation and focus")
+            XCTAssertEqual(inspector.settings.display, DisplayKind.allCases[index])
+            XCTAssertEqual(try CompositionStore(legacy: store).load().display, DisplayKind.allCases[index])
+        }
+        inspector.mode.choose(0)
+        XCTAssertTrue(try backgroundHeading().isHiddenOrHasHiddenAncestor)
+        XCTAssertFalse(inspector.exportSettings.isHiddenOrHasHiddenAncestor)
+        XCTAssertNotEqual(device.focusRingType, .none)
+        let toolbar = try XCTUnwrap(window.toolbar)
+        let add = try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "add" }?.view as? ActionButton)
+        controller.toggleSidebar(nil); root.layoutSubtreeIfNeeded()
+        XCTAssertEqual(add.title, "添加图片"); XCTAssertFalse(add.isHiddenOrHasHiddenAncestor)
     }
 
     @MainActor func testWorkspaceWindowAllowsBehindWindowMaterial() async throws {
@@ -89,7 +104,14 @@ final class WorkbenchTests: XCTestCase {
         let image = try XCTUnwrap(canvas.image)
         controller.toggleSidebar(nil); root.layoutSubtreeIfNeeded()
         XCTAssertTrue(root.collapsed); XCTAssertEqual(canvas.image?.size, image.size)
+        XCTAssertTrue(window.firstResponder === root.rail.list.documentView)
         XCTAssertEqual(list.selectedIndex, 1)
+        XCTAssertEqual(root.rail.list.entries.count, 2)
+        XCTAssertEqual(root.rail.list.selectedIndex, 1)
+        root.rail.list.select(0)
+        XCTAssertEqual(list.selectedIndex, 0, "A compact thumbnail must select the real batch item")
+        list.select(1)
+        XCTAssertEqual(root.rail.list.selectedIndex, 1)
         for size in [NSSize(width: 1030, height: 640), NSSize(width: 1400, height: 950)] {
             window.setContentSize(size); root.layoutSubtreeIfNeeded()
             XCTAssertEqual(root.left.frame.minY, root.right.frame.minY, accuracy: 1)
@@ -100,10 +122,10 @@ final class WorkbenchTests: XCTestCase {
         inspector.mode.choose(1)
         for _ in 0..<150 where canvas.image?.size != CanvasRatio.landscape.size { try await Task.sleep(nanoseconds: 20_000_000) }
         XCTAssertEqual(canvas.image?.size, CanvasRatio.landscape.size)
-        let tabs = try XCTUnwrap(descendants(inspector).compactMap { $0 as? InspectorTabs }.first)
-        tabs.selectTabViewItem(at: 1); inspector.dragBackground = true
-        tabs.selectTabViewItem(at: 0)
-        XCTAssertFalse(inspector.dragBackground, "Device page must not retain a hidden background-drag target")
+        inspector.dragBackground = true
+        inspector.devicePicker.choose(1)
+        inspector.devicePicker.choose(0)
+        XCTAssertFalse(inspector.dragBackground, "Editing the device must leave background dragging")
         let point = canvas.convert(NSPoint(x: canvas.imageRect.midX, y: canvas.imageRect.midY), to: nil)
         let down = try XCTUnwrap(NSEvent.mouseEvent(with: .leftMouseDown, location: point, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
         canvas.mouseDown(with: down)
