@@ -64,10 +64,11 @@ public final class ValuePicker: NSControl {
         return NSRect(x: CGFloat(selection) * width + 2, y: 2, width: max(0, width - 4), height: max(0, bounds.height - 4))
     }
     public override func updateLayer() {
-        layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.065).cgColor
-        layer?.cornerRadius = 10
-        indicator.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
-        indicator.layer?.cornerRadius = 8
+        let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        layer?.backgroundColor = NSColor.black.withAlphaComponent(dark ? 0.12 : 0.045).cgColor
+        layer?.cornerRadius = 8
+        indicator.layer?.backgroundColor = (dark ? NSColor.white.withAlphaComponent(0.13) : NSColor.white.withAlphaComponent(0.80)).cgColor
+        indicator.layer?.cornerRadius = 6
         indicator.layer?.shadowColor = NSColor.black.cgColor
         indicator.layer?.shadowOpacity = preferences.effectiveIncreaseContrast ? 0 : 0.10
         indicator.layer?.shadowRadius = 3; indicator.layer?.shadowOffset = NSSize(width: 0, height: -1)
@@ -144,7 +145,7 @@ public final class InspectorTabs: NSTabView, NSTabViewDelegate {
         if style == .floating {
             tabViewType = .noTabsNoBorder; drawsBackground = false
             let bar = ValuePicker(pages.map(\.0), label: "设置页面")
-            bar.controlHeight = 42
+            bar.controlHeight = 34
             bar.setSymbols(["iphone", "photo", "square.and.arrow.up"])
             bar.setAccessibilityRole(.tabGroup)
             bar.onChange = { [weak self] in self?.selectTabViewItem(at: $0) }
@@ -160,7 +161,7 @@ public final class InspectorTabs: NSTabView, NSTabViewDelegate {
     public override func layout() {
         super.layout()
         guard let navigation else { return }
-        navigation.frame = NSRect(x: 0, y: isFlipped ? 0 : bounds.height - 42, width: bounds.width, height: 42)
-        selectedTabViewItem?.view?.frame = NSRect(x: 0, y: isFlipped ? 58 : 0, width: bounds.width, height: max(0, bounds.height - 58))
+        navigation.frame = NSRect(x: 0, y: isFlipped ? 0 : bounds.height - 34, width: bounds.width, height: 34)
+        selectedTabViewItem?.view?.frame = NSRect(x: 0, y: isFlipped ? 48 : 0, width: bounds.width, height: max(0, bounds.height - 48))
     }
 }

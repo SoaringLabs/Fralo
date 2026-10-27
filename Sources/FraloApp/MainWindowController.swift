@@ -12,6 +12,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private var inspectorUI: CompositionInspector!
     private let preferences: UserDefaults
     private let pasteboard: NSPasteboard
+    private var appearanceChoice = "system"
     private var workbench: WorkbenchView!
     private let center = NSViewController()
     private let list = BatchList()
@@ -61,6 +62,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         let area = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 1000)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: min(1400, area.width - 80), height: min(950, area.height - 80)), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         super.init(window: window)
+        selectAppearance(preferences.string(forKey: "workbenchAppearance") ?? "system", persist: false)
         window.title = "Fralo"; window.titleVisibility = .hidden; window.toolbarStyle = .unifiedCompact
         window.titlebarAppearsTransparent = true; window.titlebarSeparatorStyle = .none
         // Let the behind-window workspace material composite with the desktop.
@@ -90,7 +92,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         exportAction.onExportCurrent = { [weak self] in self?.exportCurrent(nil) }
         let inspectorBody = buildInspector()
         dimensions.alignment = .center
-        let right = FloatingPanel(header: FraloStyle.stack([inspectorUI.mode, batchScope], spacing: 14, fillWidth: true),
+        let right = FloatingPanel(header: FraloStyle.stack([FraloStyle.text("检查器", role: .heading), inspectorUI.mode, batchScope], spacing: 8, fillWidth: true),
                                   body: inspectorBody,
                                   footer: FraloStyle.stack([FraloStyle.divider(), dimensions, exportAction], spacing: 12, fillWidth: true), bodySpacing: 18)
         workbench = WorkbenchView(left: left, right: right, content: center.view)
@@ -202,6 +204,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
             menu.addItem(actionItem("添加图片…", #selector(addImages(_:))))
             menu.addItem(actionItem("导入文件夹…", #selector(addFolder(_:))))
             menu.addItem(actionItem("粘贴图片", #selector(pasteImage(_:))))
+            let appearance = NSMenuItem(title: "外观", action: nil, keyEquivalent: ""); appearance.submenu = appearanceMenu(); menu.addItem(appearance)
             menu.addItem(.separator()); menu.addItem(actionItem("移除当前图片", #selector(removeSelected(_:))))
             let button = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 24, height: 28), pullsDown: true)
             button.menu = menu; button.isBordered = false; button.imagePosition = .imageOnly
@@ -228,6 +231,21 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private func actionItem(_ title: String, _ action: Selector) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; return item
     }
+    func selectAppearance(_ value: String, persist: Bool = true) {
+        guard ["system", "light", "dark"].contains(value) else { return }
+        appearanceChoice = value
+        window?.appearance = value == "dark" ? NSAppearance(named: .darkAqua) : value == "light" ? NSAppearance(named: .aqua) : nil
+        if persist { preferences.set(value, forKey: "workbenchAppearance") }
+    }
+    func appearanceMenu() -> NSMenu {
+        let menu = NSMenu(title: "外观")
+        for (value, title) in [("system", "跟随系统"), ("light", "浅色"), ("dark", "深色")] {
+            let item = actionItem(title, #selector(changeAppearance(_:))); item.representedObject = value
+            item.state = appearanceChoice == value ? .on : .off; menu.addItem(item)
+        }
+        return menu
+    }
+    @objc private func changeAppearance(_ sender: NSMenuItem) { if let value = sender.representedObject as? String { selectAppearance(value) } }
     @objc func toggleSidebar(_ sender: Any?) {
         workbench.setCollapsed(!workbench.collapsed, animated: true)
         preferences.set(workbench.collapsed, forKey: "sidebarCollapsed")
@@ -321,6 +339,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private func requestPreview() {
         previewRequest += 1; renderWork?.cancel(); rendered = nil; renderedID = nil
         guard let index = selectedIndex else {
+            inspectorUI.setInput(nil)
             canvas.image = nil; empty.isHidden = false; emptyMessage.stringValue = "拖入截图，开始套框"
             emptyAction.title = "添加图片"; emptyAction.onPress = { [weak self] in self?.addImages(nil) }
             emptyDetail.stringValue = "PNG / JPEG · 支持批量导入"
@@ -328,6 +347,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
             window?.title = "Fralo"; documentTitle.stringValue = "Fralo"; dimensions.stringValue = "尚无成品"; inspectorUI.sourceInfo.stringValue = "尚未选择图片"; inspectorUI.outputInfo.stringValue = "—"; previewSpinner.stopAnimation(nil); updateActions(); return
         }
         let input = items[index].input, snapshot = settings, generation = previewRequest
+        inspectorUI.setInput(input)
         window?.title = input.name; filename.stringValue = input.name; position.stringValue = "\(index + 1) / \(items.count)"
         documentTitle.stringValue = input.name
         empty.isHidden = true; previewScroll.isHidden = false; footer.isHidden = false
@@ -350,6 +370,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
                     self.inspectorUI.outputInfo.stringValue = "\(snapshot.format == .png ? "PNG" : "JPEG") · \(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height))"
                     self.rendered = frame; self.renderedID = input.id; self.canvas.image = NSImage(cgImage: display, size: frame.pixelSize)
                     self.canvas.showsElevation = snapshot.mode == .background
+                    self.canvas.showsTransparencyGrid = snapshot.mode == .background
                     self.dimensions.stringValue = "\(snapshot.format == .png ? "PNG" : "JPEG") · \(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height))"
                     self.empty.isHidden = true; self.layoutPreview()
                 case .failure(let error):
@@ -490,6 +511,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         if items.isEmpty { empty.isHidden = false; footer.isHidden = true; previewScroll.isHidden = true }
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(changeAppearance(_:)) { menuItem.state = (menuItem.representedObject as? String) == appearanceChoice ? .on : .off; return true }
         guard !isExporting else { return false }
         if menuItem.action == #selector(copyCurrent(_:)) { return rendered != nil || window?.firstResponder is NSTextView }
         if menuItem.action == #selector(exportCurrent(_:)) || menuItem.action == #selector(removeSelected(_:)) { return selectedIndex != nil }

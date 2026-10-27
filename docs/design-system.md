@@ -11,7 +11,7 @@ This phase supplies reusable controls and experiments before the product workben
 | Workspace | Standard macOS material, allowing restrained desktop color blending |
 | Floating panel | Denser system material with consistent insets and boundaries |
 | Artwork | An independent, accurate output image, never tinted by desktop material |
-| Preview backing | A neutral checkerboard under transparent artwork; never part of export |
+| Preview backing | Optional checkerboard; the tight transparent-shell editing view uses the workspace behind it. Neither backing enters export |
 
 `FraloStyle` owns typography and structural spacing. System colors keep text, controls and selection compatible with effective appearance. The current spacing steps are 4/8/12/16/24/32 pt. These are Fralo specifications, not Apple-mandated dimensions. Native controls keep their intrinsic sizing and behavior.
 
@@ -21,7 +21,7 @@ This phase supplies reusable controls and experiments before the product workben
 | --- | --- |
 | Text and structure | `FraloStyle.text`, `paragraph`, `stack`, `FormRow`, `InfoRow`, `FormSection` |
 | Actions | `ActionButton`, `IconButton`, `ExportAction` |
-| Value selection | `ValuePicker`, `ChoiceMenu`, `ToggleControl`, `ValueField` |
+| Value selection | `ValuePicker`, `VisualChoiceGroup`, `ChoiceMenu`, `ToggleControl`, `ValueField` |
 | Content navigation | `InspectorTabs` backed by `NSTabView` |
 | Continuous and color input | `SliderRow`, `ColorChoice` |
 | Background selection | `BackgroundSwatch`, `SwatchPicker` |
@@ -60,9 +60,13 @@ See [the development lab](development-lab.md) for running and [acceptance eviden
 
 The selected soft style is the shared `ActionButton` default in Debug and Release. Its implementation lives in `Sources/FraloDesignSystem/ActionButton.swift`; there is no separate Dev copy. `IconButton`, `ExportAction`, state actions, preview tools and the lab reuse it. The production workbench now consumes these shared implementations directly.
 
-`FraloStyle.Button` owns regular/compact heights (40/28 pt), corner radii (10/7 pt), content insets and symbol sizes. These are Fralo choices. Use regular buttons for panel actions and compact controls for toolbars. Keep an icon-only button's explicit accessibility label.
+`FraloStyle.Button` owns regular/compact heights (34/28 pt), corner radii (10/7 pt), content insets and symbol sizes. These are Fralo choices. Use regular buttons for panel actions and compact controls for toolbars. Keep an icon-only button's explicit accessibility label.
 
-The reference-image calibration uses 20 pt floating-panel radii, a 36 pt rounded value picker (44 pt for output mode), 32 pt soft native popups, 88 pt batch rows and 72 × 66 pt proportionally contained thumbnails. `InspectorTabs(style: .floating)` retains an actual borderless `NSTabView` with a persistent, icon-labelled navigation bar above the scrollable page; the lab's five-section navigation may use the standard style. `ExportAction` is a full-width 46 pt split action with separate whole-batch and current-image callbacks, press/hover feedback and keyboard focus. `ViewToolbar` can expose a real canvas-ratio popup alongside viewing scale and clean preview.
+The current calibration uses 24 pt floating-panel radii, 18 pt panel insets, a 30 pt rounded value picker (36 pt for output mode), 32 pt soft native popups, 88 pt batch rows and 72 × 66 pt proportionally contained thumbnails. `InspectorTabs(style: .floating)` retains an actual borderless `NSTabView` with a persistent, 34 pt icon-labelled navigation bar above the scrollable page; the lab's five-section navigation may use the standard style. `ExportAction` is a full-width 40 pt split action with separate whole-batch and current-image callbacks, press/hover feedback and keyboard focus. `ViewToolbar` can expose a real canvas-ratio popup alongside viewing scale and clean preview.
+
+`VisualChoiceGroup` supplies literal thumbnail radio choices with restrained accent fill, fine selected outlines and checkmarks. Its single-model row uses a neutral surface rather than a large accent banner. Mouse, arrow keys and accessibility use the same selection path; value restoration and asynchronous artwork updates do not emit edits. Inspector rebuilds restore the focused parameter so arrow keys remain local. The development Components page includes enabled/disabled card samples. Product thumbnails render the complete current input off the main thread; stale requests cannot replace a newer or cached selection. No recognition, corrective cropping or original-file writes are involved.
+
+Panel surfaces use `NSGlassEffectView` on macOS 26 and later. All foreground children must be added to `MaterialSurface.contentView`, which is hosted as the native glass content view; arbitrary glass siblings are not a supported foreground arrangement. Earlier systems retain the `NSVisualEffectView` panel recipe. Reduced transparency adds an opaque semantic backing without hiding controls, and the workspace remains on its existing visual-effect recipe. Application appearance can follow the system or select light/dark through the View menu; this does not change composition pixels or system appearance.
 
 Panel elevation and a restrained semantic tint belong to panel chrome only. Workspace material remains the complete native effect with no additional workspace tint (100% / 0% in the Dev experiment). `CanvasSurface.showsElevation` adds a viewing-only edge/shadow around background compositions, never changes artwork pixels or output aspect ratio. Batch selection uses a restrained accent fill with normal dark/light semantic text in both active and inactive windows.
 
@@ -74,6 +78,8 @@ The four roles are primary, secondary, quiet and destructive. Busy state preserv
 
 - [Materials](https://developer.apple.com/design/human-interface-guidelines/materials)
 - [NSVisualEffectView](https://developer.apple.com/documentation/appkit/nsvisualeffectview)
+- [NSGlassEffectView](https://developer.apple.com/documentation/appkit/nsglasseffectview)
+- [Native glass content view](https://developer.apple.com/documentation/appkit/nsglasseffectview/contentview)
 - [Window-background material](https://developer.apple.com/documentation/appkit/nsvisualeffectview/material-swift.enum/underwindowbackground)
 - [Reduced transparency](https://developer.apple.com/documentation/appkit/nsworkspace/accessibilitydisplayshouldreducetransparency)
 

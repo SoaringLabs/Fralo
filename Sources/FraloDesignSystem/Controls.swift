@@ -63,8 +63,9 @@ public final class ChoiceMenu: NSPopUpButton {
         let rect = bounds.insetBy(dx: 1, dy: 1)
         let path = NSBezierPath(roundedRect: rect, xRadius: 8, yRadius: 8)
         if showsSurface {
-            NSColor.controlBackgroundColor.withAlphaComponent(isEnabled ? 0.92 : 0.5).setFill(); path.fill()
-            NSColor.separatorColor.withAlphaComponent(0.20).setStroke(); path.lineWidth = 0.5; path.stroke()
+            let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            NSColor.white.withAlphaComponent(isEnabled ? (dark ? 0.055 : 0.72) : 0.025).setFill(); path.fill()
+            NSColor.labelColor.withAlphaComponent(0.09).setStroke(); path.lineWidth = 0.5; path.stroke()
         }
         let ink: NSColor = isEnabled ? .labelColor : .disabledControlTextColor
         var leading: CGFloat = 11
@@ -235,12 +236,12 @@ public final class ExportAction: NSStackView {
     public var isEnabled = true { didSet { refresh() } }
     public init(count: Int) {
         super.init(frame: .zero)
-        orientation = .horizontal; alignment = .centerY; spacing = 0
+        orientation = .horizontal; alignment = .centerY; spacing = 0; distribution = .fill
         wantsLayer = true; layer?.cornerRadius = 11
         primary.drawsSurface = false; disclosure.drawsSurface = false
         let divider = NSView(); divider.wantsLayer = true; divider.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.22).cgColor
         addArrangedSubview(primary); addArrangedSubview(divider); addArrangedSubview(disclosure)
-        NSLayoutConstraint.activate([heightAnchor.constraint(equalToConstant: 46), primary.heightAnchor.constraint(equalTo: heightAnchor),
+        NSLayoutConstraint.activate([heightAnchor.constraint(equalToConstant: 40), primary.heightAnchor.constraint(equalTo: heightAnchor),
             disclosure.heightAnchor.constraint(equalTo: heightAnchor), disclosure.widthAnchor.constraint(equalToConstant: 34),
             divider.widthAnchor.constraint(equalToConstant: 1), divider.heightAnchor.constraint(equalToConstant: 24)])
         primary.setContentHuggingPriority(.defaultLow, for: .horizontal)

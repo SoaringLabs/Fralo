@@ -28,6 +28,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #endif
         #if FRALO_DEV
         development.applyPreviewGeometry(to: controller.window)
+        if CommandLine.arguments.contains("--workbench-preview"), let arg = CommandLine.arguments.first(where: { $0.hasPrefix("--preview-appearance=") }) {
+            controller.selectAppearance(String(arg.dropFirst("--preview-appearance=".count)), persist: false)
+        }
         #endif
         controller.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -103,6 +106,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item(view, "显示/隐藏侧边栏", #selector(MainWindowController.toggleSidebar(_:)), "s", modifiers: [.command, .control])
         item(view, "适应窗口", #selector(MainWindowController.fitPreview(_:)), "0")
         item(view, "实际像素", #selector(MainWindowController.actualPixels(_:)), "1")
+        let appearance = NSMenuItem(title: "外观", action: nil, keyEquivalent: ""); appearance.submenu = controller.appearanceMenu(); view.addItem(appearance)
 
         let window = NSMenu(title: "窗口"); let windowItem = NSMenuItem(title: "窗口", action: nil, keyEquivalent: ""); windowItem.submenu = window; bar.addItem(windowItem)
         window.addItem(withTitle: "最小化", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")

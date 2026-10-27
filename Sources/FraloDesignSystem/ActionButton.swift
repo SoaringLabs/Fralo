@@ -36,7 +36,7 @@ public class ActionButton: NSButton {
         self.role = role; self.size = size; self.onPress = onPress; explicitLabel = label
         super.init(frame: .zero)
         self.title = title; self.image = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
-        font = .systemFont(ofSize: size == .regular ? 14 : 12, weight: .semibold)
+        font = .systemFont(ofSize: size == .regular ? 13 : 12, weight: .semibold)
         setButtonType(.momentaryPushIn); isBordered = false
         target = self; action = #selector(activate(_:)); focusRingType = .exterior
         hasDestructiveAction = role == .destructive; toolTip = label ?? title

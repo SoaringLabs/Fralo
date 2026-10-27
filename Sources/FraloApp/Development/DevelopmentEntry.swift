@@ -12,6 +12,7 @@ final class DevelopmentEntry: NSObject {
         guard parts.count == 2, parts.allSatisfy(\.isFinite), parts[0] >= 1030, parts[1] >= 640 else { return }
         let visible = window.screen?.visibleFrame ?? NSScreen.main!.visibleFrame
         window.setContentSize(NSSize(width: min(parts[0], visible.width), height: min(parts[1], visible.height - 52)))
+        if CommandLine.arguments.contains("--preview-collapsed"), let workbench = window.contentView as? WorkbenchView { workbench.collapsed = true }
         window.center()
     }
     static var labOnly: Bool { CommandLine.arguments.contains("--design-lab-only") }

@@ -25,7 +25,7 @@ final class WorkbenchTests: XCTestCase {
         let device = try XCTUnwrap(descendants(inspector).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == "展示类型" })
         for size in [NSSize(width: 1030, height: 640), NSSize(width: 1400, height: 838), NSSize(width: 1586, height: 945)] {
             window.setContentSize(size); root.layoutSubtreeIfNeeded()
-            XCTAssertEqual(inspector.mode.bounds.width, root.right.bounds.width - 32, accuracy: 1)
+            XCTAssertEqual(inspector.mode.bounds.width, root.right.bounds.width - FraloStyle.Workbench.panelInset * 2, accuracy: 1)
             XCTAssertEqual(export.bounds.width, inspector.mode.bounds.width, accuracy: 1)
             let nav = navigation.convert(navigation.bounds, to: inspector)
             let form = device.convert(device.bounds, to: inspector)

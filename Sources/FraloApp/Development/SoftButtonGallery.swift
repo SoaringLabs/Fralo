@@ -41,10 +41,10 @@ enum SoftButtonGallery {
         let context = MaterialSurface(.panel, radius: 16)
         let content = FraloStyle.stack([FraloStyle.text("悬浮面板中的按钮", role: .heading),
             FraloStyle.paragraph("柔和表面搭配系统材质；主操作保留清晰边界。"), contextButton], spacing: 14)
-        content.translatesAutoresizingMaskIntoConstraints = false; context.addSubview(content)
-        NSLayoutConstraint.activate([content.leadingAnchor.constraint(equalTo: context.leadingAnchor, constant: 18),
-            content.trailingAnchor.constraint(equalTo: context.trailingAnchor, constant: -18), content.topAnchor.constraint(equalTo: context.topAnchor, constant: 18),
-            content.bottomAnchor.constraint(equalTo: context.bottomAnchor, constant: -18)])
+        content.translatesAutoresizingMaskIntoConstraints = false; context.contentView.addSubview(content)
+        NSLayoutConstraint.activate([content.leadingAnchor.constraint(equalTo: context.contentView.leadingAnchor, constant: 18),
+            content.trailingAnchor.constraint(equalTo: context.contentView.trailingAnchor, constant: -18), content.topAnchor.constraint(equalTo: context.contentView.topAnchor, constant: 18),
+            content.bottomAnchor.constraint(equalTo: context.contentView.bottomAnchor, constant: -18)])
         context.preferences = state.preferences
         return FormSection("按钮规范 · 柔和定制", detail: "已选定的共享默认样式，来自 FraloDesignSystem.ActionButton。原生行仅供对照；顶部选项可检查明暗与辅助功能。", views: [
             row("现有原生", native), row("柔和定制", [primary, add, reset, remove, icon]),

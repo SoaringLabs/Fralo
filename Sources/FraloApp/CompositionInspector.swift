@@ -14,11 +14,16 @@ final class CompositionInspector: NSView {
     private weak var dragToggle: ToggleControl?
     private var tabs: InspectorTabs!
     private var selectedTab = 0
+    private let artwork = InspectorArtwork()
+    private var input: ImageInput?
+    private weak var modelCards: VisualChoiceGroup?
+    private weak var orientationCards: VisualChoiceGroup?
+    private weak var backgroundCards: VisualChoiceGroup?
 
     init(settings: CompositionSettings) {
         self.settings = settings
         mode = ValuePicker(["透明套壳", "背景成图"], label: "出图模式", selected: settings.mode == .transparent ? 0 : 1)
-        mode.controlHeight = 44
+        mode.controlHeight = 36
         super.init(frame: NSRect(x: 0, y: 0, width: 250, height: 500))
         mode.onChange = { [weak self] index in self?.edit(rebuild: true) { $0.mode = index == 0 ? .transparent : .background } }
         rebuild()
@@ -26,6 +31,16 @@ final class CompositionInspector: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     func set(_ value: CompositionSettings) { settings = value; mode.selectedIndex = value.mode == .transparent ? 0 : 1 }
     func chooseCanvas(_ value: CanvasRatio) { edit(rebuild: true) { $0.canvas = value } }
+    func setInput(_ value: ImageInput?) { input = value; refreshArtwork() }
+    private func refreshArtwork() {
+        artwork.load(input, display: settings.display) { [weak self] result in
+            guard let self else { return }
+            let frames = result.frames.map { cg in cg.map { NSImage(cgImage: $0, size: NSSize(width: $0.width, height: $0.height)) } }
+            self.modelCards?.setImages(self.settings.display == .browser ? frames : [frames[self.settings.orientation == .portrait ? 0 : 1]])
+            self.orientationCards?.setImages(frames)
+            self.backgroundCards?.setImages(result.backgrounds.map { cg in cg.map { NSImage(cgImage: $0, size: NSSize(width: $0.width, height: $0.height)) } })
+        }
+    }
     func setEditingEnabled(_ enabled: Bool) {
         func visit(_ view: NSView) { (view as? NSControl)?.isEnabled = enabled; view.subviews.forEach(visit) }
         visit(self); mode.isEnabled = enabled
@@ -34,6 +49,8 @@ final class CompositionInspector: NSView {
         change(&settings); if rebuild { self.rebuild() }; onChange?(settings)
     }
     private func rebuild() {
+        let focused = window?.firstResponder as? NSView
+        let focusLabel = focused.flatMap { $0.isDescendant(of: self) ? $0.accessibilityLabel() : nil }
         if settings.mode != .background || settings.background == .solid || settings.background == .gradient { dragBackground = false }
         tabs?.removeFromSuperview()
         tabs = InspectorTabs([("设备", ScrollContent.make(devicePage(), inset: 0)),
@@ -45,10 +62,17 @@ final class CompositionInspector: NSView {
             self?.selectedTab = index
             if index != 1 { self?.dragBackground = false; self?.dragToggle?.value = false }
         }
-        window?.recalculateKeyViewLoop()
+        refreshArtwork(); window?.recalculateKeyViewLoop()
+        if let focusLabel {
+            func replacement(in view: NSView) -> NSView? {
+                if view.acceptsFirstResponder, view.accessibilityLabel() == focusLabel { return view }
+                return view.subviews.lazy.compactMap { replacement(in: $0) }.first
+            }
+            if let control = replacement(in: self) { window?.makeFirstResponder(control) }
+        }
     }
     private func column(_ views: [NSView]) -> NSView {
-        let stack = FraloStyle.stack(views, spacing: 20)
+        let stack = FraloStyle.stack(views, spacing: 14)
         for view in views { view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true }
         return stack
     }
@@ -63,11 +87,15 @@ final class CompositionInspector: NSView {
         let device = ValuePicker(["手机", "平板", "浏览器"], label: "展示类型", selected: DisplayKind.allCases.firstIndex(of: settings.display)!) { [weak self] index in self?.edit(rebuild: true) { $0.display = DisplayKind.allCases[index] } }
         var views: [NSView] = [device]
         if settings.display == .browser {
-            views.append(FraloStyle.stack([FraloStyle.text("窗口样式", role: .detail, secondary: true), ChoiceMenu(["Safari", "Chrome"], label: "浏览器外观", selected: settings.browser == .safari ? 0 : 1) { [weak self] index in self?.edit { $0.browser = index == 0 ? .safari : .chrome } }], spacing: 6, fillWidth: true))
+            let cards = VisualChoiceGroup([.init("Safari", detail: "简洁工具栏", symbol: "safari"), .init("Chrome", detail: "标签页工具栏", symbol: "globe")], label: "浏览器外观", selected: settings.browser == .safari ? 0 : 1) { [weak self] index in self?.edit { $0.browser = index == 0 ? .safari : .chrome } }
+            modelCards = cards; views.append(cards)
             views.append(FraloStyle.stack([FraloStyle.text("窗口比例", role: .detail, secondary: true), ChoiceMenu(WindowRatio.allCases.map(\.rawValue), label: "浏览器窗口比例", selected: WindowRatio.allCases.firstIndex(of: settings.windowRatio)!) { [weak self] index in self?.edit { $0.windowRatio = WindowRatio.allCases[index] } }], spacing: 6, fillWidth: true))
         } else {
-            views.append(ChoiceMenu([settings.display == .phone ? "iPhone" : "iPad"], label: "设备外框"))
-            views.append(picker(["竖屏", "横屏"], label: "方向", selected: settings.orientation == .portrait ? 0 : 1) { [weak self] index in self?.edit { $0.orientation = index == 0 ? .portrait : .landscape } })
+            let model = VisualChoiceGroup([.init(settings.display == .phone ? "iPhone" : "iPad", detail: "标准外框", symbol: settings.display == .phone ? "iphone" : "ipad")], label: "设备外框", layout: .row)
+            modelCards = model; views.append(model)
+            let orientation = VisualChoiceGroup([.init("竖屏", detail: "Portrait", symbol: "rectangle.portrait"), .init("横屏", detail: "Landscape", symbol: "rectangle")], label: "方向", selected: settings.orientation == .portrait ? 0 : 1) { [weak self] index in self?.edit(rebuild: true) { $0.orientation = index == 0 ? .portrait : .landscape } }
+            orientationCards = orientation
+            views.append(FraloStyle.stack([FraloStyle.text("方向", role: .caption, secondary: true), orientation], spacing: 8, fillWidth: true))
         }
         if settings.mode == .background {
             views.append(slider("设备缩放", range: 10...150, value: settings.deviceScale * 100) { [weak self] v in self?.edit { $0.deviceScale = v / 100 } })
@@ -86,7 +114,10 @@ final class CompositionInspector: NSView {
             }])
         }
         let names = ["纯色", "渐变", "暖灰", "雾蓝", "灰绿", "本地图片"]
-        var views: [NSView] = [ChoiceMenu(names, label: "背景来源", selected: BackgroundKind.allCases.firstIndex(of: settings.background)!) { [weak self] index in
+        let presets: [BackgroundKind] = [.warm, .mist, .sage]
+        let backgrounds = VisualChoiceGroup([.init("暖灰"), .init("雾蓝"), .init("灰绿")], label: "背景预设", selected: presets.firstIndex(of: settings.background), layout: .tiles(columns: 3, height: 96)) { [weak self] index in self?.edit(rebuild: true) { $0.background = presets[index]; $0.backgroundScale = 1; $0.backgroundX = 0; $0.backgroundY = 0 } }
+        backgroundCards = backgrounds
+        var views: [NSView] = [backgrounds, ChoiceMenu(names, label: "背景来源", selected: BackgroundKind.allCases.firstIndex(of: settings.background)!) { [weak self] index in
             guard let self else { return }
             if BackgroundKind.allCases[index] == .local && self.settings.localBackgroundPath == nil { self.chooseBackground() }
             else { self.edit(rebuild: true) { $0.background = BackgroundKind.allCases[index] } }

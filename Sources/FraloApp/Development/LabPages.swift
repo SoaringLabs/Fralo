@@ -36,7 +36,7 @@ enum LabPages {
             FormSection("空间与尺寸", views: [
                 InfoRow("间距阶梯", value: "4 / 8 / 12 / 16 / 24 / 32 pt"),
                 InfoRow("图标按钮命中区", value: "28 × 28 pt · 图标来自 SF Symbols"),
-                InfoRow("参数选择器", value: "36 pt 起 · 模式 44 pt · 单选语义"),
+                InfoRow("参数选择器", value: "30 pt · 模式 36 pt · 单选语义"),
                 InfoRow("缩略图", value: "72 × 66 pt 等比容纳，88 pt 行高")
             ]),
             FormSection("反馈与动效", detail: "系统开启减少动态效果时直接切换。上方模拟选项只能加强系统设置。", views: [
@@ -80,6 +80,12 @@ enum LabPages {
             return (title, image)
         })
         swatches.onSelection = { feedback.stringValue = "背景样例：\($0 + 1)" }
+        let visualItems = [VisualChoiceItem("竖屏", detail: "Portrait", symbol: "iphone"),
+                           VisualChoiceItem("横屏", detail: "Landscape", symbol: "iphone.landscape")]
+        let cards = VisualChoiceGroup(visualItems, label: "图卡方向") { feedback.stringValue = "图卡方向：\($0 + 1)" }
+        cards.preferences = state.preferences
+        let disabledCards = VisualChoiceGroup(visualItems, label: "不可用图卡"); disabledCards.isEnabled = false
+        disabledCards.preferences = state.preferences
         let states: [StateView] = [
             StateView(.empty, title: "尚无图片", detail: "空态和导入入口") { feedback.stringValue = "已触发样例导入" },
             StateView(.loading, title: "生成预览", detail: "加载反馈不会替代整个窗口"),
@@ -92,6 +98,7 @@ enum LabPages {
             SoftButtonGallery.make(state: state),
             FormSection("按钮与反馈", detail: "可直接点击，并用 Tab / Shift-Tab 检查焦点；这是共享组件的真实行为。", views: [FraloStyle.stack([primary, secondary, quiet, destructive, icon], axis: .horizontal), FraloStyle.stack([disabled, busy, export], axis: .horizontal), feedback]),
             FormSection("参数选择与内容导航", views: [sample(picker, width: 320), sample(orientation, width: 240), sample(disabledPicker, width: 300), sample(navigation)]),
+            FormSection("图卡选择", detail: "正式工作台使用真实外框缩略图。此处验证图卡的选择、方向键、焦点与不可用状态。", views: [sample(cards, width: 340), sample(disabledCards, width: 340)]),
             FormSection("表单、颜色与数值", views: [sample(FormRow("窗口样式", content: popup)), sample(FormRow("透明填底", content: color)), sample(FormRow("质量数值", content: number)), sample(slider), sample(opacity), sample(unavailable), sample(InfoRow("实际尺寸", value: "2400 × 1800 px"))]),
             FormSection("背景缩略图", views: [swatches, ToggleControl("布尔选项", value: true) { feedback.stringValue = "布尔选项：\($0)" }]),
             FormSection("原图列表与长文件名", views: [list]),
@@ -149,14 +156,14 @@ final class MaterialExperiment: NSView {
         for view in [header, workspace, status] { view.translatesAutoresizingMaskIntoConstraints = false; addSubview(view) }
         for view in [canvas, panel] { view.translatesAutoresizingMaskIntoConstraints = false; workspace.addSubview(view) }
         let scroll = ScrollContent.make(controls)
-        scroll.translatesAutoresizingMaskIntoConstraints = false; panel.addSubview(scroll)
+        scroll.translatesAutoresizingMaskIntoConstraints = false; panel.contentView.addSubview(scroll)
         NSLayoutConstraint.activate([
             header.topAnchor.constraint(equalTo: topAnchor, constant: 24), header.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 24), header.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -24),
             workspace.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 20), workspace.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 24), workspace.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -24), workspace.bottomAnchor.constraint(equalTo: status.topAnchor, constant: -12),
             status.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 24), status.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -24), status.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -20),
             panel.topAnchor.constraint(equalTo: workspace.topAnchor, constant: 24), panel.bottomAnchor.constraint(equalTo: workspace.bottomAnchor, constant: -24), panel.trailingAnchor.constraint(equalTo: workspace.trailingAnchor, constant: -24), panel.widthAnchor.constraint(equalToConstant: 310),
             canvas.topAnchor.constraint(equalTo: workspace.topAnchor, constant: 24), canvas.bottomAnchor.constraint(equalTo: workspace.bottomAnchor, constant: -24), canvas.leadingAnchor.constraint(equalTo: workspace.leadingAnchor, constant: 24), canvas.trailingAnchor.constraint(equalTo: panel.leadingAnchor, constant: -16),
-            scroll.leadingAnchor.constraint(equalTo: panel.leadingAnchor), scroll.trailingAnchor.constraint(equalTo: panel.trailingAnchor), scroll.topAnchor.constraint(equalTo: panel.topAnchor), scroll.bottomAnchor.constraint(equalTo: panel.bottomAnchor)
+            scroll.leadingAnchor.constraint(equalTo: panel.contentView.leadingAnchor), scroll.trailingAnchor.constraint(equalTo: panel.contentView.trailingAnchor), scroll.topAnchor.constraint(equalTo: panel.contentView.topAnchor), scroll.bottomAnchor.constraint(equalTo: panel.contentView.bottomAnchor)
         ])
         refreshTranslucency()
     }

@@ -5,6 +5,9 @@ public final class MaterialSurface: NSView {
     public enum Role: String, CaseIterable { case workspace, panel }
     public let role: Role
     public let effect = NSVisualEffectView()
+    /// All foreground content belongs here, including when hosted inside native glass.
+    public let contentView = NSView()
+    private var nativeGlass: NSView?
     private let fallbackView = NSView()
     private let panelTint = NSView()
     private var observer: NSObjectProtocol?
@@ -12,19 +15,37 @@ public final class MaterialSurface: NSView {
     public var cornerRadius: CGFloat = 0 { didSet { refresh() } }
     public var material: NSVisualEffectView.Material { get { effect.material } set { effect.material = newValue } }
     public var isUsingOpaqueFallback: Bool { !fallbackView.isHidden }
+    public var isUsingNativeGlass: Bool { nativeGlass != nil && !isUsingOpaqueFallback }
 
-    public init(_ role: Role, radius: CGFloat = 0) {
+    public init(_ role: Role, radius: CGFloat = 0, useNativeGlass: Bool = true) {
         self.role = role; cornerRadius = radius
         super.init(frame: .zero)
         wantsLayer = true; fallbackView.wantsLayer = true; panelTint.wantsLayer = true
         effect.material = role == .workspace ? .underWindowBackground : .sidebar
         effect.blendingMode = role == .workspace ? .behindWindow : .withinWindow
         effect.state = .followsWindowActiveState
-        for view in [effect, panelTint, fallbackView] {
+        for view in [effect, panelTint] {
             view.translatesAutoresizingMaskIntoConstraints = false; addSubview(view)
             NSLayoutConstraint.activate([view.leadingAnchor.constraint(equalTo: leadingAnchor), view.trailingAnchor.constraint(equalTo: trailingAnchor),
                                          view.topAnchor.constraint(equalTo: topAnchor), view.bottomAnchor.constraint(equalTo: bottomAnchor)])
         }
+        contentView.wantsLayer = true
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+        let host: NSView
+        if role == .panel, useNativeGlass, #available(macOS 26.0, *) {
+            let glass = NSGlassEffectView(); glass.style = .regular
+            glass.cornerRadius = radius; glass.contentView = contentView
+            glass.translatesAutoresizingMaskIntoConstraints = false; addSubview(glass)
+            NSLayoutConstraint.activate([glass.leadingAnchor.constraint(equalTo: leadingAnchor), glass.trailingAnchor.constraint(equalTo: trailingAnchor),
+                glass.topAnchor.constraint(equalTo: topAnchor), glass.bottomAnchor.constraint(equalTo: bottomAnchor)])
+            nativeGlass = glass
+            host = glass
+        } else { addSubview(contentView); host = self }
+        NSLayoutConstraint.activate([contentView.leadingAnchor.constraint(equalTo: host.leadingAnchor), contentView.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+            contentView.topAnchor.constraint(equalTo: host.topAnchor), contentView.bottomAnchor.constraint(equalTo: host.bottomAnchor)])
+        fallbackView.translatesAutoresizingMaskIntoConstraints = false; contentView.addSubview(fallbackView)
+        NSLayoutConstraint.activate([fallbackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor), fallbackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            fallbackView.topAnchor.constraint(equalTo: contentView.topAnchor), fallbackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)])
         observer = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
                                                                       object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
@@ -36,15 +57,20 @@ public final class MaterialSurface: NSView {
     public override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); refresh() }
     public func refresh() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.cornerRadius = cornerRadius; layer?.masksToBounds = true
+            layer?.cornerRadius = cornerRadius; layer?.masksToBounds = nativeGlass == nil
             layer?.borderColor = (preferences.effectiveIncreaseContrast ? NSColor.separatorColor : NSColor.white.withAlphaComponent(0.30)).cgColor
             layer?.borderWidth = role == .panel ? (preferences.effectiveIncreaseContrast ? 1 : 0.5) : 0
             fallbackView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+            fallbackView.layer?.cornerRadius = cornerRadius
             panelTint.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.18).cgColor
         }
-        panelTint.isHidden = role != .panel
+        if #available(macOS 26.0, *), let glass = nativeGlass as? NSGlassEffectView {
+            glass.cornerRadius = cornerRadius
+            if #available(macOS 27.0, *) { glass.effectIsInteractive = !preferences.effectiveReduceMotion }
+        }
+        panelTint.isHidden = role != .panel || nativeGlass != nil
         fallbackView.isHidden = !preferences.effectiveReduceTransparency
-        effect.isHidden = !fallbackView.isHidden
+        effect.isHidden = !fallbackView.isHidden || nativeGlass != nil
     }
 }
 
@@ -93,15 +119,17 @@ public final class FloatingPanel: NSView {
         wantsLayer = true
         layer?.shadowColor = NSColor.black.cgColor; layer?.shadowOpacity = 0.10
         layer?.shadowRadius = 16; layer?.shadowOffset = NSSize(width: 0, height: -6)
-        for view in [surface, header, body, footer] { view.translatesAutoresizingMaskIntoConstraints = false; addSubview(view) }
+        surface.translatesAutoresizingMaskIntoConstraints = false; addSubview(surface)
+        let host = surface.contentView
+        for view in [header, body, footer] { view.translatesAutoresizingMaskIntoConstraints = false; host.addSubview(view) }
         NSLayoutConstraint.activate([
             surface.leadingAnchor.constraint(equalTo: leadingAnchor), surface.trailingAnchor.constraint(equalTo: trailingAnchor),
             surface.topAnchor.constraint(equalTo: topAnchor), surface.bottomAnchor.constraint(equalTo: bottomAnchor),
-            header.topAnchor.constraint(equalTo: topAnchor, constant: 16), header.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
-            header.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
-            footer.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16), footer.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
-            footer.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
-            body.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16), body.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
+            header.topAnchor.constraint(equalTo: host.topAnchor, constant: 18), header.leadingAnchor.constraint(equalTo: host.leadingAnchor, constant: 18),
+            header.trailingAnchor.constraint(equalTo: host.trailingAnchor, constant: -18),
+            footer.leadingAnchor.constraint(equalTo: host.leadingAnchor, constant: 18), footer.trailingAnchor.constraint(equalTo: host.trailingAnchor, constant: -18),
+            footer.bottomAnchor.constraint(equalTo: host.bottomAnchor, constant: -18),
+            body.leadingAnchor.constraint(equalTo: host.leadingAnchor, constant: 18), body.trailingAnchor.constraint(equalTo: host.trailingAnchor, constant: -18),
             body.topAnchor.constraint(equalTo: header.bottomAnchor, constant: bodySpacing), body.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -12)
         ])
     }
@@ -124,12 +152,13 @@ public final class CollapsedRail: NSView {
         super.init(frame: .zero)
         surface.translatesAutoresizingMaskIntoConstraints = false; addSubview(surface)
         let bottom = FraloStyle.stack([add, previous, next, position], spacing: 4); bottom.alignment = .centerX
-        for view in [expand, bottom] { view.translatesAutoresizingMaskIntoConstraints = false; addSubview(view) }
+        let host = surface.contentView
+        for view in [expand, bottom] { view.translatesAutoresizingMaskIntoConstraints = false; host.addSubview(view) }
         NSLayoutConstraint.activate([
             surface.leadingAnchor.constraint(equalTo: leadingAnchor), surface.trailingAnchor.constraint(equalTo: trailingAnchor),
             surface.topAnchor.constraint(equalTo: topAnchor), surface.bottomAnchor.constraint(equalTo: bottomAnchor),
-            expand.topAnchor.constraint(equalTo: topAnchor, constant: 12), expand.centerXAnchor.constraint(equalTo: centerXAnchor),
-            bottom.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12), bottom.centerXAnchor.constraint(equalTo: centerXAnchor)
+            expand.topAnchor.constraint(equalTo: host.topAnchor, constant: 12), expand.centerXAnchor.constraint(equalTo: host.centerXAnchor),
+            bottom.bottomAnchor.constraint(equalTo: host.bottomAnchor, constant: -12), bottom.centerXAnchor.constraint(equalTo: host.centerXAnchor)
         ])
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
@@ -240,6 +269,7 @@ public final class BatchList: NSScrollView, NSTableViewDataSource, NSTableViewDe
 
 @MainActor
 public final class CanvasSurface: NSView {
+    public var showsTransparencyGrid = true { didSet { needsDisplay = true } }
     public var showsElevation = false { didSet { needsDisplay = true } }
     public var image: NSImage? {
         didSet {
@@ -294,14 +324,16 @@ public final class CanvasSurface: NSView {
         NSGraphicsContext.saveGraphicsState()
         NSBezierPath(rect: rect).addClip()
         // Preview backing only. Its colors must never enter the exported image.
-        NSColor(white: 0.96, alpha: 1).setFill(); rect.fill()
-        NSColor(white: 0.90, alpha: 1).setFill()
-        let tile: CGFloat = 10
-        var y = rect.minY, row = 0
-        while y < rect.maxY {
-            var x = rect.minX + (row % 2 == 0 ? 0 : tile)
-            while x < rect.maxX { NSRect(x: x, y: y, width: tile, height: tile).fill(); x += tile * 2 }
-            y += tile; row += 1
+        if showsTransparencyGrid {
+            NSColor(white: 0.96, alpha: 1).setFill(); rect.fill()
+            NSColor(white: 0.90, alpha: 1).setFill()
+            let tile: CGFloat = 10
+            var y = rect.minY, row = 0
+            while y < rect.maxY {
+                var x = rect.minX + (row % 2 == 0 ? 0 : tile)
+                while x < rect.maxX { NSRect(x: x, y: y, width: tile, height: tile).fill(); x += tile * 2 }
+                y += tile; row += 1
+            }
         }
         image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true,
                    hints: [.interpolation: NSImageInterpolation.high])
@@ -350,12 +382,12 @@ public final class ViewToolbar: NSView {
             return view
         }
         let row = FraloStyle.stack([zoom, divider(), dimensions, composition, divider(), preview], axis: .horizontal, spacing: 10)
-        row.translatesAutoresizingMaskIntoConstraints = false; addSubview(row)
+        row.translatesAutoresizingMaskIntoConstraints = false; surface.contentView.addSubview(row)
         NSLayoutConstraint.activate([
             surface.leadingAnchor.constraint(equalTo: leadingAnchor), surface.trailingAnchor.constraint(equalTo: trailingAnchor),
             surface.topAnchor.constraint(equalTo: topAnchor), surface.bottomAnchor.constraint(equalTo: bottomAnchor),
-            row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12), row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
-            row.topAnchor.constraint(equalTo: topAnchor, constant: 4), row.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4)
+            row.leadingAnchor.constraint(equalTo: surface.contentView.leadingAnchor, constant: 12), row.trailingAnchor.constraint(equalTo: surface.contentView.trailingAnchor, constant: -12),
+            row.topAnchor.constraint(equalTo: surface.contentView.topAnchor, constant: 4), row.bottomAnchor.constraint(equalTo: surface.contentView.bottomAnchor, constant: -4)
         ])
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }

@@ -51,7 +51,7 @@ final class WorkbenchView: NSView {
         let bottom: CGFloat = compact ? 22 : 62
         let expandedWidth = min(268, max(206, bounds.width * 0.169))
         let leftWidth: CGFloat = collapsed ? 56 : expandedWidth
-        let rightWidth = min(334, max(282, bounds.width * 0.211))
+        let rightWidth = min(400, max(316, bounds.width * 0.255))
         let height = max(0, bounds.height - top - bottom)
         let leftRect = NSRect(x: margin, y: top, width: leftWidth, height: height)
         let rightRect = NSRect(x: bounds.width - margin - rightWidth, y: top, width: rightWidth, height: height)
