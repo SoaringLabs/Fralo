@@ -79,11 +79,10 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private func buildInterface() {
         center.view = DropContainer()
         (center.view as? DropContainer)?.onDrop = { [weak self] in self?.importURLs($0) }
-        let collapse = ActionButton("", size: .compact, symbol: "chevron.left", label: "收起图片列表") { [weak self] in self?.toggleSidebar(nil) }
-        let heading = FraloStyle.stack([batchCount, NSView(), collapse], axis: .horizontal, spacing: 4)
+        let heading = FraloStyle.stack([batchCount, NSView()], axis: .horizontal, spacing: 4)
         let shortcut = FraloStyle.text("↑ ↓  切换图片", role: .caption, secondary: true); shortcut.alignment = .center
         let leftFooter = FraloStyle.stack([shortcut], spacing: 14, fillWidth: true)
-        let left = FloatingPanel(header: heading, body: list, footer: leftFooter)
+        let left = DockedSidebar(header: heading, body: list, footer: leftFooter)
         list.onSelection = { [weak self] _ in self?.selectionChanged() }
         list.onDelete = { [weak self] in self?.removeSelected(nil) }
         let menu = NSMenu(); menu.addItem(actionItem("移除当前图片", #selector(removeSelected(_:))))
@@ -97,12 +96,6 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
                                   footer: FraloStyle.stack([FraloStyle.divider(), exportAction], spacing: 10, fillWidth: true), bodySpacing: 18)
         workbench = WorkbenchView(left: left, right: right, content: center.view)
         workbench.collapsed = preferences.bool(forKey: "sidebarCollapsed")
-        workbench.rail.expand.onPress = { [weak self] in self?.toggleSidebar(nil) }
-        workbench.rail.list.onSelection = { [weak self] index in self?.list.select(index) }
-        workbench.rail.list.onDelete = { [weak self] in self?.removeSelected(nil) }
-        workbench.rail.add.onPress = { [weak self] in self?.addImages(nil) }
-        workbench.rail.previous.onPress = { [weak self] in self?.moveSelection(-1) }
-        workbench.rail.next.onPress = { [weak self] in self?.moveSelection(1) }
         workbench.onGeometryChange = { [weak self] in self?.layoutPreview() }
         window?.contentView = workbench
         buildPreview()
@@ -193,6 +186,12 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         let item = NSToolbarItem(itemIdentifier: identifier)
         switch identifier.rawValue {
+        case "sidebar":
+            // A native navigation item, with our layout controller as its explicit target.
+            item.image = NSImage(systemSymbolName: "sidebar.left", accessibilityDescription: "显示或隐藏图片列表")
+            item.label = "图片列表"; item.toolTip = "显示或隐藏图片列表（⌃⌘S）"
+            item.target = self; item.action = #selector(toggleSidebar(_:))
+            item.isNavigational = true; item.isBordered = true; item.visibilityPriority = .user
         case "more":
             let menu = NSMenu(); let title = NSMenuItem(title: "", action: nil, keyEquivalent: "")
             title.image = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: nil); menu.addItem(title)
@@ -206,9 +205,6 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
             button.menu = menu; button.isBordered = false; button.imagePosition = .imageOnly
             (button.cell as? NSPopUpButtonCell)?.arrowPosition = .noArrow
             button.setAccessibilityLabel("更多图片操作"); item.view = button; item.label = "更多图片操作"
-        case "sidebar":
-            let button = IconButton("sidebar.left", label: "显示或隐藏图片列表") { [weak self] in self?.toggleSidebar(nil) }
-            item.view = button; item.label = "图片列表"
         case "add":
             addButton.onPress = { [weak self] in self?.addImages(nil) }
             item.view = addButton; item.label = "添加图片"; item.visibilityPriority = .high
@@ -251,22 +247,25 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         settingsController?.set(appearanceChoice); settingsController?.present()
     }
     @objc func toggleSidebar(_ sender: Any?) {
+        let focusWasInList = (window?.firstResponder as? NSView).map { $0.isDescendant(of: workbench.left) } ?? false
         workbench.setCollapsed(!workbench.collapsed, animated: true)
         preferences.set(workbench.collapsed, forKey: "sidebarCollapsed")
-        window?.makeFirstResponder(workbench.collapsed ? workbench.rail.list.documentView : list.documentView)
+        if !workbench.previewing && (!workbench.collapsed || focusWasInList) {
+            window?.makeFirstResponder(workbench.collapsed ? canvas : list.documentView)
+        }
     }
     private func togglePreview() {
         if !workbench.previewing { previewRestoreFocus = window?.firstResponder }
         workbench.previewing.toggle()
         viewing.preview.title = workbench.previewing ? "返回编辑 · Esc" : "成品预览"
-        window?.makeFirstResponder(workbench.previewing ? canvas : previewRestoreFocus ?? canvas); layoutPreview()
+        let restore = previewRestoreFocus as? NSView
+        let canRestore = restore.map { !$0.isHiddenOrHasHiddenAncestor } ?? false
+        window?.makeFirstResponder(workbench.previewing || !canRestore ? canvas : restore); layoutPreview()
     }
     private func moveSelection(_ delta: Int) { list.moveSelection(by: delta) }
     private func selectionChanged() { zoom = nil; fitMenu.selectItem(at: 0); updateActions(); requestPreview() }
     private func refreshList() {
         list.update(items.map { BatchEntry(id: $0.input.id, title: $0.input.name, detail: $0.error == nil ? "" : "无法读取", image: $0.thumbnail, failed: $0.error != nil) })
-        workbench.rail.list.update(list.entries)
-        workbench.rail.update(index: selectedIndex, count: items.count)
     }
     @objc private func batchMenu(_ sender: NSButton) {
         let menu = NSMenu(); menu.addItem(actionItem("移除当前图片", #selector(removeSelected(_:))))
@@ -537,11 +536,9 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private func updateActions() {
         inspectorUI?.setEditingEnabled(!isExporting)
         addButton.isEnabled = !isExporting
-        workbench.rail.add.isEnabled = !isExporting
         batchCount.stringValue = "图片 · \(items.count)"
         window?.subtitle = items.isEmpty ? "" : "\(items.count) 张图片"
         exportAction.count = items.count; exportAction.isEnabled = !isExporting
-        workbench.rail.update(index: selectedIndex, count: items.count)
         copyButton.isEnabled = rendered != nil && !isExporting
         inspectorUI?.setPreviewReady(rendered != nil && !isExporting)
         if items.isEmpty { empty.isHidden = false; footer.isHidden = true; previewScroll.isHidden = true }

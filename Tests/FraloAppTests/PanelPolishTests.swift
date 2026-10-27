@@ -5,6 +5,53 @@ import FraloDesignSystem
 @testable import FraloApp
 
 final class PanelPolishTests: XCTestCase {
+    @MainActor func testDockedSidebarUsesLeadingNativeToggleAndRestoresCollapsedState() async throws {
+        _ = NSApplication.shared
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let suite = "fralo-docked-\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: directory) }
+        let store = SettingsStore(url: directory.appendingPathComponent("settings.json"))
+        let controller = MainWindowController(store: store, preferences: defaults, restoreWindow: false)
+        let window = try XCTUnwrap(controller.window); defer { window.close() }
+        let root = try XCTUnwrap(window.contentView as? WorkbenchView)
+        let toggle = try XCTUnwrap(window.toolbar?.items.first)
+        XCTAssertEqual(toggle.itemIdentifier, NSToolbarItem.Identifier("sidebar"))
+        XCTAssertTrue(toggle.isNavigational, "AppKit must position the toggle with the leading window navigation controls")
+        XCTAssertEqual(toggle.action, #selector(MainWindowController.toggleSidebar(_:)))
+        toggle.validate()
+        XCTAssertTrue(toggle.isEnabled, "The native navigation item must validate against the workbench controller")
+        XCTAssertEqual(toggle.visibilityPriority, .user)
+        for size in [NSSize(width: 1030, height: 640), NSSize(width: 1400, height: 1000)] {
+            window.setContentSize(size); root.layoutSubtreeIfNeeded()
+            XCTAssertEqual(root.left.frame.origin, .zero)
+            XCTAssertEqual(root.left.frame.height, root.bounds.height)
+            XCTAssertGreaterThanOrEqual(root.left.frame.width, 230)
+            XCTAssertGreaterThan(root.content.frame.width, 300)
+            XCTAssertEqual(root.left.surface.cornerRadius, 0)
+            XCTAssertEqual(root.left.layer?.shadowOpacity ?? 0, 0)
+            let header = root.left.subviews.compactMap { $0 as? NSStackView }.first!
+            XCTAssertGreaterThanOrEqual(header.convert(header.bounds, to: root).minY, root.safeAreaInsets.top)
+        }
+        let inspector = try XCTUnwrap(root.right.body as? CompositionInspector)
+        func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
+        let field = try XCTUnwrap(descendants(inspector).compactMap { $0 as? NSTextField }.first { $0.isEditable && !$0.isHiddenOrHasHiddenAncestor })
+        XCTAssertTrue(window.makeFirstResponder(field))
+        let responder = window.firstResponder
+        controller.toggleSidebar(nil)
+        try await Task.sleep(nanoseconds: 350_000_000)
+        XCTAssertTrue(window.firstResponder === responder, "Hiding the list must not steal an inspector editing session")
+        XCTAssertTrue(root.left.isHidden)
+        let restored = MainWindowController(store: store, preferences: defaults, restoreWindow: false)
+        defer { restored.window?.close() }
+        XCTAssertTrue(try XCTUnwrap(restored.window?.contentView as? WorkbenchView).collapsed)
+        controller.toggleSidebar(nil); controller.toggleSidebar(nil); controller.toggleSidebar(nil)
+        try await Task.sleep(nanoseconds: 350_000_000); root.layoutSubtreeIfNeeded()
+        XCTAssertFalse(root.collapsed); XCTAssertFalse(root.left.isHidden)
+        XCTAssertEqual(root.left.frame.minX, 0)
+    }
+
+
     @MainActor func testNativeHeaderAndShadowChangesKeepThePreviewScaleStable() async throws {
         _ = NSApplication.shared
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
