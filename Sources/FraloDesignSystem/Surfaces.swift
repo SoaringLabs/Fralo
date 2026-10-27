@@ -56,8 +56,10 @@ public final class MaterialSurface: NSView {
     deinit { if let observer { NSWorkspace.shared.notificationCenter.removeObserver(observer) } }
     public override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); refresh() }
     public func refresh() {
+        // The glass radius shapes the effect, but does not fence every descendant render layer.
+        clipsToBounds = true
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.cornerRadius = cornerRadius; layer?.masksToBounds = nativeGlass == nil
+            layer?.cornerRadius = cornerRadius; layer?.masksToBounds = true
             layer?.borderColor = (preferences.effectiveIncreaseContrast ? NSColor.separatorColor : NSColor.white.withAlphaComponent(0.30)).cgColor
             layer?.borderWidth = role == .panel ? (preferences.effectiveIncreaseContrast ? 1 : 0.5) : 0
             fallbackView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
