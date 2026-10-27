@@ -115,11 +115,12 @@ public enum ScrollContent {
 
 @MainActor
 public final class FloatingPanel: NSView {
-    public let surface = MaterialSurface(.panel, radius: FraloStyle.Workbench.panelRadius)
+    public let surface: MaterialSurface
     /// The supplied body owns scrolling; the panel only arranges its viewport.
     public let body: NSView
-    public init(header: NSView, body: NSView, footer: NSView, bodySpacing: CGFloat = 12) {
+    public init(header: NSView, body: NSView, footer: NSView, bodySpacing: CGFloat = 12, useNativeGlass: Bool = true) {
         self.body = body
+        surface = MaterialSurface(.panel, radius: FraloStyle.Workbench.panelRadius, useNativeGlass: useNativeGlass)
         super.init(frame: .zero)
         wantsLayer = true
         layer?.shadowColor = NSColor.black.cgColor; layer?.shadowOpacity = 0.10

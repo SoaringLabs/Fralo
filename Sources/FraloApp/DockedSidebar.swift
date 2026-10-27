@@ -11,8 +11,7 @@ final class DockedSidebar: NSView {
         self.body = body
         super.init(frame: .zero)
         surface.material = .sidebar
-        let divider = NSBox(); divider.boxType = .separator
-        for view in [surface, header, body, footer, divider] {
+        for view in [surface, header, body, footer] {
             view.translatesAutoresizingMaskIntoConstraints = false
             addSubview(view)
         }
@@ -24,9 +23,7 @@ final class DockedSidebar: NSView {
             body.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 12), body.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -12),
             body.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12), body.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
             footer.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16), footer.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
-            footer.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
-            divider.topAnchor.constraint(equalTo: topAnchor), divider.bottomAnchor.constraint(equalTo: bottomAnchor),
-            divider.trailingAnchor.constraint(equalTo: trailingAnchor), divider.widthAnchor.constraint(equalToConstant: 1)
+            footer.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16)
         ])
         setAccessibilityElement(false)
         setAccessibilityLabel("图片列表")

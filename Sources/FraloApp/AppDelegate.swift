@@ -11,7 +11,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     #endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        #if FRALO_DEV
+        let controller = MainWindowController(inspectorUsesNativeGlass: CommandLine.arguments.contains("--panel-render-check"))
+        #else
         let controller = MainWindowController()
+        #endif
         mainController = controller
         #if FRALO_DEV
         if !DevelopmentEntry.labOnly && !CommandLine.arguments.contains("--workbench-preview") { updateController = UpdateController(mainController: controller) }

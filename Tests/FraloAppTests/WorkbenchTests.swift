@@ -52,14 +52,14 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertFalse(inspector.exportSettings.isHiddenOrHasHiddenAncestor)
         XCTAssertNotEqual(device.focusRingType, .none)
         let toolbar = try XCTUnwrap(window.toolbar)
-        XCTAssertFalse(toolbar.items.contains { $0.itemIdentifier.rawValue == "add" })
-        let sidebarAdd = try XCTUnwrap(descendants(root.left).compactMap { $0 as? ActionButton }.first { $0.title == "添加图片" })
-        XCTAssertFalse(sidebarAdd.isHiddenOrHasHiddenAncestor)
+        let add = try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "add" })
+        XCTAssertEqual(add.action, #selector(MainWindowController.addImages(_:)))
+        XCTAssertTrue(add.isEnabled); XCTAssertNotNil(add.image)
+        XCTAssertNotNil(toolbar.items.first { $0 is NSTrackingSeparatorToolbarItem })
         controller.toggleSidebar(nil); root.layoutSubtreeIfNeeded()
-        let addItem = try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "add" })
-        let add = try XCTUnwrap(addItem.view as? NSButton)
-        XCTAssertEqual(add.accessibilityLabel(), "添加图片"); XCTAssertTrue(addItem.isNavigational)
-        XCTAssertFalse(add.isHiddenOrHasHiddenAncestor)
+        XCTAssertTrue(toolbar.items.contains { $0.itemIdentifier.rawValue == "add" })
+        XCTAssertFalse(toolbar.items.contains { $0 is NSTrackingSeparatorToolbarItem })
+
     }
 
     @MainActor func testWorkspaceWindowAllowsBehindWindowMaterial() async throws {
@@ -113,7 +113,7 @@ final class WorkbenchTests: XCTestCase {
         window.makeFirstResponder(list.documentView)
         controller.toggleSidebar(nil)
         try await Task.sleep(nanoseconds: 350_000_000); root.layoutSubtreeIfNeeded()
-        XCTAssertTrue(root.collapsed); XCTAssertTrue(root.left.isHidden)
+        XCTAssertTrue(root.collapsed); XCTAssertTrue(root.sidebarItem.isCollapsed)
         XCTAssertEqual(canvas.image?.size, image.size)
         XCTAssertGreaterThan(root.content.frame.width, expandedWidth + 200, "Full collapse must return the sidebar width to the preview")
         XCTAssertTrue(window.firstResponder === canvas)
@@ -124,7 +124,7 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertEqual(list.selectedIndex, 0, "Keyboard navigation must still select the real batch while its list is hidden")
         controller.toggleSidebar(nil)
         try await Task.sleep(nanoseconds: 350_000_000); root.layoutSubtreeIfNeeded()
-        XCTAssertFalse(root.left.isHidden); XCTAssertTrue(window.firstResponder === list.documentView)
+        XCTAssertFalse(root.sidebarItem.isCollapsed); XCTAssertTrue(window.firstResponder === list.documentView)
         XCTAssertFalse(defaults.bool(forKey: "sidebarCollapsed"))
         list.select(1)
         for size in [NSSize(width: 1030, height: 640), NSSize(width: 1400, height: 950)] {

@@ -96,8 +96,10 @@ Open settings with the toolbar gear, **Fralo → 设置…**, or Command-comma. 
 Changing appearance does not rerender artwork, rewrite composition/CLI settings or change export pixels. The workspace material recipe remains 100% native effect with no added overlay. Debug preview launch overrides are temporary and do not replace a user choice in storage; ordinary preview handoffs omit those overrides.
 
 
-## Compact window actions
+## Column-aware native header
 
-The production toolbar groups More, Inspector visibility and Copy as 28 pt shared quiet icon buttons, with a separator before Copy. Only hover/press and the selected Inspector state show a surface. Quiet toggle buttons redraw on state changes, expose their checkbox value, and use a stronger outline with Increase Contrast. Application preferences remain in the More menu and the app menu/Command-comma.
+The production header follows the window's column ownership. A full-height native `NSSplitViewController` sidebar and `NSTrackingSeparatorToolbarItem` align the left titlebar region with the sidebar divider. Add Images and the sidebar toggle stay in that region. The content region owns the current filename/count, a native momentary toolbar group for Copy/Inspector, and `NSMenuToolbarItem` for More. Window chrome is transparent and has no full-width bottom separator. When the sidebar is hidden, its toolbar separator is removed while Add/Toggle remain reachable.
 
-Adding images belongs at the top of the docked sidebar as a full-width labelled action. When that sidebar is hidden (including clean preview), a compact navigational plus appears beside the leading sidebar toggle; it disappears when the labelled sidebar action is available. Both call the existing append-import path.
+The previous full-width header and duplicate full-width sidebar Add action are superseded. Native toolbar items own titlebar sizing, hover, menus and hit areas; shared Fralo components continue to own the workbench controls. The right inspector remains 360 pt wide. Its production surface uses native visual-effect material instead of native glass hosting because the latter showed displaced content when a containing split pane moved. Radius, tint, shadow and accessibility fallbacks are retained. The explicit Debug compositor probe may still opt into glass.
+
+The implementation follows [Apple's sectioned toolbar API](https://developer.apple.com/documentation/appkit/nstrackingseparatortoolbaritem) and [full-height sidebar guidance](https://developer.apple.com/videos/play/wwdc2020/10104/). The runnable result and local verification are recorded in workbench-migration.md.

@@ -4,7 +4,7 @@ import FraloCore
 import FraloDesignSystem
 
 @MainActor
-final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuItemValidation {
+final class MainWindowController: NSWindowController, NSMenuItemValidation {
     struct Item { let input: ImageInput; var thumbnail: NSImage?; var error: String? }
     private var items: [Item] = []
     private var settings: CompositionSettings
@@ -12,6 +12,7 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private var inspectorUI: CompositionInspector!
     private let preferences: UserDefaults
     private let pasteboard: NSPasteboard
+    private let inspectorUsesNativeGlass: Bool
     private(set) var appearanceChoice = AppAppearance.system
     private(set) var settingsController: AppearanceSettingsWindowController?
     private var workbench: WorkbenchView!
@@ -30,10 +31,8 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     private let footer = NSView()
     private var fitMenu: NSPopUpButton { viewing.zoom }
     private let dimensions = FraloStyle.text("尚无成品", role: .detail, secondary: true)
-    private let addButton = ActionButton("添加图片", symbol: "plus")
-    private var copyButton: NSButton?
-    private var inspectorButton: NSButton?
-    private var toolbarAddButton: NSButton?
+    private let splitController = NSSplitViewController()
+    private var header: WorkbenchHeader!
     private var rendered: RenderedComposition?
     private var renderedID: String?
     private var previewRequest = 0, thumbnailRequest = 0
@@ -59,15 +58,17 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     var isExporting: Bool { cancellation != nil }
     private var selectedIndex: Int? { list.selectedIndex }
 
-    init(store: SettingsStore = SettingsStore(), preferences: UserDefaults = .standard, pasteboard: NSPasteboard = .general, restoreWindow: Bool = true) {
+    init(store: SettingsStore = SettingsStore(), preferences: UserDefaults = .standard, pasteboard: NSPasteboard = .general, restoreWindow: Bool = true,
+         inspectorUsesNativeGlass: Bool = false) {
         self.store = CompositionStore(legacy: store); self.preferences = preferences; self.pasteboard = pasteboard
+        self.inspectorUsesNativeGlass = inspectorUsesNativeGlass
         do { settings = try self.store.load() } catch { settings = CompositionSettings(); initialWarning = error.localizedDescription }
         let area = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 1000)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: min(1400, area.width - 80), height: min(950, area.height - 80)), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         super.init(window: window)
         selectAppearance(preferences.string(forKey: "workbenchAppearance") ?? "system", persist: false)
-        window.title = "Fralo"; window.titleVisibility = .visible; window.toolbarStyle = .unified
-        window.titlebarAppearsTransparent = false; window.titlebarSeparatorStyle = .line
+        window.title = "Fralo"; window.titleVisibility = .hidden; window.toolbarStyle = .unified
+        window.titlebarAppearsTransparent = true; window.titlebarSeparatorStyle = .none
         // Let the behind-window workspace material composite with the desktop.
         // Keep window alpha at 1 so artwork and controls remain fully opaque.
         window.isOpaque = false; window.backgroundColor = .clear
@@ -82,12 +83,9 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         center.view = DropContainer()
         (center.view as? DropContainer)?.onDrop = { [weak self] in self?.importURLs($0) }
         let heading = FraloStyle.stack([batchCount, NSView()], axis: .horizontal, spacing: 4)
-        addButton.onPress = { [weak self] in self?.addImages(nil) }
-        addButton.toolTip = "添加图片（⌘O）"
-        let sidebarHeader = FraloStyle.stack([addButton, heading], spacing: 16, fillWidth: true)
         let shortcut = FraloStyle.text("↑ ↓  切换图片", role: .caption, secondary: true); shortcut.alignment = .center
         let leftFooter = FraloStyle.stack([shortcut], spacing: 14, fillWidth: true)
-        let left = DockedSidebar(header: sidebarHeader, body: list, footer: leftFooter)
+        let left = DockedSidebar(header: heading, body: list, footer: leftFooter)
         list.onSelection = { [weak self] _ in self?.selectionChanged() }
         list.onDelete = { [weak self] in self?.removeSelected(nil) }
         let menu = NSMenu(); menu.addItem(actionItem("移除当前图片", #selector(removeSelected(_:))))
@@ -98,17 +96,18 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         dimensions.alignment = .center
         let right = FloatingPanel(header: FraloStyle.stack([FraloStyle.text("出图设置", role: .heading), inspectorUI.mode], spacing: 8, fillWidth: true),
                                   body: inspectorBody,
-                                  footer: FraloStyle.stack([FraloStyle.divider(), exportAction], spacing: 10, fillWidth: true), bodySpacing: 18)
+                                  footer: FraloStyle.stack([FraloStyle.divider(), exportAction], spacing: 10, fillWidth: true), bodySpacing: 18,
+                                  useNativeGlass: inspectorUsesNativeGlass)
         workbench = WorkbenchView(left: left, right: right, content: center.view)
+        workbench.configure(in: splitController)
         workbench.collapsed = preferences.bool(forKey: "sidebarCollapsed")
         workbench.inspectorHidden = preferences.bool(forKey: "inspectorHidden")
         workbench.onGeometryChange = { [weak self] in self?.layoutPreview() }
         workbench.onPanelVisibilityChange = { [weak self] in self?.updatePanelControls() }
-        window?.contentView = workbench
+        window?.contentViewController = splitController
         buildPreview()
-        let toolbar = NSToolbar(identifier: "FraloToolbar")
-        toolbar.delegate = self; toolbar.displayMode = .iconOnly; toolbar.allowsUserCustomization = false
-        window?.toolbar = toolbar
+        header = WorkbenchHeader(owner: self, splitView: workbench.splitView, menu: moreMenu(), sidebarHidden: workbench.collapsed)
+        window?.toolbar = header.toolbar
         updatePanelControls()
         updateActions(); window?.recalculateKeyViewLoop()
     }
@@ -187,60 +186,6 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         requestPreview()
     }
 
-    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.init("sidebar"), .init("add"), .flexibleSpace, .init("more"), .init("inspector"), .init("actionSeparator"), .init("copy")]
-    }
-    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.init("sidebar")] + (workbench.collapsed || workbench.previewing ? [.init("add")] : []) +
-        [.flexibleSpace, .init("more"), .init("inspector"), .init("actionSeparator"), .init("copy")]
-    }
-    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
-        let item = NSToolbarItem(itemIdentifier: identifier)
-        switch identifier.rawValue {
-        case "sidebar":
-            // A native navigation item, with our layout controller as its explicit target.
-            item.image = NSImage(systemSymbolName: "sidebar.left", accessibilityDescription: "显示或隐藏图片列表")
-            item.label = "图片列表"; item.toolTip = "显示或隐藏图片列表（⌃⌘S）"
-            item.target = self; item.action = #selector(toggleSidebar(_:))
-            item.isNavigational = true; item.isBordered = true; item.visibilityPriority = .user
-        case "more":
-            let button = toolbarButton("ellipsis", label: "更多操作", action: #selector(showMore(_:)))
-            button.menu = moreMenu(); item.view = button; item.label = "更多操作"
-        case "inspector":
-            let button = toolbarButton("slider.horizontal.3", label: "显示或隐藏出图设置", action: #selector(toggleInspector(_:)))
-            button.setButtonType(.pushOnPushOff)
-            button.setAccessibilityRole(.checkBox)
-            button.state = workbench.inspectorHidden || workbench.previewing ? .off : .on
-            inspectorButton = button; item.view = button; item.label = "出图设置"
-        case "actionSeparator":
-            let view = NSView(frame: NSRect(x: 0, y: 0, width: 12, height: 28))
-            let divider = NSBox(); divider.boxType = .separator; divider.frame = NSRect(x: 5, y: 5, width: 1, height: 18)
-            view.addSubview(divider); item.view = view; item.label = ""
-        case "add":
-            let button = toolbarButton("plus", label: "添加图片", action: #selector(addImages(_:)))
-            button.toolTip = "添加图片（⌘O）"; button.isEnabled = !isExporting
-            toolbarAddButton = button; item.view = button; item.label = "添加图片"
-            item.isNavigational = true; item.visibilityPriority = .user
-        case "copy":
-            let button = toolbarButton("doc.on.doc", label: "复制当前图片", action: #selector(copyCurrent(_:)))
-            button.isEnabled = rendered != nil && !isExporting
-            copyButton = button; item.view = button; item.label = "复制当前图片"
-        default: return nil
-        }
-        if item.view != nil { item.autovalidates = false }
-        return item
-    }
-
-    private func toolbarButton(_ symbol: String, label: String, action: Selector) -> IconButton {
-        let button = IconButton(symbol, label: label)
-        button.onPress = { [weak self, weak button] in
-            guard let self, let button else { return }
-            NSApp.sendAction(action, to: self, from: button)
-        }
-        button.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([button.widthAnchor.constraint(equalToConstant: 28), button.heightAnchor.constraint(equalToConstant: 28)])
-        return button
-    }
     private func moreMenu() -> NSMenu {
         let menu = NSMenu()
         menu.addItem(actionItem("导入文件夹…", #selector(addFolder(_:))))
@@ -252,17 +197,16 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         menu.addItem(actionItem("应用设置…", #selector(showSettings(_:))))
         return menu
     }
-    @objc private func showMore(_ sender: NSButton) {
-        let y = sender.isFlipped ? sender.bounds.maxY + 6 : -6
-        sender.menu?.popUp(positioning: nil, at: NSPoint(x: 0, y: y), in: sender)
-    }
     private func updatePanelControls() {
-        guard let toolbar = window?.toolbar else { return }
-        let showAdd = workbench.collapsed || workbench.previewing
-        let addIndex = toolbar.items.firstIndex { $0.itemIdentifier.rawValue == "add" }
-        if showAdd && addIndex == nil { toolbar.insertItem(withItemIdentifier: .init("add"), at: 1) }
-        else if !showAdd, let addIndex { toolbar.removeItem(at: addIndex); toolbarAddButton = nil }
-        inspectorButton?.state = workbench.inspectorHidden || workbench.previewing ? .off : .on
+        guard header != nil else { return }
+        header.update(name: selectedIndex.map { items[$0].input.name } ?? "Fralo", count: items.count,
+                      sidebarHidden: workbench.collapsed || workbench.previewing,
+                      inspectorVisible: !workbench.inspectorHidden && !workbench.previewing,
+                      canAdd: !isExporting, canCopy: rendered != nil && !isExporting)
+        if workbench.collapsed, let focus = window?.firstResponder as? NSView, focus.isDescendant(of: workbench.left) {
+            window?.makeFirstResponder(canvas)
+        }
+        preferences.set(workbench.collapsed, forKey: "sidebarCollapsed")
         window?.recalculateKeyViewLoop()
     }
 
@@ -594,12 +538,10 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
     }
     private func updateActions() {
         inspectorUI?.setEditingEnabled(!isExporting)
-        addButton.isEnabled = !isExporting
-        toolbarAddButton?.isEnabled = !isExporting
         batchCount.stringValue = "图片 · \(items.count)"
         window?.subtitle = items.isEmpty ? "" : "\(items.count) 张图片"
         exportAction.count = items.count; exportAction.isEnabled = !isExporting
-        copyButton?.isEnabled = rendered != nil && !isExporting
+        updatePanelControls()
         inspectorUI?.setPreviewReady(rendered != nil && !isExporting)
         if items.isEmpty { empty.isHidden = false; footer.isHidden = true; previewScroll.isHidden = true }
     }

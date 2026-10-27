@@ -15,7 +15,7 @@ final class DevelopmentTests: XCTestCase {
         let before = try CompositionStore(legacy: store).load()
         let suite = "panel-probe-\(UUID())"; let preferences = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { preferences.removePersistentDomain(forName: suite) }
-        let controller = MainWindowController(store: store, preferences: preferences, restoreWindow: false)
+        let controller = MainWindowController(store: store, preferences: preferences, restoreWindow: false, inspectorUsesNativeGlass: true)
         let window = try XCTUnwrap(controller.window); defer { window.close() }
         let root = try XCTUnwrap(window.contentView as? WorkbenchView)
         // Seed a nonzero baseline so C proves it removes a shadow, rather than comparing zero with zero.
