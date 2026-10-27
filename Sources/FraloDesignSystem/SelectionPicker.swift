@@ -45,7 +45,7 @@ public final class ValuePicker: NSControl {
         }
         setAccessibilityElement(true); setAccessibilityRole(.radioGroup)
         setAccessibilityLabel(label); setAccessibilityChildren(buttons)
-        focusRingType = .exterior
+        focusRingType = .none
         select(selection, animated: false, notify: false)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
