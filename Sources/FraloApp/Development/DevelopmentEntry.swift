@@ -9,6 +9,7 @@ final class DevelopmentEntry: NSObject {
     private var productMenu: NSMenu?
     private var labMenu: NSMenu?
     private weak var mainWindow: NSWindow?
+    private var materialProbe: WorkspaceMaterialProbe?
     private var observer: NSObjectProtocol?
     func install(in menu: NSMenu, mainWindow: NSWindow? = nil) {
         self.mainWindow = mainWindow; productMenu = menu
@@ -45,6 +46,13 @@ final class DevelopmentEntry: NSObject {
         entry.submenu = submenu; menu.addItem(entry)
         let item = submenu.addItem(withTitle: "设计实验室…", action: #selector(openLab(_:)), keyEquivalent: "d")
         item.keyEquivalentModifierMask = [.command, .option, .shift]; item.target = self
+        if CommandLine.arguments.contains("--workspace-material-check") {
+            submenu.addItem(.separator())
+            let reference = submenu.addItem(withTitle: "不透明窗口参考（仅验证）", action: #selector(toggleMaterialReference(_:)), keyEquivalent: "")
+            reference.target = self
+            let stop = submenu.addItem(withTitle: "结束材质底板验证", action: #selector(stopMaterialProbe(_:)), keyEquivalent: "")
+            stop.target = self
+        }
     }
     @objc private func openLab(_ sender: Any?) { showLab() }
     func showLab() {
@@ -52,6 +60,16 @@ final class DevelopmentEntry: NSObject {
         controller?.showWindow(nil); controller?.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
+    func showMaterialProbeIfRequested(behind window: NSWindow?) {
+        guard CommandLine.arguments.contains("--workspace-material-check"), let window else { return }
+        materialProbe = WorkspaceMaterialProbe(window: window)
+        window.makeKeyAndOrderFront(nil)
+    }
+    @objc private func toggleMaterialReference(_ sender: NSMenuItem) {
+        materialProbe?.toggleOpaqueReference()
+        sender.state = materialProbe?.isOpaqueReference == true ? .on : .off
+    }
+    @objc private func stopMaterialProbe(_ sender: NSMenuItem) { materialProbe?.stop(); materialProbe = nil }
     func runProbeIfRequested() {
         guard let argument = CommandLine.arguments.first(where: { $0.hasPrefix("--design-lab-probe=") }),
               let controller else { return }

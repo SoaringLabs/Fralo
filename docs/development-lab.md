@@ -66,3 +66,8 @@ The probe exercises its live process, writes a report and view-cache images, the
 The verifier checks actual Debug/Release Mach-O symbols, the Release shared module, required runtime observations and snapshot presence. `--release-app dist/Fralo.app` also checks the packaged binary and exclusion of development fixtures.
 
 View-cache captures can omit native composited surfaces. Use actual window screenshots for material/contrast review. VoiceOver speech and human animation/material review remain separate. See [acceptance evidence](design-system-acceptance.md).
+
+
+## Whole-window material verification
+
+For a controlled desktop-composite check, start the isolated production preview with `--workspace-material-check`. This Debug-only flag places a red/blue native window immediately behind the real workbench. The development menu offers an opaque-window reference and **结束材质底板验证** to remove the test backdrop. Optional `--workspace-material-report=/absolute/path.json` records window/material/accessibility state without modifying settings or artwork. This probe requires direct native observation; single-window captures may look flatter than the desktop composite. The normal preview has no backdrop or probe menu items.

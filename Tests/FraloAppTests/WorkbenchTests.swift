@@ -5,6 +5,26 @@ import FraloDesignSystem
 @testable import FraloApp
 
 final class WorkbenchTests: XCTestCase {
+    @MainActor func testWorkspaceWindowAllowsBehindWindowMaterial() async throws {
+        _ = NSApplication.shared
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let suite = "fralo-material-\(UUID())"; let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let controller = MainWindowController(store: SettingsStore(url: directory.appendingPathComponent("settings.json")), preferences: defaults, restoreWindow: false)
+        let window = try XCTUnwrap(controller.window); defer { window.close() }
+        let root = try XCTUnwrap(window.contentView as? WorkbenchView)
+        XCTAssertFalse(window.isOpaque, "An opaque window prevents the workspace from compositing with content behind it")
+        XCTAssertEqual(window.backgroundColor.alphaComponent, 0, accuracy: 0.001,
+                       "The default solid window background must not cover the behind-window material")
+        XCTAssertEqual(root.workspace.effect.blendingMode, .behindWindow)
+        XCTAssertEqual(root.workspace.effect.state, .followsWindowActiveState)
+        XCTAssertEqual(window.alphaValue, 1, "Only the workspace material is translucent; artwork and controls must retain full opacity")
+        var reduced = DesignPreferences(); reduced.reduceTransparency = true
+        root.workspace.preferences = reduced
+        XCTAssertTrue(root.workspace.isUsingOpaqueFallback, "System reduced-transparency behavior must remain available")
+    }
+
     @MainActor func testRealBatchUsesSharedPanelsAndKeepsArtworkWhenCollapsed() async throws {
         _ = NSApplication.shared
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

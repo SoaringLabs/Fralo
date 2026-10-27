@@ -61,6 +61,9 @@ final class MainWindowController: NSWindowController, NSToolbarDelegate, NSMenuI
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: min(1400, area.width - 80), height: min(950, area.height - 80)), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         super.init(window: window)
         window.title = "Fralo"; window.titleVisibility = .visible; window.toolbarStyle = .unified
+        // Let the behind-window workspace material composite with the desktop.
+        // Keep window alpha at 1 so artwork and controls remain fully opaque.
+        window.isOpaque = false; window.backgroundColor = .clear
         window.contentMinSize = NSSize(width: 1030, height: 640)
         buildInterface()
         if restoreWindow { window.setFrameAutosaveName("FraloMainWindow") }; window.center()

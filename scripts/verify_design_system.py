@@ -8,7 +8,7 @@ import subprocess
 import struct
 
 ROOT = Path(__file__).resolve().parents[1]
-DEV_SYMBOLS = ('DesignLabController', 'DevelopmentEntry', 'LabProbe', 'LabSamples', 'ScenarioWorkbench', 'SoftButtonGallery')
+DEV_SYMBOLS = ('WorkspaceMaterialProbe', 'DesignLabController', 'DevelopmentEntry', 'LabProbe', 'LabSamples', 'ScenarioWorkbench', 'SoftButtonGallery')
 
 
 def code_identity(binary):

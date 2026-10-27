@@ -39,3 +39,14 @@ GUI preferences use a separate `settings.workbench.json` beside the existing set
 Run `scripts/run-workbench-preview.sh /absolute/input.png` for an isolated Debug trial. It uses a separate bundle identity, temporary settings, the real production controller, production background resources and the Debug lab menu. It skips updater initialization in this preview only. The installed application is not replaced.
 
 Human acceptance of the complete workbench styling/motion and a full VoiceOver traversal remains pending. The tested OS is the local Apple Silicon machine; macOS 14 runtime and alternate desktops/system accessibility transitions have not been established. The migration has not been pushed, merged or released. These limits do not redefine the remaining acceptance as complete.
+
+
+## Workspace translucency correction
+
+The first production window still had AppKit's opaque-window declaration and a fully opaque background color. The window-level regression test failed for both values. Disabling `isOpaque` alone still failed the background-alpha check; setting the window's base color to clear made it pass. The window alpha remains 1, and the original semantic behind-window workspace material is retained. Artwork/controls are not faded to achieve the effect. Reduced-transparency fallback remains covered.
+
+A Debug-only native backdrop probe provides a red/blue field behind the real workbench and an opaque-reference toggle. It is enabled only by `--workspace-material-check`, with optional `--workspace-material-report=/absolute/path.json` for public AppKit state metadata. Its controls, temporary backdrop and state writer are absent from Release. Temporary material/state/clipping selectors used during diagnosis were removed; they did not become stable defaults.
+
+The user directly observed red/blue transmission when the window was focused and a more opaque appearance on focus loss. This matches the retained `followsWindowActiveState` policy; the user was told this native behavior is the default. Diagnostic window screenshots looked considerably flatter than that direct observation, so they do not independently prove desktop transmission. No global accessibility setting was changed. The test backdrop is stopped before the normal preview handoff; the user's composition configuration is retained.
+
+Apple's state contract: https://developer.apple.com/documentation/appkit/nsvisualeffectview/state-swift.enum . Material appearance follows window activity unless explicitly forced active/inactive; opacity strength itself is supplied by the system material recipe.
