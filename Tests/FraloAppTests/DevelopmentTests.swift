@@ -27,6 +27,7 @@ final class DevelopmentTests: XCTestCase {
         let workspaceMaterial = root.workspace.material
         let workspaceAlpha = root.workspace.effect.alphaValue
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
+        #if compiler(>=6.4)
         if #available(macOS 27.0, *) {
             let glass = try XCTUnwrap(descendants(root.right).compactMap { $0 as? NSGlassEffectView }.first)
             let interactive = glass.effectIsInteractive
@@ -45,6 +46,7 @@ final class DevelopmentTests: XCTestCase {
             probe.select(.baseline)
             XCTAssertEqual(glass.effectIsInteractive, interactive)
         }
+        #endif
         XCTAssertEqual(root.right.surface.layer?.masksToBounds, originalClipping)
         XCTAssertEqual(root.right.layer?.shadowOpacity, originalShadow)
         XCTAssertEqual(root.workspace.material, workspaceMaterial)

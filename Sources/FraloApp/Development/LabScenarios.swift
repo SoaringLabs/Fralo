@@ -252,12 +252,12 @@ final class ScenarioWorkbench: NSView {
         context.cgContext.clear(bounds)
         if !config.transparent, state.samples.backgrounds.indices.contains(config.background) {
             let background = state.samples.backgrounds[config.background]
-            let factor = max(size.width / background.size.width, size.height / background.size.height) * config.backgroundScale / 100
+            let factor: CGFloat = max(size.width / background.size.width, size.height / background.size.height) * CGFloat(config.backgroundScale) / 100
             let destination = NSRect(x: (size.width - background.size.width * factor) / 2, y: (size.height - background.size.height * factor) / 2,
                                      width: background.size.width * factor, height: background.size.height * factor)
             background.draw(in: destination, from: .zero, operation: .sourceOver, fraction: config.backgroundOpacity / 100)
         }
-        let factor = config.transparent ? 1 : min(size.width / natural.width, size.height / natural.height) * config.scale / 100
+        let factor: CGFloat = config.transparent ? 1 : min(size.width / natural.width, size.height / natural.height) * CGFloat(config.scale) / 100
         let device = NSRect(x: (size.width - natural.width * factor) / 2, y: (size.height - natural.height * factor) / 2,
                             width: natural.width * factor, height: natural.height * factor)
         context.cgContext.saveGState(); context.cgContext.setAlpha(config.opacity / 100)

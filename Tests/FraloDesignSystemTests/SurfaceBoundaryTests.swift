@@ -13,10 +13,12 @@ final class SurfaceBoundaryTests: XCTestCase {
             panel.appearance = NSAppearance(named: name); panel.refresh()
             XCTAssertGreaterThan(try XCTUnwrap(backing.layer?.backgroundColor).alpha, 0.8)
         }
+        #if compiler(>=6.4)
         if #available(macOS 27.0, *) {
             let glass = try XCTUnwrap(panel.subviews.compactMap { $0 as? NSGlassEffectView }.first)
             XCTAssertFalse(glass.effectIsInteractive)
         }
+        #endif
         var preferences = DesignPreferences(); preferences.reduceTransparency = true
         panel.preferences = preferences; XCTAssertTrue(panel.isUsingOpaqueFallback)
     }
