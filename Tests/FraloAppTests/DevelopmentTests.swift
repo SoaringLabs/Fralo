@@ -65,7 +65,15 @@ final class DevelopmentTests: XCTestCase {
         let experiment = try XCTUnwrap(controller.materialView)
         let pixels = experiment.canvas.image?.tiffRepresentation
         experiment.setTranslucency(opacity: 65, tint: 35)
-        XCTAssertEqual(experiment.workspace.effect.alphaValue, 0.65, accuracy: 0.001)
+        let reducedTransparency = controller.state.preferences.effectiveReduceTransparency
+        XCTAssertEqual(experiment.workspace.isUsingOpaqueFallback, reducedTransparency)
+        XCTAssertEqual(experiment.workspace.effect.isHidden, reducedTransparency)
+        XCTAssertEqual(experiment.tintOverlay.isHidden, reducedTransparency)
+        XCTAssertEqual(experiment.opacity.isEnabled, !reducedTransparency)
+        XCTAssertEqual(experiment.tint.isEnabled, !reducedTransparency)
+        print("[MaterialFallback] systemReduceTransparency=\(NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency) fallback=\(reducedTransparency) alpha=\(experiment.workspace.effect.alphaValue)")
+        XCTAssertEqual(experiment.workspace.effect.alphaValue, reducedTransparency ? 1 : 0.65, accuracy: 0.001,
+                       "The system accessibility preference takes precedence over the experiment slider")
         XCTAssertEqual(experiment.canvas.alphaValue, 1)
         XCTAssertEqual(experiment.panel.alphaValue, 1)
         XCTAssertEqual(experiment.canvas.image?.tiffRepresentation, pixels)

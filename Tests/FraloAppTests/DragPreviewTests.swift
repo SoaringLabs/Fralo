@@ -73,7 +73,12 @@ final class DragPreviewTests: XCTestCase {
             if pan { XCTAssertNotEqual(saved.backgroundX, settings.backgroundX) }
             else { XCTAssertEqual(saved.deviceX, settings.deviceX + 0.14, accuracy: 0.00001) }
             let expected = try CompositionRenderer.render(ImageInput(url: source), settings: saved, preparePreviewLayers: true)
-            XCTAssertEqual(finalRect, try XCTUnwrap(expected.previewLayers).deviceRect(settings: saved))
+            let expectedRect = try XCTUnwrap(expected.previewLayers).deviceRect(settings: saved)
+            // Repeated pointer deltas and a fresh render can differ in the final floating-point bit.
+            for (actual, expected) in zip([finalRect.minX, finalRect.minY, finalRect.width, finalRect.height],
+                                          [expectedRect.minX, expectedRect.minY, expectedRect.width, expectedRect.height]) {
+                XCTAssertEqual(actual, expected, accuracy: 0.000001, "The live rectangle must match the final render within one millionth of a pixel")
+            }
             controller.copyCurrent(nil)
             XCTAssertEqual(board.data(forType: .png), try (format == .png ? CompositionRenderer.data(expected.image, settings: saved) : FrameRenderer.pngData(expected.image)), "Copy must contain the final composition with the existing PNG/JPEG contract")
         }
