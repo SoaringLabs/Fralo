@@ -15,7 +15,103 @@ final class CompositionTests: XCTestCase {
         let c = try XCTUnwrap(CompositionRenderer.bitmap(CGSize(width: image.width, height: image.height)))
         CompositionRenderer.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height), context: c)
         let p = try XCTUnwrap(c.data).assumingMemoryBound(to: UInt8.self)
-        return Array(UnsafeBufferPointer(start: p, count: c.bytesPerRow * c.height))
+        var bytes: [UInt8] = []; bytes.reserveCapacity(image.width * image.height * 4)
+        for row in 0..<image.height {
+            bytes.append(contentsOf: UnsafeBufferPointer(start: p + row * c.bytesPerRow, count: image.width * 4))
+        }
+        return bytes
+    }
+    private func solidInput(_ size: CGSize) throws -> ImageInput {
+        let context = try XCTUnwrap(CompositionRenderer.bitmap(size))
+        context.setFillColor(CGColor(srgbRed: 0.3, green: 0.5, blue: 0.8, alpha: 1))
+        context.fill(CGRect(origin: .zero, size: size))
+        return ImageInput(data: try FrameRenderer.pngData(XCTUnwrap(context.makeImage())), name: "solid.png")
+    }
+    func testFixedDeviceSizesAndSilhouettesIgnoreSourceResolutionAndAspectRatio() throws {
+        let sources = try [CGSize(width: 40, height: 10), CGSize(width: 1600, height: 400), CGSize(width: 100, height: 240), CGSize(width: 80, height: 80)].map(solidInput)
+        for display in DisplayKind.allCases {
+            for orientation in Orientation.allCases {
+                for ratio in WindowRatio.allCases where display == .browser || ratio == .standard {
+                    var settings = CompositionSettings(); settings.display = display; settings.orientation = orientation; settings.windowRatio = ratio
+                    let portrait = display == .phone ? CGSize(width: 1530, height: 3036) : CGSize(width: 2400, height: 3200)
+                    let browserSize: CGSize
+                    switch ratio {
+                    case .standard: browserSize = CGSize(width: 3000, height: 1875)
+                    case .wide: browserSize = CGSize(width: 3000, height: 1688)
+                    case .classic: browserSize = CGSize(width: 3000, height: 2250)
+                    }
+                    let base = display == .browser ? browserSize : orientation == .portrait ? portrait : CGSize(width: portrait.height, height: portrait.width)
+                    for (shadow, margin): (ShadowStyle, CGFloat) in [(.none, 0), (.soft, 84), (.strong, 138)] {
+                        settings.transparentShadow = shadow
+                        var silhouette: [UInt8]?
+                        for source in sources {
+                            let result = try CompositionRenderer.render(source, settings: settings, maxDimension: 240)
+                            XCTAssertEqual(result.pixelSize, CGSize(width: base.width + margin * 2, height: base.height + margin * 2))
+                            XCTAssertEqual(result.previewReferenceSize, CGSize(width: base.width + 276, height: base.height + 276))
+                            XCTAssertLessThanOrEqual(max(result.image.width, result.image.height), 240)
+                            let bytes = try pixels(result.image)
+                            let alpha = stride(from: 3, to: bytes.count, by: 4).map { bytes[$0] }
+                            if let silhouette { XCTAssertEqual(alpha, silhouette, "Changing source pixels must not alter device or shadow geometry") }
+                            silhouette = alpha
+                        }
+                    }
+                }
+            }
+        }
+    }
+    func testShadowHasClearOuterEdgesAndDoesNotResizeDevice() throws {
+        let source = try input()
+        for display in DisplayKind.allCases {
+            var settings = CompositionSettings(); settings.display = display
+            let bare = try CompositionRenderer.render(source, settings: settings)
+            let bareBytes = try pixels(bare.image)
+            for (shadow, margin) in [(ShadowStyle.soft, 84), (.strong, 138)] {
+                settings.transparentShadow = shadow
+                let result = try CompositionRenderer.render(source, settings: settings)
+                let bytes = try pixels(result.image), w = result.image.width, h = result.image.height
+                var edgeAlpha: UInt8 = 0
+                for x in 0..<w { edgeAlpha = max(edgeAlpha, bytes[x * 4 + 3], bytes[((h - 1) * w + x) * 4 + 3]) }
+                for y in 0..<h { edgeAlpha = max(edgeAlpha, bytes[(y * w) * 4 + 3], bytes[(y * w + w - 1) * 4 + 3]) }
+                XCTAssertEqual(edgeAlpha, 0, "Shadow must fade out on every outer edge")
+                var visibleShadow = false
+                var changedDevicePixels = 0
+                for y in stride(from: 0, to: h, by: 8) {
+                    for x in stride(from: 0, to: w, by: 8) {
+                        let alpha = bytes[(y * w + x) * 4 + 3]
+                        if x < margin || y < margin || x >= w - margin || y >= h - margin {
+                            if alpha > 0 { visibleShadow = true }
+                        } else {
+                            let barePixel = ((y - margin) * bare.image.width + x - margin) * 4
+                            if bareBytes[barePixel + 3] == 255 {
+                                let pixel = (y * w + x) * 4
+                                if (0..<4).contains(where: { bytes[pixel + $0] != bareBytes[barePixel + $0] }) { changedDevicePixels += 1 }
+                            }
+                        }
+                    }
+                }
+                XCTAssertTrue(visibleShadow)
+                XCTAssertEqual(changedDevicePixels, 0, "Shadow must preserve opaque device pixels at the same scale")
+            }
+        }
+    }
+    func testBackgroundCanvasAndDeviceSilhouetteStayFixedAcrossSources() throws {
+        let sources = try [CGSize(width: 40, height: 10), CGSize(width: 1600, height: 400), CGSize(width: 100, height: 240)].map(solidInput)
+        for display in DisplayKind.allCases {
+            var settings = CompositionSettings(); settings.display = display; settings.mode = .background
+            settings.background = .solid; settings.backgroundOpacity = 0
+            for shadow in ShadowStyle.allCases {
+                settings.backgroundShadow = shadow
+                var silhouette: [UInt8]?
+                for source in sources {
+                    let result = try CompositionRenderer.render(source, settings: settings, maxDimension: 240)
+                    XCTAssertEqual(result.pixelSize, CGSize(width: 2400, height: 1800))
+                    XCTAssertEqual(result.previewReferenceSize, result.pixelSize)
+                    let bytes = try pixels(result.image), alpha = stride(from: 3, to: bytes.count, by: 4).map { bytes[$0] }
+                    if let silhouette { XCTAssertEqual(alpha, silhouette, "Background composition must use device geometry independently of source density") }
+                    silhouette = alpha
+                }
+            }
+        }
     }
     func testAllShellsContainMismatchedSourceAndKeepBothEdges() throws {
         let source = try input()
@@ -67,6 +163,7 @@ final class CompositionTests: XCTestCase {
         let report = try BatchExporter.run(inputs: [source, bad], settings: .init(), directory: root, composition: s)
         XCTAssertEqual(report.succeeded, 1); XCTAssertEqual(report.failed, 1); XCTAssertEqual(report.composition, s)
         XCTAssertTrue(report.entries[0].output.hasSuffix(".jpg"))
+        XCTAssertEqual(try ImageInput(url: URL(fileURLWithPath: report.entries[0].output)).dimensions(), CGSize(width: 3000, height: 1875))
         let roundtrip = try JSONDecoder().decode(ExportReport.self, from: JSONEncoder().encode(report)); XCTAssertEqual(roundtrip.composition, s)
         let again = try BatchExporter.run(inputs: [source], settings: .init(), directory: root, composition: s); XCTAssertEqual(again.skipped, 1)
         let token = CancellationToken(); token.cancel()

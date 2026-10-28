@@ -43,7 +43,7 @@ public enum CompositionRenderer {
         let nativeSize: CGSize
         switch settings.display {
         case .phone:
-            let frame = try FrameRenderer.render(input, settings: RenderSettings(orientation: settings.orientation), maxDimension: limit, containSource: true)
+            let frame = try FrameRenderer.render(input, settings: RenderSettings(orientation: settings.orientation), maxDimension: limit, containSource: true, canvasSize: settings.deviceCanvasSize)
             device = frame.image; nativeSize = frame.plan.pixelSize
         case .tablet, .browser:
             let frame = try shell(input, settings: settings, maxDimension: limit); device = frame.image; nativeSize = frame.pixelSize
@@ -77,8 +77,8 @@ public enum CompositionRenderer {
         }
         let rect: CGRect
         if settings.mode == .background {
-            let fit = min(size.width / CGFloat(device.width), size.height / CGFloat(device.height)) * settings.deviceScale
-            let w = CGFloat(device.width) * fit, h = CGFloat(device.height) * fit
+            let fit = min(size.width / nativeSize.width, size.height / nativeSize.height) * settings.deviceScale
+            let w = nativeSize.width * fit, h = nativeSize.height * fit
             rect = CGRect(x: (size.width - w) / 2 + CGFloat(settings.deviceX) * size.width, y: (size.height - h) / 2 + CGFloat(settings.deviceY) * size.height, width: w, height: h)
         } else { rect = CGRect(x: margin, y: margin, width: nativeSize.width, height: nativeSize.height) }
         context.saveGState(); context.setAlpha(settings.deviceOpacity)
@@ -134,13 +134,15 @@ public enum CompositionRenderer {
     }
     private static func shell(_ input: ImageInput, settings: CompositionSettings, maxDimension: Int?) throws -> RenderedComposition {
         let tablet = settings.display == .tablet
-        let size = tablet ? (settings.orientation == .portrait ? CGSize(width: 1100, height: 1442) : CGSize(width: 1442, height: 1100)) : CGSize(width: 1500, height: (1500 / settings.windowRatio.ratio).rounded())
-        let sourceSize = try input.dimensions()
+        let size = tablet ? (settings.orientation == .portrait ? CGSize(width: 1100, height: 1442) : CGSize(width: 1442, height: 1100)) : CGSize(width: 1500, height: 1500 / settings.windowRatio.ratio)
         let screen = tablet ? CGRect(origin: .zero, size: size).insetBy(dx: 38, dy: 38) : CGRect(x: 2, y: settings.browser == .chrome ? 86 : 64, width: size.width - 4, height: size.height - (settings.browser == .chrome ? 88 : 66))
-        let density = max(sourceSize.width / screen.width, sourceSize.height / screen.height)
-        let requested = maxDimension.map { min(density, CGFloat($0) / max(size.width, size.height)) } ?? density
-        let output = CGSize(width: ceil(size.width * requested), height: ceil(size.height * requested))
-        let context = try bitmap(output); context.scaleBy(x: requested, y: requested)
+        let nativeSize = settings.deviceCanvasSize
+        let reduction = maxDimension.map { min(1, CGFloat($0) / max(nativeSize.width, nativeSize.height)) } ?? 1
+        let output = CGSize(width: ceil(nativeSize.width * reduction), height: ceil(nativeSize.height * reduction))
+        let fit = min(nativeSize.width / size.width, nativeSize.height / size.height)
+        let context = try bitmap(output); context.scaleBy(x: reduction, y: reduction)
+        context.translateBy(x: (nativeSize.width - size.width * fit) / 2, y: (nativeSize.height - size.height * fit) / 2)
+        context.scaleBy(x: fit, y: fit)
         let bodyColor = tablet ? CGColor(srgbRed: 0.12, green: 0.13, blue: 0.14, alpha: 1) : CGColor(srgbRed: 0.92, green: 0.92, blue: 0.93, alpha: 1)
         fill(CGRect(origin: .zero, size: size), radius: tablet ? 62 : 16, color: bodyColor, context: context)
         if tablet {
@@ -162,10 +164,10 @@ public enum CompositionRenderer {
         }
         context.saveGState(); context.addPath(CGPath(roundedRect: screen, cornerWidth: tablet ? 30 : 4, cornerHeight: tablet ? 30 : 4, transform: nil)); context.clip()
         context.setFillColor(CGColor(gray: 0.04, alpha: 1)); context.fill(screen)
-        let image = try input.decode(maxDimension: maxDimension)
-        let fit = min(screen.width / CGFloat(image.width), screen.height / CGFloat(image.height))
-        let rect = CGRect(x: screen.midX - CGFloat(image.width) * fit / 2, y: screen.midY - CGFloat(image.height) * fit / 2, width: CGFloat(image.width) * fit, height: CGFloat(image.height) * fit)
+        let image = try input.decode(maxDimension: max(1, Int(ceil(max(screen.width, screen.height) * fit * reduction))))
+        let sourceFit = min(screen.width / CGFloat(image.width), screen.height / CGFloat(image.height))
+        let rect = CGRect(x: screen.midX - CGFloat(image.width) * sourceFit / 2, y: screen.midY - CGFloat(image.height) * sourceFit / 2, width: CGFloat(image.width) * sourceFit, height: CGFloat(image.height) * sourceFit)
         draw(image, in: rect, context: context); context.restoreGState()
-        return RenderedComposition(image: context.makeImage()!, pixelSize: CGSize(width: ceil(size.width * density), height: ceil(size.height * density)))
+        return RenderedComposition(image: context.makeImage()!, pixelSize: nativeSize)
     }
 }

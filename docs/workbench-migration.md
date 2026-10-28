@@ -214,3 +214,35 @@ the correctly named save sheet and cancellation preserves the 11-input batch.
 Core/renderer/export implementation is unchanged, so the prior full-suite result
 remains historical rather than claimed as a new full run. The new preview remains
 open for user review; human visual acceptance and older-OS behavior are pending.
+
+## Fixed device output sizes — 2026-10-28
+
+The user approved source-independent device canvases: phone portrait 1530 × 3036,
+tablet portrait 2400 × 3200, with width/height exchanged in landscape. Browser
+windows are 3000 px wide: 1875 px high at 16:10, 1688 at 16:9 and 2250 at 4:3.
+These are output envelopes; existing device artwork fits proportionally and is
+centred without stretching. Uploaded content remains fully contained inside the
+screen. Decoding is bounded by the destination screen resolution.
+
+Transparent output adds 0 / 84 / 138 px on every side for no / soft / strong
+shadow. Device pixels retain their scale and position relative to the base
+canvas. Fit-to-window uses the strongest-shadow envelope for all shadow styles,
+so shadow changes do not resize the displayed device. Selecting another input
+also preserves a manually selected preview zoom. Bottom-bar and inspector sizes,
+copy and export all use the resulting canvas dimensions including shadow padding.
+
+Background composition keeps its selected canvas dimensions. Device layout uses
+the fixed logical device size rather than the temporary raster dimensions, so
+preview reduction and source density cannot change its placement. This GUI
+contract is separate from the legacy CLI, whose source-density rendering and
+aspect-mismatch validation remain intact. Existing settings require no migration.
+
+Regression coverage includes source resolution/aspect changes across all device
+directions, browser ratios and shadow styles; transparent silhouettes, outer
+shadow edges and opaque device samples; background silhouettes; real-controller
+fit/pixel zoom, dimensions and clipboard output; and batch JPEG dimensions.
+
+All 80 Debug and 72 Release tests passed with the native build backend, plus the
+10 CLI integration checks. Native desktop inspection is recorded separately in
+the local fixed-size evidence bundle; automated checks do not imply human visual
+acceptance, merge or release authorization.

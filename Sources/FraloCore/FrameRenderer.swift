@@ -9,12 +9,13 @@ public struct RenderedFrame {
 }
 
 public enum FrameRenderer {
-    public static func render(_ input: ImageInput, settings: RenderSettings, maxDimension: Int? = nil, containSource: Bool = false) throws -> RenderedFrame {
-        let plan = try RenderPlan(sourceSize: input.dimensions(), settings: settings, containSource: containSource)
+    public static func render(_ input: ImageInput, settings: RenderSettings, maxDimension: Int? = nil, containSource: Bool = false, canvasSize: CGSize? = nil) throws -> RenderedFrame {
+        let plan = try RenderPlan(sourceSize: input.dimensions(), settings: settings, containSource: containSource, canvasSize: canvasSize)
         let reduction = maxDimension.map { min(1, CGFloat($0) / max(plan.pixelSize.width, plan.pixelSize.height)) } ?? 1
         let width = max(1, Int(ceil(plan.pixelSize.width * reduction)))
         let height = max(1, Int(ceil(plan.pixelSize.height * reduction)))
-        let source = try input.decode(maxDimension: maxDimension.map { _ in max(1, Int(ceil(max(plan.sourceSize.width, plan.sourceSize.height) * reduction))) })
+        let decodeLimit = canvasSize != nil ? max(1, Int(ceil(max(plan.screen.width, plan.screen.height) * reduction))) : maxDimension.map { _ in max(1, Int(ceil(max(plan.sourceSize.width, plan.sourceSize.height) * reduction))) }
+        let source = try input.decode(maxDimension: decodeLimit)
         guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!,
                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue) else {
@@ -22,7 +23,7 @@ public enum FrameRenderer {
         }
         context.clear(CGRect(x: 0, y: 0, width: width, height: height))
         context.translateBy(x: 0, y: CGFloat(height)); context.scaleBy(x: reduction, y: -reduction)
-        context.translateBy(x: CGFloat(settings.padding), y: CGFloat(settings.padding))
+        context.translateBy(x: plan.origin.x, y: plan.origin.y)
         context.scaleBy(x: plan.scale, y: plan.scale)
         let geometry = plan.geometry
 

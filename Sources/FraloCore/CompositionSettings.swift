@@ -56,6 +56,17 @@ public struct CompositionSettings: Codable, Equatable, Sendable {
     public var pngQuality = 0.85
     public var jpegFill = ArtworkColor(1, 1, 1)
     public var shadow: ShadowStyle { mode == .transparent ? transparentShadow : backgroundShadow }
+    /// Output envelope for the device, before transparent shadow padding. Source pixels never set this size.
+    public var deviceCanvasSize: CGSize {
+        switch display {
+        case .phone:
+            return orientation == .portrait ? CGSize(width: 1530, height: 3036) : CGSize(width: 3036, height: 1530)
+        case .tablet:
+            return orientation == .portrait ? CGSize(width: 2400, height: 3200) : CGSize(width: 3200, height: 2400)
+        case .browser:
+            return CGSize(width: 3000, height: (3000 / windowRatio.ratio).rounded())
+        }
+    }
     public init() {}
     private enum CodingKeys: String, CodingKey {
         case schemaVersion, display, orientation, browser, windowRatio, mode, canvas, deviceScale, deviceX, deviceY, deviceOpacity, background, backgroundColor, localBackgroundPath, backgroundScale, backgroundX, backgroundY, backgroundOpacity, transparentShadow, backgroundShadow, format, jpegQuality, jpegFill, pngLossless, pngQuality

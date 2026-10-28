@@ -265,7 +265,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         window?.makeFirstResponder(workbench.previewing || !canRestore ? canvas : restore); layoutPreview()
     }
     private func moveSelection(_ delta: Int) { list.moveSelection(by: delta) }
-    private func selectionChanged() { zoom = nil; fitMenu.selectItem(at: 0); updateActions(); requestPreview() }
+    private func selectionChanged() { updateActions(); requestPreview() }
     private func refreshList() {
         list.update(items.map { BatchEntry(id: $0.input.id, title: $0.input.name, detail: $0.error == nil ? "" : "无法读取", image: $0.thumbnail, failed: $0.error != nil) })
     }

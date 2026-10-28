@@ -172,6 +172,60 @@ final class PanelPolishTests: XCTestCase {
         }
     }
 
+    @MainActor func testChangingSourceKeepsDevicePreviewSizeAndChosenZoom() async throws {
+        _ = NSApplication.shared
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let suite = "fralo-fixed-preview-\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        let board = NSPasteboard.withUniqueName()
+        let controller = MainWindowController(store: SettingsStore(url: directory.appendingPathComponent("settings.json")), preferences: defaults, pasteboard: board, restoreWindow: false)
+        let window = try XCTUnwrap(controller.window)
+        defer { window.close(); defaults.removePersistentDomain(forName: suite); board.releaseGlobally(); try? FileManager.default.removeItem(at: directory) }
+        window.setContentSize(NSSize(width: 1400, height: 1000))
+        let root = try XCTUnwrap(window.contentView as? WorkbenchView)
+        let inspector = try XCTUnwrap(root.right.body as? CompositionInspector), list = try XCTUnwrap(root.left.body as? BatchList)
+        func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
+        let canvas = try XCTUnwrap(descendants(root).compactMap { $0 as? CanvasSurface }.first)
+        let viewing = try XCTUnwrap(descendants(root).compactMap { $0 as? ViewToolbar }.first)
+        let sizes = [CGSize(width: 80, height: 20), CGSize(width: 1600, height: 400), CGSize(width: 100, height: 240)]
+        let files = try sizes.enumerated().map { index, size -> URL in
+            let context = try XCTUnwrap(CGContext(data: nil, width: Int(size.width), height: Int(size.height), bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.setFillColor(CGColor(srgbRed: 0.2, green: 0.5, blue: 0.3, alpha: 1)); context.fill(CGRect(origin: .zero, size: size))
+            let file = directory.appendingPathComponent("source-\(index).png")
+            try FrameRenderer.pngData(XCTUnwrap(context.makeImage())).write(to: file); return file
+        }
+        func waitForPreview(replacing previous: NSImage?) async throws {
+            for _ in 0..<300 where canvas.image == nil || canvas.image === previous { try await Task.sleep(nanoseconds: 20_000_000) }
+            XCTAssertNotNil(canvas.image); XCTAssertFalse(canvas.image === previous)
+            root.layoutSubtreeIfNeeded()
+        }
+        controller.importURLs(files); try await waitForPreview(replacing: nil)
+        for device in 0..<3 {
+            if device > 0 {
+                let previous = canvas.image; inspector.devicePicker.choose(device); try await waitForPreview(replacing: previous)
+            }
+            controller.fitPreview(nil); root.layoutSubtreeIfNeeded()
+            let size = try XCTUnwrap(canvas.image).size, fitRect = canvas.imageRect, fitZoom = try XCTUnwrap(canvas.zoom)
+            for index in [1, 2, 0] {
+                let previous = canvas.image; list.select(index); try await waitForPreview(replacing: previous)
+                XCTAssertEqual(try XCTUnwrap(canvas.image).size, size)
+                XCTAssertEqual(try XCTUnwrap(canvas.zoom), fitZoom, accuracy: 0.0001)
+                XCTAssertEqual(canvas.imageRect, fitRect)
+                XCTAssertEqual(viewing.dimensions.stringValue, "\(Int(size.width)) × \(Int(size.height))")
+            }
+            controller.actualPixels(nil); root.layoutSubtreeIfNeeded()
+            let actualZoom = try XCTUnwrap(canvas.zoom), actualRect = canvas.imageRect
+            let previous = canvas.image; list.select(1); try await waitForPreview(replacing: previous)
+            XCTAssertEqual(try XCTUnwrap(canvas.zoom), actualZoom, accuracy: 0.0001, "Changing source must preserve the chosen pixel zoom")
+            XCTAssertEqual(canvas.imageRect, actualRect)
+            controller.copyCurrent(nil)
+            let copied = try XCTUnwrap(board.data(forType: .png))
+            XCTAssertEqual(try ImageInput(data: copied, name: "copy.png").dimensions(), size)
+            let beforeReset = canvas.image; list.select(0); try await waitForPreview(replacing: beforeReset)
+        }
+    }
+
     @MainActor func testInspectorWidthStaysFixedWhenLongSettingsNeedScrolling() async throws {
         _ = NSApplication.shared
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
