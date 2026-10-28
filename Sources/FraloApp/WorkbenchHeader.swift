@@ -12,10 +12,11 @@ private final class HeaderDocument: NSView {
         count.font = .systemFont(ofSize: 11); count.textColor = .secondaryLabelColor
         let stack = NSStackView(views: [name, count]); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 1
         stack.translatesAutoresizingMaskIntoConstraints = false; addSubview(stack)
-        NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: leadingAnchor), stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+        NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16), stack.trailingAnchor.constraint(equalTo: trailingAnchor),
                                      stack.centerYAnchor.constraint(equalTo: centerYAnchor)])
         widthAnchor.constraint(equalToConstant: 220).isActive = true
-        name.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor).isActive = true
+        name.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor).isActive = true
+        count.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor).isActive = true
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
 }
@@ -37,10 +38,12 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
         toolbar.delegate = self; toolbar.displayMode = .iconOnly; toolbar.allowsUserCustomization = false
     }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.init("add"), .space, .init("sidebar"), .init("sidebarBoundary"), .init("document"), .flexibleSpace, .init("copyCurrent"), .init("exportCurrent"), .space, .init("inspector"), .space, .init("more")]
+        [.flexibleSpace, .init("add"), .space, .init("sidebar"), .init("sidebarBoundary"), .init("document"), .flexibleSpace, .init("copyCurrent"), .init("exportCurrent"), .space, .init("inspector"), .space, .init("more")]
     }
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        toolbarAllowedItemIdentifiers(toolbar).filter { !sidebarHidden || $0.rawValue != "sidebarBoundary" }
+        toolbarAllowedItemIdentifiers(toolbar).enumerated().compactMap { index, id in
+            sidebarHidden && (index == 0 || id.rawValue == "sidebarBoundary") ? nil : id
+        }
     }
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         if id.rawValue == "sidebarBoundary" { return NSTrackingSeparatorToolbarItem(identifier: id, splitView: splitView, dividerIndex: 0) }
@@ -93,8 +96,15 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
         document.name.stringValue = name; document.name.toolTip = name
         document.count.stringValue = count == 0 ? "添加图片，开始套框" : "\(count) 张图片"
         let boundary = toolbar.items.firstIndex { $0.itemIdentifier.rawValue == "sidebarBoundary" }
-        if sidebarHidden, let boundary { toolbar.removeItem(at: boundary) }
-        else if !sidebarHidden && boundary == nil { toolbar.insertItem(withItemIdentifier: .init("sidebarBoundary"), at: 3) }
+        if sidebarHidden {
+            if let boundary { toolbar.removeItem(at: boundary) }
+            if toolbar.items.first?.itemIdentifier == .flexibleSpace { toolbar.removeItem(at: 0) }
+        } else {
+            if toolbar.items.first?.itemIdentifier != .flexibleSpace { toolbar.insertItem(withItemIdentifier: .flexibleSpace, at: 0) }
+            if boundary == nil, let sidebar = toolbar.items.firstIndex(where: { $0.itemIdentifier.rawValue == "sidebar" }) {
+                toolbar.insertItem(withItemIdentifier: .init("sidebarBoundary"), at: sidebar + 1)
+            }
+        }
         toolbar.items.first { $0.itemIdentifier.rawValue == "add" }?.isEnabled = canAdd
         let title = inspectorVisible ? "隐藏出图设置" : "显示出图设置"
         toolbar.items.first { $0.itemIdentifier.rawValue == "inspector" }?.toolTip = title

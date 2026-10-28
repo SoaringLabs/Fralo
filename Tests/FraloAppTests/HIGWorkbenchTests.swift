@@ -85,6 +85,7 @@ final class HIGWorkbenchTests: XCTestCase {
         controller.togglePreview()
         XCTAssertTrue(controller.validateMenuItem(sidebar)); XCTAssertEqual(sidebar.title, "显示图片列表")
         controller.toggleSidebar(nil); XCTAssertFalse(root.previewing); XCTAssertFalse(root.collapsed)
+        controller.toggleInspector(nil) // Open the initially empty inspector before testing its hide command.
         controller.toggleInspector(nil)
         XCTAssertTrue(controller.validateMenuItem(inspector)); XCTAssertEqual(inspector.title, "显示出图设置")
         controller.toggleInspector(nil); XCTAssertFalse(root.inspectorHidden)
@@ -100,6 +101,7 @@ final class HIGWorkbenchTests: XCTestCase {
         let store = SettingsStore(url: root.appendingPathComponent("settings.json"))
         let controller = MainWindowController(store: store, preferences: defaults, restoreWindow: false)
         let window = try XCTUnwrap(controller.window); defer { window.close() }
+        controller.toggleInspector(nil)
         let inspector = try XCTUnwrap(descendants(try XCTUnwrap(window.contentView)).compactMap { $0 as? CompositionInspector }.first)
         inspector.devicePicker.choose(1)
         let field = try XCTUnwrap(descendants(inspector).compactMap { $0 as? ValueField }.first)

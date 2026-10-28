@@ -16,6 +16,8 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private(set) var appearanceChoice = AppAppearance.system
     private(set) var settingsController: AppearanceSettingsWindowController?
     private var workbench: WorkbenchView!
+    private var batchHadImages: Bool?
+    private var inspectorHiddenForEmptyBatch = false
     private let center = NSViewController()
     private let list = BatchList()
     private let viewing = ViewToolbar()
@@ -331,6 +333,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         }
     }
     @objc func toggleInspector(_ sender: Any?) {
+        inspectorHiddenForEmptyBatch = false
         if workbench.previewing {
             togglePreview()
             workbench.setInspectorHidden(false, animated: true)
@@ -655,7 +658,23 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         }
         alert.beginSheetModal(for: window!) { response in if response == .alertSecondButtonReturn { NSWorkspace.shared.open(directory) } }
     }
+    /// Empty-batch transitions affect presentation, never the user's visibility preference.
+    private func synchronizeInspectorWithBatch() {
+        let hasImages = !items.isEmpty
+        guard batchHadImages != hasImages else { return }
+        batchHadImages = hasImages
+        if !hasImages {
+            inspectorHiddenForEmptyBatch = !workbench.inspectorHidden
+            let focusWasInInspector = (window?.firstResponder as? NSView).map { $0.isDescendant(of: workbench.right) } ?? false
+            workbench.setInspectorHidden(true, animated: window?.isVisible == true)
+            if focusWasInInspector { window?.makeFirstResponder(emptyAction) }
+        } else if inspectorHiddenForEmptyBatch {
+            inspectorHiddenForEmptyBatch = false
+            workbench.setInspectorHidden(false, animated: window?.isVisible == true)
+        }
+    }
     private func updateActions() {
+        synchronizeInspectorWithBatch()
         updateCanvasInteraction()
         inspectorUI?.setEditingEnabled(!isExporting)
         batchCount.stringValue = "图片 · \(items.count)"
