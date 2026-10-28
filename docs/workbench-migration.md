@@ -246,3 +246,69 @@ All 80 Debug and 72 Release tests passed with the native build backend, plus the
 10 CLI integration checks. Native desktop inspection is recorded separately in
 the local fixed-size evidence bundle; automated checks do not imply human visual
 acceptance, merge or release authorization.
+
+## Whole-workbench HIG review — 2026-10-28
+
+This pass reviews the existing Mac workbench rather than choosing a new design.
+The full-height native batch sidebar, fixed 360 pt inspector, native toolbar
+command groups, and bottom viewing controls remain the accepted visual target.
+The preceding cached-layer dragging fix remains part of the tested baseline.
+
+The audit covers task entry, normal/minimum windows, long names, light/dark
+appearance, batch navigation, settings and numerical entry, keyboard/menu
+coverage, focus restoration, feedback, error recovery, copying and export.
+Screenshots and native accessibility snapshots were captured before changes;
+they are retained in the local `fralo-hig-audit` evidence bundle. Observations
+about assistive technology are limited to what was actually inspected.
+
+| Finding | Resulting behavior | HIG grounding |
+| --- | --- | --- |
+| Dragging and settings edits could not be undone | One drag or continuous slider gesture is one named Undo step; Redo restores it. Native text editing keeps its own history. | [Undo and redo](https://developer.apple.com/design/human-interface-guidelines/undo-and-redo) |
+| Removing an image or clearing a batch had no recovery | Add, paste, remove and clear record reversible batch snapshots, including selection. Restoring a batch brings the restored list into focus. No source file is deleted. | [Undo and redo](https://developer.apple.com/design/human-interface-guidelines/undo-and-redo), [Alerts](https://developer.apple.com/design/human-interface-guidelines/alerts) |
+| Long names displaced important toolbar commands at minimum width | The document title has a bounded width and middle truncation; the full name remains available in a tooltip/accessibility text. | [Toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars) |
+| Invalid percentage input silently reverted | The previous valid value stays intact, with an inline range message and an accessibility announcement. Formatting and whole-input parsing use the locale's decimal separator. | [Text fields](https://developer.apple.com/design/human-interface-guidelines/text-fields) |
+| Inspector visibility, preview and image navigation lacked menu entries | View exposes those actions with dynamic Show/Hide or Return labels and shortcuts. Revealing a panel from preview reliably restores editing. | [The menu bar](https://developer.apple.com/design/human-interface-guidelines/the-menu-bar) |
+| Drag positioning had no equivalent precision keyboard operation | Option–arrow commands move the current artwork target by one output pixel; typing focus retains normal text-navigation behavior. | [Designing for macOS](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos), [Accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility) |
+| Background panning lacked a current-target cue | The canvas uses open/closed hand cursors and target-specific tooltip/accessibility help. | [Pointers](https://developer.apple.com/design/human-interface-guidelines/pointing-devices), [Accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility) |
+| Retry still looked and announced like Add | Failure uses a warning illustration and refresh action; the accessible label matches Retry. | [Feedback](https://developer.apple.com/design/human-interface-guidelines/feedback), [Accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility) |
+| Copy had no confirmation | A short, nonmodal viewing-bar confirmation and accessibility announcement acknowledge a successful copy, then restore the output dimensions. | [Feedback](https://developer.apple.com/design/human-interface-guidelines/feedback) |
+
+The review also confirms useful existing behavior: hiding a focused panel moves
+focus into the canvas; empty output actions are disabled; failed inputs explain
+the failure and can recover after retry; file dialogs can be cancelled; the
+exporter preserves source data and reports same-name skips. The existing
+semantic-color, stronger-contrast and reduced-motion/transparency paths are
+retained and exercised by the design-system tests.
+
+Default macOS Tab behavior is not treated as a defect: without system-wide
+keyboard navigation enabled, Tab may visit text fields and lists while skipping
+buttons and sliders. This pass does not change the user's system preferences or
+force every control into that default sequence.
+
+Verification uses real-controller Undo/Redo, grouped edits, recovery, menu-state,
+keyboard-position, title-width and numeric-validation tests, alongside the full
+core/design-system/application suites and native preview checks. It does not
+establish full VoiceOver speech correctness, complete contrast conformance,
+older-macOS/Intel support, or every physical accessibility setting. PNG palette
+reduction still refreshes its encoded appearance after dragging ends; that
+quality contract is unchanged. Human acceptance, push, merge and release remain
+separate from this local optimization pass.
+
+Final native-backend verification: Release ran 81 tests and Debug ran 89 tests,
+with no failures in the final clean runs. Each suite skips the opt-in visible
+window probe; a separate visible probe passed with 360 updates, a 17.35 ms P95
+interval and zero complete renders during the gesture. Native inspection also
+covers 1030 × 640 light/dark windows with a long title, validation text fitting,
+Undo/Redo and restoring selection, retry recovery, copy acknowledgement, JPEG
+output, and cancelling a 42-image export. Cancellation was checked twice:
+8 completed / 34 unprocessed, then 10 completed / 32 unprocessed; the output
+file counts matched each report. Only the second run has a saved summary image.
+
+One earlier Debug run reported a PNG byte-comparison difference in the existing
+JPEG-preview clipboard test. Ten isolated repetitions, two full instrumented
+runs and the final clean full run passed; decoded pixels in the captured passing
+runs were identical. The failing buffers were not captured, so the cause remains
+unconfirmed. The original assertion and renderer were not relaxed or changed to
+hide it. The initial failure and subsequent diagnostics remain in the local
+verification bundle. This is a recorded test uncertainty, not a demonstrated
+HIG fix or proof that an output issue was resolved.

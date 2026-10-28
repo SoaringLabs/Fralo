@@ -99,7 +99,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         file.addItem(withTitle: "关闭窗口", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
 
         let edit = NSMenu(title: "编辑"); let editItem = NSMenuItem(title: "编辑", action: nil, keyEquivalent: ""); editItem.submenu = edit; bar.addItem(editItem)
-        edit.addItem(withTitle: "撤销", action: Selector(("undo:")), keyEquivalent: "z")
+        item(edit, "撤销", #selector(MainWindowController.undoChange(_:)), "z")
+        item(edit, "重做", #selector(MainWindowController.redoChange(_:)), "z", modifiers: [.command, .shift])
         edit.addItem(.separator())
         edit.addItem(withTitle: "剪切", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
         item(edit, "复制当前图片", #selector(MainWindowController.copyCurrent(_:)), "c")
@@ -111,6 +112,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let view = NSMenu(title: "显示"); let viewItem = NSMenuItem(title: "显示", action: nil, keyEquivalent: ""); viewItem.submenu = view; bar.addItem(viewItem)
         item(view, "显示/隐藏侧边栏", #selector(MainWindowController.toggleSidebar(_:)), "s", modifiers: [.command, .control])
+        item(view, "显示/隐藏出图设置", #selector(MainWindowController.toggleInspector(_:)), "i", modifiers: [.command, .option])
+        item(view, "成品预览", #selector(MainWindowController.togglePreview(_:)), "p", modifiers: [.command, .option])
+        view.addItem(.separator())
+        item(view, "上一张图片", #selector(MainWindowController.previousImage(_:)), "[")
+        item(view, "下一张图片", #selector(MainWindowController.nextImage(_:)), "]")
+        let position = NSMenuItem(title: "微调位置", action: nil, keyEquivalent: "")
+        let positionMenu = NSMenu(title: "微调位置"); position.submenu = positionMenu; view.addItem(position)
+        for (title, key, delta) in [("向左移动 1 px", "\u{F702}", NSPoint(x: -1, y: 0)), ("向右移动 1 px", "\u{F703}", NSPoint(x: 1, y: 0)),
+                                    ("向上移动 1 px", "\u{F700}", NSPoint(x: 0, y: -1)), ("向下移动 1 px", "\u{F701}", NSPoint(x: 0, y: 1))] {
+            item(positionMenu, title, #selector(MainWindowController.nudgeArtwork(_:)), key, modifiers: .option)
+            positionMenu.items.last?.representedObject = NSValue(point: delta)
+        }
+        view.addItem(.separator())
         item(view, "适应窗口", #selector(MainWindowController.fitPreview(_:)), "0")
         item(view, "实际像素", #selector(MainWindowController.actualPixels(_:)), "1")
         let appearance = NSMenuItem(title: "外观", action: nil, keyEquivalent: ""); appearance.submenu = controller.appearanceMenu(); view.addItem(appearance)

@@ -98,9 +98,22 @@ public final class ChoiceMenu: NSPopUpButton {
 }
 
 @MainActor
+private final class TrackingSlider: NSSlider {
+    var onEditingChanged: ((Bool) -> Void)?
+    override func mouseDown(with event: NSEvent) {
+        guard isEnabled else { return }
+        onEditingChanged?(true)
+        defer { onEditingChanged?(false) }
+        super.mouseDown(with: event)
+    }
+}
+
+@MainActor
 public final class SliderRow: NSStackView {
     public let slider: NSSlider
     public let valueField: ValueField
+    public let validationLabel = FraloStyle.paragraph("")
+    public var onEditingChanged: ((Bool) -> Void)?
     public var valueLabel: NSTextField { valueField }
     public var onChange: ((Double) -> Void)?
     public var isEnabled: Bool {
@@ -113,17 +126,23 @@ public final class SliderRow: NSStackView {
     }
     public init(_ title: String, range: ClosedRange<Double>, value: Double, onChange: ((Double) -> Void)? = nil) {
         precondition(range.lowerBound.isFinite && range.upperBound.isFinite)
-        slider = NSSlider(value: range.lowerBound, minValue: range.lowerBound, maxValue: range.upperBound, target: nil, action: nil)
+        slider = TrackingSlider(value: range.lowerBound, minValue: range.lowerBound, maxValue: range.upperBound, target: nil, action: nil)
         self.onChange = onChange
         valueField = ValueField(label: title + "百分比", value: value, range: range)
         super.init(frame: .zero)
         valueField.onCommit = { [weak self] in self?.setValue($0, notify: true) }
+        (slider as? TrackingSlider)?.onEditingChanged = { [weak self] in self?.onEditingChanged?($0) }
+        validationLabel.textColor = .systemRed; validationLabel.isHidden = true
+        valueField.onValidationChange = { [weak self] message in
+            self?.validationLabel.stringValue = message ?? ""; self?.validationLabel.isHidden = message == nil
+        }
         orientation = .vertical; alignment = .leading; spacing = 6
         let label = FraloStyle.text(title); label.font = .systemFont(ofSize: 13, weight: .medium)
         addArrangedSubview(label)
         let suffix = FraloStyle.text("%", role: .detail, secondary: true)
         let row = FraloStyle.stack([slider, valueField, suffix], axis: .horizontal, spacing: 5)
         addArrangedSubview(row); row.widthAnchor.constraint(equalTo: widthAnchor).isActive = true
+        addArrangedSubview(validationLabel); validationLabel.widthAnchor.constraint(equalTo: widthAnchor).isActive = true
         valueLabel.alignment = .right; valueLabel.widthAnchor.constraint(equalToConstant: 56).isActive = true
         valueLabel.setContentHuggingPriority(.required, for: .horizontal)
         valueLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -145,32 +164,54 @@ public final class SliderRow: NSStackView {
 @MainActor
 public final class ValueField: NSTextField, NSTextFieldDelegate {
     public var onCommit: ((Double) -> Void)?
+    public var onValidationChange: ((String?) -> Void)?
+    public private(set) var validationMessage: String?
     public private(set) var value: Double
     private let range: ClosedRange<Double>
-    public init(label: String, value: Double, range: ClosedRange<Double>, onCommit: ((Double) -> Void)? = nil) {
+    private let numbers: NumberFormatter
+    private let rangeHelp: String
+    public init(label: String, value: Double, range: ClosedRange<Double>, locale: Locale = .current, onCommit: ((Double) -> Void)? = nil) {
         self.range = range; self.value = min(range.upperBound, max(range.lowerBound, value)); self.onCommit = onCommit
+        numbers = NumberFormatter(); numbers.locale = locale; numbers.numberStyle = .decimal
+        numbers.usesGroupingSeparator = false; numbers.minimumFractionDigits = 0; numbers.maximumFractionDigits = 1
+        rangeHelp = "请输入 " + (numbers.string(from: NSNumber(value: range.lowerBound)) ?? "") + "–" + (numbers.string(from: NSNumber(value: range.upperBound)) ?? "") + " 之间的数值。"
         super.init(frame: .zero)
-        stringValue = Self.display(self.value); delegate = self; setAccessibilityLabel(label)
+        stringValue = display(self.value); delegate = self; setAccessibilityLabel(label)
+        toolTip = rangeHelp; setAccessibilityHelp(rangeHelp)
         FraloStyle.configure(self); font = .monospacedDigitSystemFont(ofSize: 13, weight: .regular); bezelStyle = .roundedBezel
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     public func restore(_ next: Double) {
         guard next.isFinite else { return }; value = min(range.upperBound, max(range.lowerBound, next))
-        stringValue = Self.display(value)
+        stringValue = display(value); showValidation(nil)
     }
     @discardableResult public func commit() -> Bool {
-        guard isEnabled, let parsed = Double(stringValue), parsed.isFinite, range.contains(parsed) else {
-            stringValue = Self.display(value); NSAccessibility.post(element: self, notification: .valueChanged); return false
+        guard isEnabled else { return false }
+        let text = stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Parse the whole input: NumberFormatter alone can accept a valid prefix of invalid text.
+        let separator = NSRegularExpression.escapedPattern(for: numbers.decimalSeparator ?? ".")
+        let pattern = "^[+-]?(?:[0-9]+(?:" + separator + "[0-9]*)?|" + separator + "[0-9]+)$"
+        guard text.range(of: pattern, options: .regularExpression) != nil,
+              let parsed = numbers.number(from: text)?.doubleValue, parsed.isFinite, range.contains(parsed) else {
+            stringValue = display(value); showValidation(rangeHelp)
+            NSAccessibility.post(element: self, notification: .announcementRequested,
+                                 userInfo: [.announcement: rangeHelp, .priority: NSAccessibilityPriorityLevel.high.rawValue])
+            return false
         }
-        // Merely leaving the rounded display must not quantize an untouched slider value.
-        if stringValue == Self.display(value) { return true }
+        // Leaving the rounded display must not quantize an untouched continuous slider value.
+        if text == display(value) { showValidation(nil); return true }
         let changed = parsed != value; restore(parsed)
         if changed { onCommit?(parsed) }; return true
     }
     public func controlTextDidEndEditing(_ obj: Notification) { _ = commit() }
-    private static func display(_ value: Double) -> String {
-        let text = String(format: "%.1f", value)
-        return text.hasSuffix(".0") ? String(text.dropLast(2)) : text
+    public func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+        if commandSelector == #selector(NSResponder.cancelOperation(_:)) { restore(value); return true }
+        return false
+    }
+    private func display(_ value: Double) -> String { numbers.string(from: NSNumber(value: value)) ?? String(value) }
+    private func showValidation(_ message: String?) {
+        validationMessage = message; toolTip = message ?? rangeHelp; setAccessibilityHelp(message ?? rangeHelp)
+        onValidationChange?(message)
     }
 }
 

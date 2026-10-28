@@ -15,7 +15,9 @@ final class CompositionInspector: NSView {
     let outputInfo = FraloStyle.text("—", role: .detail, secondary: true)
     let outputSize = FraloStyle.text("尚未计算文件大小", role: .detail, secondary: true)
     let calculateSize = ActionButton("计算当前大小", role: .quiet)
-    var dragBackground = false
+    var onContinuousEditing: ((Bool) -> Void)?
+    var onDragTargetChange: (() -> Void)?
+    var dragBackground = false { didSet { if oldValue != dragBackground { onDragTargetChange?() } } }
     private weak var dragToggle: ToggleControl?
     private let deviceDetails = NSView(), backgroundDetails = NSView(), exportDetails = NSView()
     private let backgroundSection = NSStackView()
@@ -78,6 +80,12 @@ final class CompositionInspector: NSView {
         // Artwork dragging updates positions only; selection controls keep their identity and focus.
         settings = value; mode.selectedIndex = value.mode == .transparent ? 0 : 1
     }
+    func restore(_ value: CompositionSettings) {
+        settings = value; mode.selectedIndex = value.mode == .transparent ? 0 : 1
+        devicePicker.selectedIndex = DisplayKind.allCases.firstIndex(of: value.display) ?? 0
+        formatPicker.selectedIndex = value.format == .png ? 0 : 1
+        stopBackgroundDrag(); rebuildDevice(); rebuildBackground(); rebuildExport()
+    }
     func chooseCanvas(_ value: CanvasRatio) { edit { $0.canvas = value }; rebuildBackground() }
     private func refreshArtwork() {
         artwork.load(display: settings.display) { [weak self] result in
@@ -108,6 +116,11 @@ final class CompositionInspector: NSView {
         let focusLabel = focused.flatMap { $0.isDescendant(of: host) ? $0.accessibilityLabel() : nil }
         host.subviews.forEach { $0.removeFromSuperview() }
         let content = FraloStyle.stack(views, spacing: 14, fillWidth: true)
+        func wire(_ view: NSView) {
+            if let row = view as? SliderRow { row.onEditingChanged = { [weak self] in self?.onContinuousEditing?($0) } }
+            view.subviews.forEach(wire)
+        }
+        wire(content)
         content.translatesAutoresizingMaskIntoConstraints = false; host.addSubview(content)
         NSLayoutConstraint.activate([content.leadingAnchor.constraint(equalTo: host.leadingAnchor), content.trailingAnchor.constraint(equalTo: host.trailingAnchor),
                                      content.topAnchor.constraint(equalTo: host.topAnchor), content.bottomAnchor.constraint(equalTo: host.bottomAnchor)])

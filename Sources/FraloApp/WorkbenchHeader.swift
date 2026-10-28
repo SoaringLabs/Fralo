@@ -14,6 +14,7 @@ private final class HeaderDocument: NSView {
         stack.translatesAutoresizingMaskIntoConstraints = false; addSubview(stack)
         NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: leadingAnchor), stack.trailingAnchor.constraint(equalTo: trailingAnchor),
                                      stack.centerYAnchor.constraint(equalTo: centerYAnchor)])
+        widthAnchor.constraint(equalToConstant: 220).isActive = true
         name.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor).isActive = true
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }

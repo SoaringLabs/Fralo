@@ -333,6 +333,11 @@ public final class CanvasSurface: NSView {
     public var zoom: CGFloat? { didSet { needsDisplay = true } }
     public override var isFlipped: Bool { true }
     public override var acceptsFirstResponder: Bool { true }
+    public var allowsPositioning = false { didSet { window?.invalidateCursorRects(for: self) } }
+    public override func resetCursorRects() {
+        super.resetCursorRects()
+        if allowsPositioning { addCursorRect(imageRect, cursor: .openHand) }
+    }
     public var onDrag: ((CGPoint) -> Void)?
     public var onDragEnd: (() -> Void)?
     public var centerGuideX = false { didSet { if oldValue != centerGuideX { updateGuides() } } }
@@ -403,7 +408,11 @@ public final class CanvasSurface: NSView {
         CATransaction.commit()
     }
     private var dragPoint: CGPoint?
-    public override func mouseDown(with event: NSEvent) { window?.makeFirstResponder(self); dragPoint = convert(event.locationInWindow, from: nil) }
+    private var positioningCursorPushed = false
+    public override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(self); dragPoint = convert(event.locationInWindow, from: nil)
+        if allowsPositioning && !positioningCursorPushed { NSCursor.closedHand.push(); positioningCursorPushed = true }
+    }
     public override func mouseDragged(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         if let previous = dragPoint, imageRect.width > 0, imageRect.height > 0 {
@@ -411,7 +420,10 @@ public final class CanvasSurface: NSView {
         }
         dragPoint = point
     }
-    public override func mouseUp(with event: NSEvent) { dragPoint = nil; onDragEnd?() }
+    public override func mouseUp(with event: NSEvent) {
+        if positioningCursorPushed { NSCursor.pop(); positioningCursorPushed = false }
+        dragPoint = nil; onDragEnd?()
+    }
     public var onPrevious: (() -> Void)?
     public var onNext: (() -> Void)?
     public var onEscape: (() -> Void)?
