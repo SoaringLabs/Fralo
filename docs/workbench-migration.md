@@ -195,3 +195,22 @@ the correctly named save panel and cancelling without changing the batch.
 Screenshots and launch/build records are in the chat's fralo-toolbar-groups
 preview folder. Older macOS, full VoiceOver speech, fullscreen and human visual
 acceptance remain unverified. No push, merge or release is included.
+
+
+## Notes toolbar spacing follow-up — 2026-10-28
+
+Opened Notes as requested and compared only its toolbar. The two-command cluster
+has approximately 44 pt between icon centers, versus approximately 36 pt in the
+previous Fralo segmented group. Fralo now uses adjacent toolbar-style NSButtons
+with 44 × 36 pt hit areas and system-managed shared glass. The internal segmented
+divider is gone, and each action retains independent target/enable/accessibility
+behavior. Inspector, More and the left-hand controls keep their prior spacing.
+
+All 27 Debug and 19 Release App tests passed after the final change. This scoped
+run covers native header wiring, isolated clipboard copy, empty output disabling,
+widths, collapse/inspector/preview state and focus. Live inspection confirms the
+new spacing in the light/default and dark/minimum windows; Export Current opens
+the correctly named save sheet and cancellation preserves the 11-input batch.
+Core/renderer/export implementation is unchanged, so the prior full-suite result
+remains historical rather than claimed as a new full run. The new preview remains
+open for user review; human visual acceptance and older-OS behavior are pending.

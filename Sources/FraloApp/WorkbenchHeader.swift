@@ -27,7 +27,6 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
     private let splitView: NSSplitView
     private let menu: NSMenu
     private let document = HeaderDocument()
-    private(set) var actions: NSToolbarItemGroup!
     private var sidebarHidden = false
 
     init(owner: MainWindowController, splitView: NSSplitView, menu: NSMenu, sidebarHidden: Bool) {
@@ -37,7 +36,7 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
         toolbar.delegate = self; toolbar.displayMode = .iconOnly; toolbar.allowsUserCustomization = false
     }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.init("add"), .space, .init("sidebar"), .init("sidebarBoundary"), .init("document"), .flexibleSpace, .init("workspaceActions"), .space, .init("inspector"), .space, .init("more")]
+        [.init("add"), .space, .init("sidebar"), .init("sidebarBoundary"), .init("document"), .flexibleSpace, .init("copyCurrent"), .init("exportCurrent"), .space, .init("inspector"), .space, .init("more")]
     }
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         toolbarAllowedItemIdentifiers(toolbar).filter { !sidebarHidden || $0.rawValue != "sidebarBoundary" }
@@ -51,16 +50,10 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
             item.label = "更多操作"; item.toolTip = "更多操作"; item.isBordered = true
             return item
         }
-        if id.rawValue == "workspaceActions" {
-            let images = [("doc.on.doc", "复制当前图片"), ("square.and.arrow.up", "导出当前图片")].map { NSImage(systemSymbolName: $0.0, accessibilityDescription: $0.1)! }
-            let group = NSToolbarItemGroup(itemIdentifier: id, images: images, selectionMode: .momentary,
-                                           labels: ["复制当前图片", "导出当前图片"], target: self, action: #selector(performWorkspaceAction(_:)))
-            group.label = "图片输出"; group.controlRepresentation = .expanded; group.isBordered = true
-            group.autovalidates = false
-            group.subitems.forEach { $0.autovalidates = false }
-            actions = group
-            return group
-        }
+        // Adjacent command items automatically share native glass, with normal button spacing.
+        // NSToolbarItemGroup is rendered as a tighter segmented control on the current OS.
+        if id.rawValue == "copyCurrent" { return outputItem("copyCurrent", symbol: "doc.on.doc", title: "复制当前图片", action: #selector(MainWindowController.copyCurrent(_:))) }
+        if id.rawValue == "exportCurrent" { return outputItem("exportCurrent", symbol: "square.and.arrow.up", title: "导出当前图片", action: #selector(MainWindowController.exportCurrent(_:))) }
         let item = NSToolbarItem(itemIdentifier: id); item.autovalidates = false
         switch id.rawValue {
         case "add":
@@ -80,10 +73,19 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
         }
         return item
     }
-    @objc private func performWorkspaceAction(_ sender: NSToolbarItemGroup) {
-        guard let owner else { return }
-        if sender.selectedIndex == 0 { owner.copyCurrent(sender) }
-        else if sender.selectedIndex == 1 { owner.exportCurrent(sender) }
+    private func outputItem(_ identifier: String, symbol: String, title: String, action: Selector) -> NSToolbarItem {
+        let item = NSToolbarItem(itemIdentifier: .init(identifier))
+        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: title)!
+        let button = NSButton(image: image, target: owner, action: action)
+        button.bezelStyle = .toolbar; button.setButtonType(.momentaryPushIn)
+        button.setAccessibilityLabel(title); button.toolTip = title
+        // Match the Notes two-action cluster: 44 pt between the icon centers.
+        button.widthAnchor.constraint(equalToConstant: 44).isActive = true
+        button.heightAnchor.constraint(equalToConstant: 36).isActive = true
+        item.view = button
+        item.label = title; item.toolTip = title; item.target = owner; item.action = action
+        item.isBordered = true; item.autovalidates = false
+        return item
     }
     func update(name: String, count: Int, sidebarHidden: Bool, inspectorVisible: Bool, canAdd: Bool, canCopy: Bool, canExport: Bool) {
         self.sidebarHidden = sidebarHidden
@@ -95,13 +97,7 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
         toolbar.items.first { $0.itemIdentifier.rawValue == "add" }?.isEnabled = canAdd
         let title = inspectorVisible ? "隐藏出图设置" : "显示出图设置"
         toolbar.items.first { $0.itemIdentifier.rawValue == "inspector" }?.toolTip = title
-        if let actions {
-            actions.subitems[0].isEnabled = canCopy
-            actions.subitems[1].isEnabled = canExport
-            if let control = actions.view as? NSSegmentedControl {
-                control.setEnabled(canCopy, forSegment: 0); control.setEnabled(canExport, forSegment: 1)
-                control.setToolTip("复制当前图片", forSegment: 0); control.setToolTip("导出当前图片", forSegment: 1)
-            }
-        }
+        toolbar.items.first { $0.itemIdentifier.rawValue == "copyCurrent" }?.isEnabled = canCopy
+        toolbar.items.first { $0.itemIdentifier.rawValue == "exportCurrent" }?.isEnabled = canExport
     }
 }

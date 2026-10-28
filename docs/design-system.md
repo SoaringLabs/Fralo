@@ -98,7 +98,7 @@ Changing appearance does not rerender artwork, rewrite composition/CLI settings 
 
 ## Column-aware native header
 
-The production header follows the window's column ownership. A full-height native `NSSplitViewController` sidebar and `NSTrackingSeparatorToolbarItem` align the left titlebar region with the sidebar divider. Add Images and the sidebar toggle stay in that region. The content region owns the current filename/count, a native momentary toolbar group for Copy/Export Current, an independent Inspector button, and `NSMenuToolbarItem` for More. Window chrome is transparent and has no full-width bottom separator. When the sidebar is hidden, its toolbar separator is removed while Add/Toggle remain reachable.
+The production header follows the window's column ownership. A full-height native `NSSplitViewController` sidebar and `NSTrackingSeparatorToolbarItem` align the left titlebar region with the sidebar divider. Add Images and the sidebar toggle stay in that region. The content region owns the current filename/count, adjacent native toolbar buttons for Copy/Export Current sharing a glass group, an independent Inspector button, and `NSMenuToolbarItem` for More. Window chrome is transparent and has no full-width bottom separator. When the sidebar is hidden, its toolbar separator is removed while Add/Toggle remain reachable.
 
 The previous full-width header and duplicate full-width sidebar Add action are superseded. Native toolbar items own titlebar sizing, hover, menus and hit areas; shared Fralo components continue to own the workbench controls. The right inspector remains 360 pt wide. Its production surface uses native visual-effect material instead of native glass hosting because the latter showed displaced content when a containing split pane moved. Radius, tint, shadow and accessibility fallbacks are retained. The explicit Debug compositor probe may still opt into glass.
 
@@ -109,3 +109,10 @@ a native output group; Inspector and More each have their own round native butto
 Fixed spaces keep Add and Sidebar independent too. Filename/count explicitly use
 `isBordered = false`. Build/preview scripts select the native SwiftPM backend to
 record the actual SDK and allow AppKit to render these shapes; see CONTRIBUTING.md.
+
+The output pair uses native toolbar-style NSButtons with 44 pt width and 36 pt
+height. This follows an observed Notes toolbar reference (approximately 44 pt
+between icon centers). Adjacent toolbar items merge into one system glass
+surface, without the divider or tighter spacing produced by NSToolbarItemGroup's
+segmented representation. Tooltip, accessibility label, enabled state and target
+action remain native and independent for each button.

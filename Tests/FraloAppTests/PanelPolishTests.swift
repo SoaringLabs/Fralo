@@ -17,32 +17,35 @@ final class PanelPolishTests: XCTestCase {
         let root = try XCTUnwrap(window.contentView as? WorkbenchView), toolbar = try XCTUnwrap(window.toolbar)
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
         let inspector = try XCTUnwrap(root.right.body as? CompositionInspector)
-        let actions = try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "workspaceActions" } as? NSToolbarItemGroup)
+        let actions = try ["copyCurrent", "exportCurrent"].map { id in
+            try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == id })
+        }
         let more = try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "more" } as? NSMenuToolbarItem)
         let inspectorAction = try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "inspector" })
         func toggleInspector() { NSApp.sendAction(try! XCTUnwrap(inspectorAction.action), to: inspectorAction.target, from: inspectorAction) }
-        func copyCurrent() { actions.selectedIndex = 0; NSApp.sendAction(try! XCTUnwrap(actions.action), to: actions.target, from: actions) }
+        func copyCurrent() { let item = actions[0]; NSApp.sendAction(try! XCTUnwrap(item.action), to: item.target, from: item) }
         XCTAssertEqual(Array(toolbar.items.prefix(5).map { $0.itemIdentifier }), [.init("add"), .space, .init("sidebar"), .init("sidebarBoundary"), .init("document")])
-        XCTAssertEqual(actions.selectionMode, .momentary)
-        XCTAssertEqual(actions.subitems.map(\.label), ["复制当前图片", "导出当前图片"])
-        XCTAssertFalse(actions.subitems[1].isEnabled)
+        XCTAssertEqual(actions.map(\.action), [#selector(MainWindowController.copyCurrent(_:)), #selector(MainWindowController.exportCurrent(_:))])
+        XCTAssertTrue(actions.allSatisfy { $0.target === controller && $0.isBordered })
+        XCTAssertEqual(actions.map(\.label), ["复制当前图片", "导出当前图片"])
+        XCTAssertFalse(actions[1].isEnabled)
         XCTAssertEqual(inspectorAction.action, #selector(MainWindowController.toggleInspector(_:)))
         XCTAssertFalse(try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "document" }).isBordered)
-        XCTAssertEqual(Array(toolbar.items.suffix(5).map(\.itemIdentifier)), [.init("workspaceActions"), .space, .init("inspector"), .space, .init("more")])
+        XCTAssertEqual(Array(toolbar.items.suffix(6).map(\.itemIdentifier)), [.init("copyCurrent"), .init("exportCurrent"), .space, .init("inspector"), .space, .init("more")])
         XCTAssertEqual(more.menu.items.filter { !$0.isSeparatorItem }.map(\.title), ["导入文件夹…", "粘贴图片", "移除当前图片", "清空批次", "应用设置…"])
         for size in [NSSize(width: 1030, height: 640), NSSize(width: 1400, height: 1000), NSSize(width: 1900, height: 1000)] {
             window.setContentSize(size); root.layoutSubtreeIfNeeded()
             XCTAssertEqual(root.right.bounds.width, 360, accuracy: 0.1)
             XCTAssertGreaterThan(root.content.bounds.width, 300)
         }
-        XCTAssertEqual(inspectorAction.toolTip, "隐藏出图设置"); XCTAssertFalse(actions.subitems[0].isEnabled)
+        XCTAssertEqual(inspectorAction.toolTip, "隐藏出图设置"); XCTAssertFalse(actions[0].isEnabled)
         let context = try XCTUnwrap(CGContext(data: nil, width: 300, height: 600, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.setFillColor(CGColor(srgbRed: 0.1, green: 0.6, blue: 0.3, alpha: 1)); context.fill(CGRect(x: 0, y: 0, width: 300, height: 600))
         let input = directory.appendingPathComponent("input.png"); try FrameRenderer.pngData(XCTUnwrap(context.makeImage())).write(to: input)
         controller.importURLs([input])
         let canvas = try XCTUnwrap(descendants(root.content).compactMap { $0 as? CanvasSurface }.first)
         for _ in 0..<150 where canvas.image == nil { try await Task.sleep(nanoseconds: 20_000_000) }
-        XCTAssertTrue(actions.subitems[0].isEnabled); XCTAssertTrue(actions.subitems[1].isEnabled)
+        XCTAssertTrue(actions[0].isEnabled); XCTAssertTrue(actions[1].isEnabled)
         let image = try XCTUnwrap(canvas.image), list = try XCTUnwrap(root.left.body as? BatchList)
         inspector.mode.choose(1)
         for _ in 0..<150 where canvas.image === image { try await Task.sleep(nanoseconds: 20_000_000) }
