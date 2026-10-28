@@ -9,8 +9,37 @@ public struct RenderedComposition {
     public let pixelSize: CGSize
     /// A stable fit-to-window envelope, independent of the selected shadow's export padding.
     public let previewReferenceSize: CGSize
+    public var previewLayers: CompositionPreviewLayers?
     init(image: CGImage, pixelSize: CGSize, previewReferenceSize: CGSize? = nil) {
         self.image = image; self.pixelSize = pixelSize; self.previewReferenceSize = previewReferenceSize ?? pixelSize
+    }
+}
+
+/// Immutable raster assets and logical geometry reused throughout a positioning gesture.
+public struct CompositionPreviewLayers {
+    public let background: CGImage
+    public let device: CGImage
+    public let backgroundOpacity: CGFloat
+    public let canvasSize: CGSize
+    private let initialDeviceRect: CGRect
+    private let initialBackgroundRect: CGRect
+    private let initialPosition: CGPoint
+    private let initialBackgroundPosition: CGPoint
+
+    init(background: CGImage, device: CGImage, backgroundOpacity: CGFloat, canvasSize: CGSize,
+         deviceRect: CGRect, backgroundRect: CGRect, settings: CompositionSettings) {
+        self.background = background; self.device = device; self.backgroundOpacity = backgroundOpacity
+        self.canvasSize = canvasSize; initialDeviceRect = deviceRect; initialBackgroundRect = backgroundRect
+        initialPosition = CGPoint(x: settings.deviceX, y: settings.deviceY)
+        initialBackgroundPosition = CGPoint(x: settings.backgroundX, y: settings.backgroundY)
+    }
+    public func deviceRect(settings: CompositionSettings) -> CGRect {
+        initialDeviceRect.offsetBy(dx: (settings.deviceX - initialPosition.x) * canvasSize.width,
+                                   dy: (settings.deviceY - initialPosition.y) * canvasSize.height)
+    }
+    public func backgroundRect(settings: CompositionSettings) -> CGRect {
+        initialBackgroundRect.offsetBy(dx: (settings.backgroundX - initialBackgroundPosition.x) * (initialBackgroundRect.width - canvasSize.width) / 2,
+                                       dy: (settings.backgroundY - initialBackgroundPosition.y) * (initialBackgroundRect.height - canvasSize.height) / 2)
     }
 }
 
@@ -36,7 +65,7 @@ public enum CompositionRenderer {
         return try Data(contentsOf: url)
     }
 
-    public static func render(_ input: ImageInput, settings: CompositionSettings, backgroundData: Data? = nil, maxDimension: Int? = nil) throws -> RenderedComposition {
+    public static func render(_ input: ImageInput, settings: CompositionSettings, backgroundData: Data? = nil, maxDimension: Int? = nil, preparePreviewLayers: Bool = false) throws -> RenderedComposition {
         let settings = try settings.validated()
         let limit = settings.mode == .background ? min(maxDimension ?? 2400, 2400) : maxDimension
         let device: CGImage
@@ -55,6 +84,9 @@ public enum CompositionRenderer {
         let reduction = maxDimension.map { min(1, CGFloat($0) / max(size.width, size.height)) } ?? 1
         let context = try bitmap(CGSize(width: ceil(size.width * reduction), height: ceil(size.height * reduction)))
         context.scaleBy(x: reduction, y: reduction)
+        var previewBackground: CGImage?
+        var previewBackgroundRect = CGRect(origin: .zero, size: size)
+        var previewBackgroundOpacity: CGFloat = 1
         if settings.mode == .background {
             context.saveGState(); context.setAlpha(settings.backgroundOpacity)
             switch settings.background {
@@ -72,8 +104,10 @@ public enum CompositionRenderer {
                                   y: (size.height - imageSize.height) / 2 + CGFloat(settings.backgroundY) * (imageSize.height - size.height) / 2,
                                   width: imageSize.width, height: imageSize.height)
                 draw(image, in: rect, context: context)
+                if preparePreviewLayers { previewBackground = image; previewBackgroundRect = rect; previewBackgroundOpacity = settings.backgroundOpacity }
             }
             context.restoreGState()
+            if preparePreviewLayers, previewBackground == nil { previewBackground = context.makeImage() }
         }
         let rect: CGRect
         if settings.mode == .background {
@@ -87,7 +121,21 @@ public enum CompositionRenderer {
         guard let image = context.makeImage() else { throw FraloError.message("无法合成成品。") }
         let maximumMargin = ceil(strongestShadowBlur * 3 + shadowOffsetY)
         let reference = settings.mode == .background ? size : CGSize(width: nativeSize.width + maximumMargin * 2, height: nativeSize.height + maximumMargin * 2)
-        return RenderedComposition(image: image, pixelSize: size, previewReferenceSize: reference)
+        var result = RenderedComposition(image: image, pixelSize: size, previewReferenceSize: reference)
+        if preparePreviewLayers, let background = previewBackground {
+            // Rasterize the shadow at composition scale once, rather than on every pointer event.
+            let spriteSize = CGSize(width: ceil(rect.width + margin * 2), height: ceil(rect.height + margin * 2))
+            let sprite = try bitmap(spriteSize)
+            sprite.setAlpha(settings.deviceOpacity)
+            if blur > 0 { sprite.setShadow(offset: CGSize(width: 0, height: shadowOffset), blur: blur, color: CGColor(srgbRed: 0, green: 0, blue: 0, alpha: settings.shadow == .strong ? 0.4 : 0.23)) }
+            draw(device, in: CGRect(x: margin, y: margin, width: rect.width, height: rect.height), context: sprite)
+            guard let spriteImage = sprite.makeImage() else { throw FraloError.message("无法创建拖动预览。") }
+            result.previewLayers = CompositionPreviewLayers(background: background, device: spriteImage,
+                backgroundOpacity: previewBackgroundOpacity, canvasSize: size,
+                deviceRect: CGRect(origin: CGPoint(x: rect.minX - margin, y: rect.minY - margin), size: spriteSize),
+                backgroundRect: previewBackgroundRect, settings: settings)
+        }
+        return result
     }
 
     public static func panBackground(_ settings: inout CompositionSettings, delta: CGPoint, imageSize: CGSize) {

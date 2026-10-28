@@ -35,7 +35,9 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private var header: WorkbenchHeader!
     private var rendered: RenderedComposition?
     private var renderedID: String?
-    private var previewRequest = 0, thumbnailRequest = 0
+    private(set) var previewRequest = 0
+    private var thumbnailRequest = 0
+    private var positioningLayers: CompositionPreviewLayers?
     private var renderWork: DispatchWorkItem?
     private var previewToken = CancellationToken()
     private let renderQueue = DispatchQueue(label: "app.fralo.preview", qos: .userInitiated)
@@ -166,11 +168,18 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             self.canvas.centerGuideX = false; self.canvas.centerGuideY = false; self.dragDevicePosition = nil
             guard self.artworkDragChanged else { return }; self.artworkDragChanged = false
             do { try self.store.save(self.settings) } catch { self.showError(error.localizedDescription) }
+            self.requestPreview(preservePositioning: true)
         }
         return inspectorUI
     }
     private func dragArtwork(_ delta: CGPoint) {
         guard settings.mode == .background, !isExporting else { return }
+        if !artworkDragChanged {
+            // Invalidate any pending final image before the first live transform.
+            previewRequest += 1; renderWork?.cancel(); previewToken.cancel()
+            rendered = nil; renderedID = nil
+            inspectorUI.showOutputSize(nil); viewing.finishPreviewUpdate(); updateActions()
+        }
         artworkDragChanged = true
         if inspectorUI.dragBackground {
             if let backgroundImageSize { CompositionRenderer.panBackground(&settings, delta: delta, imageSize: backgroundImageSize) }
@@ -183,7 +192,9 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             canvas.centerGuideX = settings.deviceX == 0; canvas.centerGuideY = settings.deviceY == 0
         }
         inspectorUI.set(settings)
-        requestPreview()
+        if let layers = positioningLayers {
+            canvas.positionArtwork(deviceRect: layers.deviceRect(settings: settings), backgroundRect: layers.backgroundRect(settings: settings))
+        }
     }
 
     private func moreMenu() -> NSMenu {
@@ -343,7 +354,12 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             }
         }
     }
-    private func requestPreview() {
+    private func requestPreview(preservePositioning: Bool = false) {
+        if !preservePositioning {
+            artworkDragChanged = false; dragDevicePosition = nil; positioningLayers = nil
+            canvas.finishPositioningArtwork(discard: true)
+            canvas.centerGuideX = false; canvas.centerGuideY = false
+        }
         previewRequest += 1; renderWork?.cancel(); rendered = nil; renderedID = nil
         previewToken.cancel(); let token = CancellationToken(); previewToken = token
         inspectorUI.showOutputSize(nil)
@@ -362,9 +378,10 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             guard !token.isCancelled else { return }
             let result = autoreleasepool { Result { () -> (RenderedComposition, CGImage, CGSize, CGSize?, Int?) in
                 let backdrop = try CompositionRenderer.backgroundData(snapshot)
-                let frame = try CompositionRenderer.render(input, settings: snapshot, backgroundData: backdrop)
+                let frame = try CompositionRenderer.render(input, settings: snapshot, backgroundData: backdrop, preparePreviewLayers: true)
                 guard !token.isCancelled else { throw CancellationError() }
                 let encoded = snapshot.format == .jpeg || !snapshot.pngLossless ? try CompositionRenderer.data(frame.image, settings: snapshot) : nil
+                guard !token.isCancelled else { throw CancellationError() }
                 let display = try encoded.map { try ImageInput(data: $0, name: "preview").decode() } ?? frame.image
                 return (frame, display, try input.dimensions(), try backdrop.map { try ImageInput(data: $0, name: "background.png").dimensions() }, encoded?.count)
             } }
@@ -381,6 +398,12 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
                         self.dimensions.toolTip = "原始图片：" + self.inspectorUI.sourceInfo.stringValue
                         self.inspectorUI.outputInfo.stringValue = "\(snapshot.format == .png ? "PNG" : "JPEG") · \(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height))"
                         self.inspectorUI.showOutputSize(byteCount)
+                        self.positioningLayers = frame.previewLayers
+                        self.canvas.finishPositioningArtwork(discard: true)
+                        if let layers = frame.previewLayers {
+                            self.canvas.prepareArtwork(background: layers.background, device: layers.device,
+                                backgroundOpacity: layers.backgroundOpacity, canvasSize: layers.canvasSize)
+                        }
                         self.rendered = frame; self.renderedID = input.id; self.canvas.image = NSImage(cgImage: display, size: frame.pixelSize)
                         self.canvas.setAccessibilityLabel("成品画布，" + input.name)
                         self.canvas.showsElevation = snapshot.mode == .background
@@ -388,6 +411,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
                         self.dimensions.stringValue = "\(snapshot.format == .png ? "PNG" : "JPEG") · \(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height))"
                         self.empty.isHidden = true; self.layoutPreview()
                     case .failure(let error):
+                        self.positioningLayers = nil; self.canvas.finishPositioningArtwork(discard: true)
                         self.canvas.image = nil; self.empty.isHidden = false; self.emptyMessage.stringValue = "无法生成成品"
                         self.emptyAction.title = "重试预览"; self.emptyAction.onPress = { [weak self] in self?.scheduleThumbnails(); self?.requestPreview() }
                         self.emptyDetail.stringValue = error.localizedDescription

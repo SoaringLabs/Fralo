@@ -27,6 +27,27 @@ final class CompositionTests: XCTestCase {
         context.fill(CGRect(origin: .zero, size: size))
         return ImageInput(data: try FrameRenderer.pngData(XCTUnwrap(context.makeImage())), name: "solid.png")
     }
+    func testPreviewLayersKeepOffCanvasContentAndDoNotChangeFinalPixels() throws {
+        let source = try input()
+        for background in [BackgroundKind.solid, .gradient, .sage] {
+            var settings = CompositionSettings(); settings.mode = .background; settings.background = background
+            settings.deviceX = 0.9; settings.deviceY = -0.7; settings.backgroundScale = 2
+            settings.deviceOpacity = 0.6; settings.backgroundOpacity = 0.5; settings.backgroundShadow = .strong
+            let plain = try CompositionRenderer.render(source, settings: settings)
+            let prepared = try CompositionRenderer.render(source, settings: settings, preparePreviewLayers: true)
+            XCTAssertEqual(try FrameRenderer.pngData(plain.image), try FrameRenderer.pngData(prepared.image))
+            let layers = try XCTUnwrap(prepared.previewLayers)
+            let initial = layers.deviceRect(settings: settings)
+            XCTAssertEqual(Int(initial.width), layers.device.width)
+            XCTAssertEqual(Int(initial.height), layers.device.height)
+            settings.deviceX = -0.2; settings.deviceY = 0.3; settings.backgroundX = 0.4
+            let moved = layers.deviceRect(settings: settings)
+            XCTAssertEqual(moved.minX - initial.minX, -1.1 * settings.canvas.size.width, accuracy: 0.0001)
+            XCTAssertEqual(moved.minY - initial.minY, settings.canvas.size.height, accuracy: 0.0001)
+            if background == .sage { XCTAssertGreaterThan(layers.backgroundRect(settings: settings).width, settings.canvas.size.width) }
+        }
+    }
+
     func testFixedDeviceSizesAndSilhouettesIgnoreSourceResolutionAndAspectRatio() throws {
         let sources = try [CGSize(width: 40, height: 10), CGSize(width: 1600, height: 400), CGSize(width: 100, height: 240), CGSize(width: 80, height: 80)].map(solidInput)
         for display in DisplayKind.allCases {

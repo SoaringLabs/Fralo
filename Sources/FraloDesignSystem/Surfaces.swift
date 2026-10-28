@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 
 @MainActor
 public final class MaterialSurface: NSView {
@@ -334,8 +335,73 @@ public final class CanvasSurface: NSView {
     public override var acceptsFirstResponder: Bool { true }
     public var onDrag: ((CGPoint) -> Void)?
     public var onDragEnd: (() -> Void)?
-    public var centerGuideX = false { didSet { needsDisplay = true } }
-    public var centerGuideY = false { didSet { needsDisplay = true } }
+    public var centerGuideX = false { didSet { if oldValue != centerGuideX { updateGuides() } } }
+    public var centerGuideY = false { didSet { if oldValue != centerGuideY { updateGuides() } } }
+    public private(set) var isPositioningArtwork = false
+    public private(set) var positionedDeviceRect = CGRect.zero
+    private let artworkClip = CALayer(), backgroundArtwork = CALayer(), deviceArtwork = CALayer()
+    private let artworkGuides = CAShapeLayer()
+    private var artworkCanvasSize = CGSize.zero
+    private var positionedBackgroundRect = CGRect.zero
+
+    public func prepareArtwork(background: CGImage, device: CGImage, backgroundOpacity: CGFloat, canvasSize: CGSize) {
+        wantsLayer = true
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        if artworkClip.superlayer == nil {
+            artworkClip.masksToBounds = true; artworkClip.isGeometryFlipped = true
+            artworkClip.addSublayer(backgroundArtwork); artworkClip.addSublayer(deviceArtwork); artworkClip.addSublayer(artworkGuides)
+            layer?.addSublayer(artworkClip)
+            artworkGuides.fillColor = nil; artworkGuides.lineWidth = 1
+        }
+        artworkCanvasSize = canvasSize
+        backgroundArtwork.contents = background; backgroundArtwork.opacity = Float(backgroundOpacity)
+        deviceArtwork.contents = device
+        artworkClip.isHidden = true
+        CATransaction.commit()
+    }
+    /// Position existing textures. No decoding, drawing, encoding or implicit animation.
+    public func positionArtwork(deviceRect: CGRect, backgroundRect: CGRect) {
+        guard artworkCanvasSize.width > 0, deviceArtwork.contents != nil else { return }
+        let starting = !isPositioningArtwork
+        isPositioningArtwork = true; positionedDeviceRect = deviceRect; positionedBackgroundRect = backgroundRect
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        artworkClip.isHidden = false
+        layoutArtwork()
+        CATransaction.commit()
+        if starting { needsDisplay = true }
+    }
+    public func finishPositioningArtwork(discard: Bool = false) {
+        isPositioningArtwork = false
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        artworkClip.isHidden = true
+        if discard { backgroundArtwork.contents = nil; deviceArtwork.contents = nil; artworkCanvasSize = .zero }
+        CATransaction.commit()
+        needsDisplay = true
+    }
+    public override func layout() {
+        super.layout()
+        if isPositioningArtwork {
+            CATransaction.begin(); CATransaction.setDisableActions(true); layoutArtwork(); CATransaction.commit()
+        }
+    }
+    private func layoutArtwork() {
+        let rect = imageRect
+        artworkClip.frame = rect
+        let sx = rect.width / artworkCanvasSize.width, sy = rect.height / artworkCanvasSize.height
+        func scaled(_ r: CGRect) -> CGRect { CGRect(x: r.minX * sx, y: r.minY * sy, width: r.width * sx, height: r.height * sy) }
+        backgroundArtwork.frame = scaled(positionedBackgroundRect); deviceArtwork.frame = scaled(positionedDeviceRect)
+        artworkGuides.frame = artworkClip.bounds
+        updateGuides()
+    }
+    private func updateGuides() {
+        guard isPositioningArtwork else { needsDisplay = true; return }
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        let rect = artworkClip.bounds, path = CGMutablePath()
+        if centerGuideX { path.move(to: CGPoint(x: rect.midX, y: 0)); path.addLine(to: CGPoint(x: rect.midX, y: rect.height)) }
+        if centerGuideY { path.move(to: CGPoint(x: 0, y: rect.midY)); path.addLine(to: CGPoint(x: rect.width, y: rect.midY)) }
+        artworkGuides.path = path; artworkGuides.strokeColor = NSColor.controlAccentColor.withAlphaComponent(0.6).cgColor
+        CATransaction.commit()
+    }
     private var dragPoint: CGPoint?
     public override func mouseDown(with event: NSEvent) { window?.makeFirstResponder(self); dragPoint = convert(event.locationInWindow, from: nil) }
     public override func mouseDragged(with event: NSEvent) {
@@ -387,14 +453,16 @@ public final class CanvasSurface: NSView {
                 y += tile; row += 1
             }
         }
-        image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true,
-                   hints: [.interpolation: NSImageInterpolation.high])
+        if !isPositioningArtwork {
+            image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true,
+                       hints: [.interpolation: NSImageInterpolation.high])
+        }
         NSGraphicsContext.restoreGraphicsState()
         if showsElevation {
             NSColor.black.withAlphaComponent(0.09).setStroke()
             let border = NSBezierPath(rect: rect); border.lineWidth = 0.5; border.stroke()
         }
-        if centerGuideX || centerGuideY {
+        if !isPositioningArtwork && (centerGuideX || centerGuideY) {
             NSColor.controlAccentColor.withAlphaComponent(0.6).setStroke()
             let path = NSBezierPath(); path.lineWidth = 1
             if centerGuideX { path.move(to: NSPoint(x: rect.midX, y: rect.minY)); path.line(to: NSPoint(x: rect.midX, y: rect.maxY)) }
