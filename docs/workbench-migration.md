@@ -1,0 +1,314 @@
+# Production workbench migration — FRALO-6
+
+Design basis: the selected FRALO-5 native lab and the approved 2026-10-26 design specification. The user authorized creating and implementing this task; merge and release remain separate.
+
+## Delivery stages
+
+1. Real workbench: shared material surfaces, aligned floating panels, expanding source viewport, compact rail, shared actions and independent artwork. Connect real import, append, remove, clear, preview, copy and batch output. Keep native menus and file dialogs.
+2. Composition: one phone and one tablet, Safari/Chrome, transparent/background modes, complete source containment, canvas ratios, independent device/background scale/opacity/position, shadows and preset/local backgrounds. No content inference or corrective crop.
+3. Output: PNG/JPEG and explicit JPEG fill, unified preview/export/copy, stable export-all action, snapshot/cancellation/partial failure/source protection, old settings and CLI compatibility, local native review and Release isolation.
+
+## Current evidence
+
+Stage 1 is implemented. The production window composes `FloatingPanel`, `BatchList`, `CollapsedRail`, `CanvasSurface`, `ViewToolbar`, `ActionButton` and `ValuePicker` directly. The source list shows source thumbnails. Refreshing entries preserves selection without re-emitting an edit; this avoids repeated preview requests when thumbnails arrive. Delete continues through the shared native list. The existing business renderer/output are still the legacy implementation at this checkpoint.
+
+All 37 Debug tests passed, including an actual production-window test that imports two distinct source files, deduplicates identity, waits for real rendering, collapses the sidebar without changing artwork, checks two window sizes, removes/clears the batch and verifies original bytes/settings preservation. No constraint diagnostics appeared. Live native inspection and the later composition/output stages remain outstanding; this is not a claim that the complete migration is finished.
+
+FRALO-5 foundations were locally cherry-picked into this base-derived task branch to reuse the exact shared implementation. The source worktree remains intact. FRALO-4 was not merged. No push, PR, merge or release performed.
+
+## Composition and output now connected
+
+The production inspector has device/background/export pages and a shared mode selector. Phone, tablet and Safari/Chrome shells use the same deterministic composition route for preview, export and copy. A single source is completely contained in the chosen screen; the GUI no longer rejects aspect mismatch or crops to fill. Necessary shell corner/camera masks remain. Shell artwork is original; the tablet/browser drawings are first-version appearances, not claims of pixel-exact hardware reproduction.
+
+Transparent mode has tight device bounds, optional shadow extent and no manual padding/canvas controls. Background mode offers device scale/position/opacity, independent background scale/pan/opacity, center snapping with editing-only guides, five canvas ratios, three shadow levels and three built-in layout combinations. Backgrounds include solid, gradient, three generated neutral images and local PNG/JPEG. Image-background panning is bounded by actual overflow so it cannot reveal an accidental empty border. Returning to the device page resets the background drag target. Small device-drag deltas accumulate before snapping; positions persist on gesture completion.
+
+Canvas output presets are 2400×2400, 2400×1800, 2400×1350, 1800×2400 and 1350×2400 for 1:1, 4:3, 16:9, 3:4 and 9:16. Browser window ratios are independent of the output canvas. Transparent output follows source pixel density and shell geometry; viewing reduction preserves the full output dimensions.
+
+JPEG preview uses the same encoded JPEG/fill settings as output. Copy uses the unflattened composition as PNG even when JPEG is selected. Export-all stays the primary action, with current-image export in the adjacent native menu. Export snapshots composition values and background bytes before processing; source protection, collision policy, cancellation and per-image failure handling reuse `BatchExporter`. Error recovery clears stale failure state and has an explicit retry action.
+
+GUI preferences use a separate `settings.workbench.json` beside the existing settings path. Initial migration inherits the old orientation; GUI choices intentionally converge to one phone and tight transparent bounds. The old CLI configuration, six model identifiers and old crop/mismatch contract remain unchanged. New GUI options are not silently added to CLI parsing. Legacy reports omit the optional composition field; GUI reports include its snapshot.
+
+## Verification and handoff
+
+- 45 Debug tests and 39 Release tests passed (14 shared controls, 18 Core, 13/7 application tests). The six new composition tests exercise all shell kinds/directions, both browser styles, three browser ratios, five canvas ratios, source-edge preservation, shadow extent, independent alpha, JPEG fill, source protection, skip/cancel/failure, migration and reduced preview dimensions. Three production-window tests cover real batches, shared geometry, incremental drag escape from snapping, drag-target reset, failure/retry recovery and exact PNG clipboard bytes under JPEG settings. Clipboard tests use an isolated pasteboard.
+- The existing ten CLI integration checks passed on the packaged binary, using generated inputs and isolated configuration.
+- The retained lab probe passed all 22 checks and produced 13 captures. Debug/Release symbol isolation, package/executable identity, production background checksums and exclusion of Dev screenshot fixtures passed. Production backgrounds are intentionally packaged separately from the lab fixtures.
+- Native CUA inspection covered the real phone/browser workbench, independent canvas, local background file selection, keyboard Down changing the current input, clean preview and Escape recovery. Real file panels exported all three sample images as PNG and JPEG: each batch succeeded 3/3 at 2400×1800. PNG files expose alpha; JPEG files do not. This is actual app output, not gallery simulation.
+- Final code review found and repaired sticky center snapping, stale failure marks after recovery, and hidden background-drag targeting. Native export evidence preceded the later clipboard injection/gesture/error-state fixes; the reviewed delta does not change composition/encoding/export execution. Final tests and package/probe checks cover that delta. Final preview is rebuilt from the committed source.
+
+Run `scripts/run-workbench-preview.sh /absolute/input.png` for an isolated Debug trial. It uses a separate bundle identity, temporary settings, the real production controller, production background resources and the Debug lab menu. It skips updater initialization in this preview only. The installed application is not replaced.
+
+Human acceptance of the complete workbench styling/motion and a full VoiceOver traversal remains pending. The tested OS is the local Apple Silicon machine; macOS 14 runtime and alternate desktops/system accessibility transitions have not been established. The migration has not been pushed, merged or released. These limits do not redefine the remaining acceptance as complete.
+
+
+## Workspace translucency correction
+
+The first production window still had AppKit's opaque-window declaration and a fully opaque background color. The window-level regression test failed for both values. Disabling `isOpaque` alone still failed the background-alpha check; setting the window's base color to clear made it pass. The window alpha remains 1, and the original semantic behind-window workspace material is retained. Artwork/controls are not faded to achieve the effect. Reduced-transparency fallback remains covered.
+
+A Debug-only native backdrop probe provides a red/blue field behind the real workbench and an opaque-reference toggle. It is enabled only by `--workspace-material-check`, with optional `--workspace-material-report=/absolute/path.json` for public AppKit state metadata. Its controls, temporary backdrop and state writer are absent from Release. Temporary material/state/clipping selectors used during diagnosis were removed; they did not become stable defaults.
+
+The user directly observed red/blue transmission when the window was focused and a more opaque appearance on focus loss. This matches the retained `followsWindowActiveState` policy; the user was told this native behavior is the default. Diagnostic window screenshots looked considerably flatter than that direct observation, so they do not independently prove desktop transmission. No global accessibility setting was changed. The test backdrop is stopped before the normal preview handoff; the user's composition configuration is retained.
+
+Apple's state contract: https://developer.apple.com/documentation/appkit/nsvisualeffectview/state-swift.enum . Material appearance follows window activity unless explicitly forced active/inactive; opacity strength itself is supplied by the system material recipe.
+# Reference-image calibration (2026-10-27)
+
+The supplied approved mock (`exec-b907247d-57e2-4c7e-aa43-be366eac941d.png`) is the visual target for this pass. Comparison uses the same Safari / background mode / 16:10 shell / 4:3 output / 74% device / soft shadow state. User screenshot 2 instead used transparent iPad mode and a portrait source; that content/state difference is kept separate from UI drift.
+
+Changes consolidate responsive panel widths/insets, same-height elevated panels, full-width mode/action groups, softly styled popups and rectangular parameter choices, icon navigation without a boxed form, larger contained thumbnails and restrained selection, a centred document title and concise toolbar actions, and a floating viewing toolbar with actual canvas-ratio editing. Persistent controls stay outside scrolling forms. Source image containment, composition/export pixels and the default native workspace effect remain unchanged.
+
+Native reference captures use the Debug-only `--preview-window=1400x876` flag with `--workbench-preview` (the full-size-content window includes its titlebar in this geometry). It neither changes installed-app settings nor enters Release. Reference density and generated-mock aspect inconsistencies are normalized before judging fidelity; real output rectangles preserve their exact ratio rather than stretching to match a generated illustration.
+
+Full comparison history, native captures and focused comparisons are retained outside the checkout in the local `fralo-ui-fidelity/` acceptance bundle (its full path is recorded in the private task receipt). Its `design-qa.md` records the observed result and residual differences. Desktop blur/tint varies with backdrop, focus and OS; a screenshot alone cannot prove the desktop composite. Human preference review remains separate from automated checks.
+
+## Glass inspector reference follow-up
+
+The user rejected the previous visual refinement as insufficient and supplied a dark native glass inspector as the new panel/control reference. The user explicitly retained workspace material opacity 100% and overlay 0%; the reference's stronger blue/purple desktop transmission is not adopted. The device/source content, available models and image-handling contract remain unchanged.
+
+The follow-up replaces the panel recipe with native glass where supported, moves foreground content into the correct glass content host, tightens typography and shared control density, and introduces actual rendered thumbnail choices for device orientation, Safari/Chrome and neutral background presets. The fixed one-model phone/tablet row stays neutral; genuine alternatives use fine accent outlines and selected checkmarks. A current-input thumbnail cache runs outside the main thread and invalidates stale work even when returning to a cached input. Rebuilding direction controls preserves parameter focus. The production window offers system/light/dark application appearance without changing OS settings, saved composition or output pixels.
+
+Transparent-shell editing no longer paints an obtrusive checkerboard rectangle behind the device. This is viewing chrome only; export alpha and geometry are unchanged. Background mode still displays the exact output rectangle and ratio. Both expanded panels retain aligned full-height bounds, independent scrolling, persistent tabs and export actions. The reference's extra device/color/orientation options are not simulated as product capabilities.
+
+The new local evidence bundle is named `fralo-glass-inspector`. Native captures, source/build provenance, comparison notes and refreshed checks are recorded there. Automated checks establish behavior and build isolation; they do not establish user acceptance or a pixel match to the reference. The darker reference also uses different source artwork and a colored desktop, which are not substituted into the user's upload or system wallpaper.
+
+## Light appearance and a separate settings window
+
+The user requested a light version and an independent settings window with at least light/dark switching. The new **Fralo 设置** window exposes system/light/dark cards through the shared design system, reachable from the toolbar gear, app menu or Command-comma. A single typed appearance value keeps the workbench, settings window and quick menu selections synchronized. Changes save immediately through the existing preference key and restore on relaunch. The setting affects product window chrome; composition values, source bytes and existing artwork remain unchanged.
+
+Targeted actual-controller tests cover settings selection in both directions, system inheritance, menu consistency, window close/reopen reuse, persisted relaunch, ignored invalid values, nonpersistent preview overrides, byte-identical composition/source files and retained artwork identity. Native light/dark screenshots and final build evidence are retained in the local `fralo-appearance-settings` bundle. A settings-window focus halo found in native review was removed while retaining its selected-card outline and keyboard behavior. The intermittent panel-edge investigation remains deferred at the user's explicit request and is not reopened by this appearance work.
+
+## Rounded render-boundary correction
+
+The user later supplied a camera photo showing an unrounded dark perimeter outside the bottom viewing toolbar, reopening the panel-edge investigation. The toolbar shares `MaterialSurface` with both floating panels. Public AppKit state showed the configured radius remained correct after hosting, and earlier event traces confirmed interactive glass was disabled during the user's B trial. The bottom toolbar has no added panel shadow, so disabling that shadow cannot address this example.
+
+The native-glass branch had explicitly disabled backing-layer masking. The shared surface now enforces both AppKit clipping and rounded layer masking, retaining the existing radius, material, foreground and workspace 100% / 0% recipe. A modeled effect-child perimeter test fails on the old container with 2288 outside pixels plus square-corner paint and passes after the correction with zero outside pixels, transparent corners and retained foreground content across light/dark/light. It uses public test layers to exercise the clipping seam; the original transient GPU/compositor frame has not been automatically reproduced. The local `fralo-rounded-boundary` bundle retains the supplied photo, red/green checks and native candidate evidence. Physical confirmation that the intermittent flash is completely gone remains separate.
+
+
+## Panel review follow-up (2026-10-27)
+
+The user authorized the screenshot audit's recommendations. The production workbench now uses a stable semantic panel backing and fine boundary across focus states; native glass on the panel remains static instead of reacting as a single large control. The workspace's existing behind-window material, active-state policy and rounded render clipping remain intact.
+
+The expanded image list uses separate, spaced thumbnail cards without inline filenames. Full filenames remain in hover/accessibility labels and the centered document title, which is width-limited for long names. Collapsing leaves an 80pt thumbnail rail connected to the same real batch, including selection, error labels, removal and keyboard navigation. The compact table column explicitly fits its viewport rather than retaining AppKit's default minimum width. The directional collapse/expand symbols now match the movement. A labeled Add Images action remains in the top toolbar in both states; its native file-panel path was checked.
+
+The right panel is named 出图设置. Device settings and the conditional 背景与画布 section share a scrolling form. Export format, conditional JPEG quality/fill controls, output summary and the primary export action remain in a separate persistent footer. The device/background/export page tabs are removed from production. One-model phone/tablet choices are compact descriptions, and orientation cards no longer duplicate Chinese labels in English. Background selection distinguishes color/gradient/image, with image presets and local-file selection at the next level; canvas ratio has one visible, labeled editing location. The bottom viewing toolbar displays read-only pixel dimensions.
+
+Mode, device, format and background-type selectors retain their view identity. Device changes update only the dependent settings, and direction changes retain the existing direction control. Selection animation is no longer overwritten by routine layout or repeated same-value restoration. Pointer selection avoids an extra focus halo; keyboard focus remains visible and reduced-motion duration stays zero. Sliders now accept finite, range-checked percentage input, with synchronized slider/field baselines and disabled-state behavior.
+
+Verification: 62 Debug tests and 54 Release tests passed, including narrow-column layout, real batch synchronization, focus transfer, conditional sections, persistent export geometry at 1030×640 / 1400×838 / 1586×945, numeric entry, failure recovery, output/copy and source protection. Release build, ten CLI checks, public-source scan and Debug/Release symbol isolation passed. Native review covered light active/inactive states, expanded/compact lists, actual keyboard selection, top Add Images file panel, phone/tablet/browser selection, direct 37.5% input, background scrolling and a dark 1030×640 JPEG window. Preview copies use isolated bundle identifiers and composition stores; the installed application was not replaced.
+
+Screenshots, source/binary provenance and logs are retained outside Git in the local `fralo-panel-refinement` evidence bundle, with its absolute location in the private task receipt. Full VoiceOver speech traversal, older-OS hardware behavior and the user's subjective animation/style acceptance are not claimed. No push, PR merge or release is part of this implementation pass.
+
+## Compact panels and fixed illustrations (2026-10-27)
+
+The follow-up replaces the bright control-background backing with a semantic window-background tint inside the glass content host. Panels retain their rounded boundary and static glass behavior in both focus states. Expanded list rows are now 100pt rather than 148pt, with the existing separation retained. Pointer and contextual selection suppress the table's additional system highlight; keyboard focus uses the rounded card outline. The right-click handler selects the clicked row before opening its menu.
+
+Both panel forms use a transparent 4pt scroll indicator with native scroller dragging and accessibility, widened to 6pt for Increase Contrast. A constant 12pt gutter keeps controls at the same horizontal position whether content overflows or fits. Wheel scrolling, thumb dragging, the fixed export footer and the compact thumbnail rail remain available. Preview activity occupies the pixel-summary slot in the bottom viewing toolbar after a 180ms delay; cancellation and newer requests invalidate pending indicators without shifting adjacent actions.
+
+Six original fixed phone/tablet/browser illustrations replace per-input inspector rendering. They are generated by `scripts/generate-inspector-demos.swift` and shipped in the App resource bundle in both preview and Release packaging. Changing inputs still updates the actual canvas and output, while explanatory illustrations are cached independently. Native review also exposed disappearing export-button content after focus changes; its two custom-drawn button children now have independent layer backing.
+
+The follow-up has 67 passing Debug tests and 59 passing Release tests, including the previously failing overflow-width and preview-indicator placement checks, stable illustrations across real batch selection, delayed activity cancellation, and enabled indicator scrolling. Native checks on macOS 27.0.1 arm64 cover light focus states, dark 1030×640, expanded/compact lists, fixed tablet/browser examples, wheel/drag scrolling and persistent export content. The open context menu and selected row were verified through accessibility; capturing the open popup times out in the automation tool, so its final composited border still needs a direct visual acceptance check. Full VoiceOver speech, older OS hardware and subjective style acceptance remain outside these claims. Logs and private native captures stay outside Git in `fralo-panel-followup-v2`.
+
+## Menu tracking and quieter settings (2026-10-27)
+
+The next user review supersedes the visible scroll indicators and persistent export-settings footer. Both panel lists now hide scrollbars entirely, including their reserved gutter, while retaining native wheel, trackpad, keyboard and accessibility scrolling. The right header keeps the mode selector; its footer keeps only the primary export action. Device/background settings, file format, JPEG quality/fill and the output summary share the middle scroll viewport. The redundant batch-style scope caption is removed. Direction and browser illustrations are centered within their cards, with captions immediately below the card boundary; the entire option remains clickable and keyboard-selectable.
+
+The contextual-menu preview delay was reproduced by switching actual batch inputs while pumping the event-tracking run loop: selection changed but the rendered canvas did not. Preview completion now uses the main run loop's default, menu-tracking and modal-panel modes instead of main-queue dispatch, retaining generation checks and background rendering. The updated canvas is displayed while the menu is still open; its accessibility description includes the rendered source name. The failing event-tracking test now passes, and native accessibility evidence shows the new rendered source and the open context menu simultaneously.
+
+The hover text-color regression also has a failing-before/passing-after bitmap test. Primary button foreground is chosen from its resting surface and kept stable; hover/press feedback adjusts the background toward greater contrast. The export split button uses the same resting palette. Resting/hover/pressed palettes meet at least 4.5:1 text contrast for representative blue, red, yellow, purple, black and white accents, following WCAG 2.2 SC 1.4.3 as a contrast reference. Percentage fields display at most one decimal in a wider field with monospaced digits; leaving an untouched rounded display does not quantize its stored slider value.
+
+Verification: 70 Debug tests and 62 Release tests passed. Native macOS 27.0.1 arm64 checks cover the eleven-image batch, menu-open canvas updates, hidden-bar scrolling to both list/form ends, fixed mode/export action, exterior captions, dark 1030×640 and compact-rail keyboard selection. CLI compatibility, Release packaging and development-symbol isolation are checked separately. Private captures and source/binary provenance remain outside Git in `fralo-menu-followup-v3`. This does not establish full VoiceOver speech traversal, older-OS hardware behavior or human style acceptance; no push, merge or release is authorized.
+
+## Stable preview, native header and PNG compression (2026-10-27)
+
+Direction cards now invalidate the cached AppKit focus mask when selection changes. Pointer selection suppresses the keyboard halo; keyboard navigation still exposes a visible focus ring. Transparent compositions report a stable preview reference envelope using the maximum shadow extent. Fit-to-window uses that envelope, while actual exported padding and dimensions still follow the selected shadow. The device therefore stays the same displayed size when changing shadow styles without adding unnecessary transparent margins to every export.
+
+The window again uses a visible native title, image-count subtitle, unified toolbar and titlebar separator. Sidebar, Add Images, Copy and Settings remain native toolbar items. This follows the window-frame placement described in [Apple's toolbar guidance](https://developer.apple.com/design/human-interface-guidelines/toolbars). Light 1400×1000 and dark 1030×640 windows were checked; the mode and export action remain fixed while all intervening parameters scroll.
+
+PNG defaults to lossless encoding, including migration from existing workbench settings. Optional 减色压缩 exposes a 10–100% quality control that adjusts the RGB palette; 100% in this mode is still color reduction, not lossless. Output dimensions and alpha are retained. The native Core Image implementation samples at up to 384px, builds 16–128 palette colors with CIKMeans, applies CIPalettize and restores source alpha. A raw-RGB kernel explicitly replaces the K-means cluster-weight alpha with opaque palette entries. When remapping would make the PNG larger, the original encoding is kept. Preview, PNG export and PNG copy use the selected encoder.
+
+The user-requested reference, [IMGo's pinned PNG implementation](https://github.com/meowtec/imgo/blob/9fe7450970ddb2417ed8665ae51dfb8e07e79746/crates/minifier/src/png/quantize.rs), uses imagequant quality-controlled quantization followed by indexed PNG encoding and oxipng optimization. Its lossless mode disables the quality control. Fralo follows the distinction between lossless and color reduction, but uses the macOS engine: it does not bundle imagequant/oxipng or claim equivalent compression ratios, indexed output or perceptual quality. No external codec dependency was added.
+
+Exact file size requires encoding the image; saving it to disk is unnecessary. A whole-batch total would require one encode per image and settings snapshot. The interface therefore calculates only the current image on request for lossless PNG, and reuses the already encoded preview size for JPEG and reduced-color PNG. It never starts an automatic batch-size scan or retains a batch of encoded buffers. Changing the image or settings clears old size results; stale preview requests are cancelled before entering encoding where possible. On this Mac, three public 1444×2964 fixtures took roughly 35–38ms each for lossless PNG encoding, plus 73–92ms composition rendering. Reduced-color PNG encoding was roughly 0.22s warm, with a 0.6–1.3s first-use cost across two runs. These are fixture measurements, not a throughput guarantee for photos or other hardware.
+
+Verification: 74 Debug and 66 Release tests passed, including the previously failing direction-focus, native-header and shadow-scale cases, PNG quality/dimensions/alpha/color checks, old-config migration and current-image size behavior. Ten CLI checks, Release packaging, signature validation, public-source scan and Debug/Release isolation passed. Native checks confirmed direction selection, shadow scale, quality-dependent size updates and small-window scrolling. The user's eleven source files remain unchanged. Private screenshots, timings, logs and provenance stay outside Git in `fralo-export-polish-v4`. Full VoiceOver speech, older-OS hardware and human style acceptance remain unclaimed. No push, merge or release is part of this pass.
+
+
+## Docked sidebar — 2026-10-27
+
+The approved sidebar direction supersedes the earlier floating left panel and compact thumbnail rail. Production now uses a window-edge sidebar: its material reaches the left and bottom edges, the header respects the titlebar safe area, and a single separator defines the preview boundary. The thumbnail selection cards and real batch remain in the same list. The right inspector retains its existing floating composition.
+
+The native AppKit toolbar item is marked navigational and kept at the leading edge next to the window controls. It remains available in both states; the duplicate in-panel collapse control is removed. Collapsing slides the sidebar out completely and expands the preview viewport. Selection, composition and explicit viewing scale are retained. If the list held keyboard focus, focus moves to the canvas so up/down navigation still works; an inspector editing session keeps its focus. Reopening restores list focus, and the existing collapsed preference persists across launches. Rapid transitions use a generation guard; Reduce Motion takes the immediate path.
+
+Verification for this revision is recorded separately from the earlier floating-panel results. Full VoiceOver speech and subjective animation acceptance remain manual checks.
+
+This sidebar revision passed all 75 Debug and 67 Release tests. The production-window regressions cover full width recovery, real-batch keyboard selection while hidden, inspector editing focus, persisted collapse, rapid toggles and minimum/default geometry. Live native checks verified the leading header button, full collapse/reopen, keyboard selection retention, light 1400×1000, dark 1030×640 and empty dark minimum states. The toolbar uses an ordinary native `NSToolbarItem` with `isNavigational` and an explicit controller target, avoiding the built-in split-view item's specialized validation. Local screenshots/runtime records are in the current chat's `fralo-docked-sidebar` evidence folder. No push, merge or release is included.
+
+
+## Fixed inspector and compact actions — 2026-10-28
+
+The approved layout replaces proportional inspector sizing with a fixed 360 pt width. Window growth belongs to the preview. The inspector retains a scrolling parameter body and pinned mode/export regions, and can be independently hidden with the header slider icon. Visibility is saved separately from sidebar collapse. Hiding a focused inspector transfers focus to the canvas; returning from clean preview restores the user's panel preferences. Using the Inspector button while in clean preview returns to editing and reveals the inspector.
+
+The right toolbar is More, Inspector visibility, separator, Copy. Shared quiet icon buttons keep consistent 28 pt hit areas, proportionally contained symbols and a persistent neutral selected surface for the inspector. The More menu groups folder import/paste, remove/clear and application settings. Global appearance remains in the settings window; renderer/export behavior is unchanged.
+
+The full-width Add Images action now sits above the sidebar count/list. When the sidebar is hidden, a compact header plus is inserted in the leading navigation group. The same import path appends to the current batch, and native file menus, Command-O and the empty-state action remain available.
+
+All 76 Debug and 68 Release tests passed. Production-window regressions verify 360 pt at minimum/default/wide sizes, retained artwork/batch/settings and copy output when the inspector is hidden, focus transfer, persisted visibility, clean-preview transitions, toolbar state and accessibility checkbox value, and both add-entry states. Native checks covered both file-panel entry points and More → Application Settings. Final runtime screenshots and version provenance are saved with this chat's fixed-inspector preview. Full VoiceOver speech and subjective visual acceptance remain manual checks; no push, merge or release is included.
+
+
+At minimum width, the fixed inspector leaves a narrower preview viewport. The viewing toolbar now uses a compact layout below 440 pt: tighter gaps, an 84 pt status slot and no decorative display icon. Zoom text, pixel dimensions/loading status and the full preview action remain available. A production-window assertion verifies the zoom action has at least its intrinsic text width; the final dark minimum screenshot confirms it is readable.
+
+
+## Native sectioned header — 2026-10-28
+
+The user supplied macOS Notes as the reference and rejected a header that spans the whole window as one strip. The workbench now has a native split controller with a full-height sidebar and a toolbar separator that tracks its divider. Add Images/sidebar controls belong to the left titlebar section; the filename/count, native image-action group and native More menu belong to the content section. The duplicate sidebar Add button and full-width header baseline are removed. On collapse, the section divider leaves the toolbar while the left actions remain reachable.
+
+WorkbenchHeader owns the toolbar and native controls; WorkbenchView owns native sidebar layout and the existing independent 360 pt inspector/preview arrangement. A guarded native-collapse completion preserves the newest request during rapid toggles, and native collapse is observed for user-driven state changes. Nonzero initial pane frames avoid construction-time constraint conflicts, and an explicitly backed workspace keeps drawing stable during native pane transitions. Source selection, settings, zoom, keyboard navigation, copy pipeline, renderer/export logic and app settings remain connected to the existing actions.
+
+Native-window checks exposed stale glass-hosted inspector contents after a containing split pane changed origin. Production therefore selects the shared visual-effect material path with the same panel radius, tint and shadow. FloatingPanel gains an optional glass choice, preserving the default for existing lab scenarios; only the explicit Debug `--panel-render-check` route opts the production window back into glass. The probe regression supplies that option explicitly. No experimental route is added to Release.
+
+All 76 Debug and 68 Release tests passed, with no conflicting-constraint diagnostics. Production-window coverage includes native split/toolbar ownership, tracking-divider identity, preserved batch/artwork/settings/copy output, focus and persisted state, rapid collapse/reveal, minimum/default/wide geometry, readable preview controls and native action/menu wiring. Live checks verified Add opens the file chooser and cancellation preserves all 11 inputs; More opens application settings; the native action group hides/reveals the inspector; light/default, inactive, dark/minimum, collapsed and empty states were inspected. Final screenshots and launch/build provenance are retained in this chat's fralo-sectioned-header folder. Full VoiceOver speech, fullscreen and subjective visual acceptance remain unclaimed. No push, merge or release is included.
+
+
+## Native toolbar grouping — 2026-10-28
+
+Add and Sidebar are separate native circular items. Copy and Export Current share
+one momentary native output group; Inspector and More are independent circular
+items. Fixed toolbar spaces express these boundaries. Filename/count remain
+unbordered text. Export Current reuses the existing save panel and output pipeline;
+empty and busy states use separate availability for Copy and Export. Batch export
+remains in the inspector footer.
+
+Live inspection caught a build-tool issue: Xcode 27's default SwiftPM backend
+recorded `minos 14.0`, `sdk 14.0` in the executable despite compiling with SDK 27.
+`--sdk` and `-sdk_version` did not fix that backend. The native backend records
+`minos 14.0`, `sdk 27.0`, and the same AppKit controls then display the intended
+round and capsule glass. Both preview launchers and packaging now explicitly
+select this backend. It is deprecated by SwiftPM, so this is a documented
+workaround to remove when the default backend records the real SDK. No binary
+restamping, custom glass toolbar, or increase to the deployment minimum is used.
+
+The final native-backend run passes 76 Debug and 68 Release tests. The Release
+resize test now waits for native split/stack layout to settle before checking
+regular preview-control spacing; its immediate assertion had raced that layout.
+Native UI checks cover light/default, dark/minimum, sidebar collapse, empty-state
+output disabling, independent inspector hide/reveal, and Export Current opening
+the correctly named save panel and cancelling without changing the batch.
+Screenshots and launch/build records are in the chat's fralo-toolbar-groups
+preview folder. Older macOS, full VoiceOver speech, fullscreen and human visual
+acceptance remain unverified. No push, merge or release is included.
+
+
+## Notes toolbar spacing follow-up — 2026-10-28
+
+Opened Notes as requested and compared only its toolbar. The two-command cluster
+has approximately 44 pt between icon centers, versus approximately 36 pt in the
+previous Fralo segmented group. Fralo now uses adjacent toolbar-style NSButtons
+with 44 × 36 pt hit areas and system-managed shared glass. The internal segmented
+divider is gone, and each action retains independent target/enable/accessibility
+behavior. Inspector, More and the left-hand controls keep their prior spacing.
+
+All 27 Debug and 19 Release App tests passed after the final change. This scoped
+run covers native header wiring, isolated clipboard copy, empty output disabling,
+widths, collapse/inspector/preview state and focus. Live inspection confirms the
+new spacing in the light/default and dark/minimum windows; Export Current opens
+the correctly named save sheet and cancellation preserves the 11-input batch.
+Core/renderer/export implementation is unchanged, so the prior full-suite result
+remains historical rather than claimed as a new full run. The new preview remains
+open for user review; human visual acceptance and older-OS behavior are pending.
+
+## Fixed device output sizes — 2026-10-28
+
+The user approved source-independent device canvases: phone portrait 1530 × 3036,
+tablet portrait 2400 × 3200, with width/height exchanged in landscape. Browser
+windows are 3000 px wide: 1875 px high at 16:10, 1688 at 16:9 and 2250 at 4:3.
+These are output envelopes; existing device artwork fits proportionally and is
+centred without stretching. Uploaded content remains fully contained inside the
+screen. Decoding is bounded by the destination screen resolution.
+
+Transparent output adds 0 / 84 / 138 px on every side for no / soft / strong
+shadow. Device pixels retain their scale and position relative to the base
+canvas. Fit-to-window uses the strongest-shadow envelope for all shadow styles,
+so shadow changes do not resize the displayed device. Selecting another input
+also preserves a manually selected preview zoom. Bottom-bar and inspector sizes,
+copy and export all use the resulting canvas dimensions including shadow padding.
+
+Background composition keeps its selected canvas dimensions. Device layout uses
+the fixed logical device size rather than the temporary raster dimensions, so
+preview reduction and source density cannot change its placement. This GUI
+contract is separate from the legacy CLI, whose source-density rendering and
+aspect-mismatch validation remain intact. Existing settings require no migration.
+
+Regression coverage includes source resolution/aspect changes across all device
+directions, browser ratios and shadow styles; transparent silhouettes, outer
+shadow edges and opaque device samples; background silhouettes; real-controller
+fit/pixel zoom, dimensions and clipboard output; and batch JPEG dimensions.
+
+All 80 Debug and 72 Release tests passed with the native build backend, plus the
+10 CLI integration checks. Native desktop inspection is recorded separately in
+the local fixed-size evidence bundle; automated checks do not imply human visual
+acceptance, merge or release authorization.
+
+## Whole-workbench HIG review — 2026-10-28
+
+This pass reviews the existing Mac workbench rather than choosing a new design.
+The full-height native batch sidebar, fixed 360 pt inspector, native toolbar
+command groups, and bottom viewing controls remain the accepted visual target.
+The preceding cached-layer dragging fix remains part of the tested baseline.
+
+The audit covers task entry, normal/minimum windows, long names, light/dark
+appearance, batch navigation, settings and numerical entry, keyboard/menu
+coverage, focus restoration, feedback, error recovery, copying and export.
+Screenshots and native accessibility snapshots were captured before changes;
+they are retained in the local `fralo-hig-audit` evidence bundle. Observations
+about assistive technology are limited to what was actually inspected.
+
+| Finding | Resulting behavior | HIG grounding |
+| --- | --- | --- |
+| Dragging and settings edits could not be undone | One drag or continuous slider gesture is one named Undo step; Redo restores it. Native text editing keeps its own history. | [Undo and redo](https://developer.apple.com/design/human-interface-guidelines/undo-and-redo) |
+| Removing an image or clearing a batch had no recovery | Add, paste, remove and clear record reversible batch snapshots, including selection. Restoring a batch brings the restored list into focus. No source file is deleted. | [Undo and redo](https://developer.apple.com/design/human-interface-guidelines/undo-and-redo), [Alerts](https://developer.apple.com/design/human-interface-guidelines/alerts) |
+| Long names displaced important toolbar commands at minimum width | The document title has a bounded width and middle truncation; the full name remains available in a tooltip/accessibility text. | [Toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars) |
+| Invalid percentage input silently reverted | The previous valid value stays intact, with an inline range message and an accessibility announcement. Formatting and whole-input parsing use the locale's decimal separator. | [Text fields](https://developer.apple.com/design/human-interface-guidelines/text-fields) |
+| Inspector visibility, preview and image navigation lacked menu entries | View exposes those actions with dynamic Show/Hide or Return labels and shortcuts. Revealing a panel from preview reliably restores editing. | [The menu bar](https://developer.apple.com/design/human-interface-guidelines/the-menu-bar) |
+| Drag positioning had no equivalent precision keyboard operation | Option–arrow commands move the current artwork target by one output pixel; typing focus retains normal text-navigation behavior. | [Designing for macOS](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos), [Accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility) |
+| Background panning lacked a current-target cue | The canvas uses open/closed hand cursors and target-specific tooltip/accessibility help. | [Pointers](https://developer.apple.com/design/human-interface-guidelines/pointing-devices), [Accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility) |
+| Retry still looked and announced like Add | Failure uses a warning illustration and refresh action; the accessible label matches Retry. | [Feedback](https://developer.apple.com/design/human-interface-guidelines/feedback), [Accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility) |
+| Copy had no confirmation | A short, nonmodal viewing-bar confirmation and accessibility announcement acknowledge a successful copy, then restore the output dimensions. | [Feedback](https://developer.apple.com/design/human-interface-guidelines/feedback) |
+
+The review also confirms useful existing behavior: hiding a focused panel moves
+focus into the canvas; empty output actions are disabled; failed inputs explain
+the failure and can recover after retry; file dialogs can be cancelled; the
+exporter preserves source data and reports same-name skips. The existing
+semantic-color, stronger-contrast and reduced-motion/transparency paths are
+retained and exercised by the design-system tests.
+
+Default macOS Tab behavior is not treated as a defect: without system-wide
+keyboard navigation enabled, Tab may visit text fields and lists while skipping
+buttons and sliders. This pass does not change the user's system preferences or
+force every control into that default sequence.
+
+Verification uses real-controller Undo/Redo, grouped edits, recovery, menu-state,
+keyboard-position, title-width and numeric-validation tests, alongside the full
+core/design-system/application suites and native preview checks. It does not
+establish full VoiceOver speech correctness, complete contrast conformance,
+older-macOS/Intel support, or every physical accessibility setting. PNG palette
+reduction still refreshes its encoded appearance after dragging ends; that
+quality contract is unchanged. Human acceptance, push, merge and release remain
+separate from this local optimization pass.
+
+Final native-backend verification: Release ran 81 tests and Debug ran 89 tests,
+with no failures in the final clean runs. Each suite skips the opt-in visible
+window probe; a separate visible probe passed with 360 updates, a 17.35 ms P95
+interval and zero complete renders during the gesture. Native inspection also
+covers 1030 × 640 light/dark windows with a long title, validation text fitting,
+Undo/Redo and restoring selection, retry recovery, copy acknowledgement, JPEG
+output, and cancelling a 42-image export. Cancellation was checked twice:
+8 completed / 34 unprocessed, then 10 completed / 32 unprocessed; the output
+file counts matched each report. Only the second run has a saved summary image.
+
+One earlier Debug run reported a PNG byte-comparison difference in the existing
+JPEG-preview clipboard test. Ten isolated repetitions, two full instrumented
+runs and the final clean full run passed; decoded pixels in the captured passing
+runs were identical. The failing buffers were not captured, so the cause remains
+unconfirmed. The original assertion and renderer were not relaxed or changed to
+hide it. The initial failure and subsequent diagnostics remain in the local
+verification bundle. This is a recorded test uncertainty, not a demonstrated
+HIG fix or proof that an output issue was resolved.

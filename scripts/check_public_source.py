@@ -13,7 +13,7 @@ paths = sorted(set(path for path in paths if path))
 errors = []
 private_prefixes = (".build/", ".swiftpm/", "dist/", "artifacts/", "design/", "docs/adr/")
 private_files = {
-    "CONTEXT.md", "AGENTS.md", "design-qa.md", "docs/product-brief.md",
+    "CONTEXT.md", "design-qa.md", "docs/product-brief.md",
     "docs/implementation-plan.md", "docs/functional-scope.md", "docs/ui-guidelines.md",
     "scripts/compare-design.swift", "scripts/read-pasteboard.swift", "scripts/verify-pixels.swift",
 }
@@ -30,6 +30,9 @@ for name in paths:
         errors.append(f"File larger than 10 MiB: {name}")
     if path.suffix in {".md", ".swift", ".py", ".yml", ".yaml", ".json", ".html"}:
         content = path.read_text()
+        # Authored project rules are public; generated personal memory stays private.
+        if name == "AGENTS.md" and "<claude-mem-context>" in content:
+            errors.append("Generated private memory in project rules: AGENTS.md")
         if secret.search(content) or personal_path.search(content):
             errors.append(f"Secret-like value or personal absolute path: {name}")
         if path.suffix == ".md":

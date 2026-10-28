@@ -42,25 +42,35 @@ public struct RenderPlan {
     public let sourceSize: CGSize
     public let scale: CGFloat
     public let pixelSize: CGSize
+    public let origin: CGPoint
     public var screen: CGRect {
         let r = geometry.oriented(geometry.screen, settings.orientation)
-        return CGRect(x: r.minX * scale + CGFloat(settings.padding), y: r.minY * scale + CGFloat(settings.padding), width: r.width * scale, height: r.height * scale)
+        return CGRect(x: r.minX * scale + origin.x, y: r.minY * scale + origin.y, width: r.width * scale, height: r.height * scale)
     }
-    public init(sourceSize: CGSize, settings: RenderSettings) throws {
+    public init(sourceSize: CGSize, settings: RenderSettings, containSource: Bool = false, canvasSize: CGSize? = nil) throws {
         self.settings = try settings.validated(); self.sourceSize = sourceSize
         geometry = FrameGeometry(model: settings.model)
         let screen = geometry.oriented(geometry.screen, settings.orientation)
         let sourceRatio = sourceSize.width / sourceSize.height
         let screenRatio = screen.width / screen.height
         let cropFraction = 1 - min(sourceRatio, screenRatio) / max(sourceRatio, screenRatio)
-        guard cropFraction <= 0.03 else {
+        guard containSource || cropFraction <= 0.03 else {
             throw FraloError.message("截图比例与所选设备不匹配，裁切将超过 3%。请调整原图或设备设置。")
         }
-        // Use the source's pixel density rather than downscaling to a fixed template size.
-        scale = max(sourceSize.width / screen.width, sourceSize.height / screen.height)
         let size = geometry.orientedSize(settings.orientation)
-        pixelSize = CGSize(width: ceil(size.width * scale) + CGFloat(settings.padding * 2), height: ceil(size.height * scale) + CGFloat(settings.padding * 2))
-        guard scale.isFinite, scale > 0, pixelSize.width * pixelSize.height <= 100_000_000 else {
+        if let canvasSize {
+            scale = min((canvasSize.width - CGFloat(settings.padding * 2)) / size.width,
+                        (canvasSize.height - CGFloat(settings.padding * 2)) / size.height)
+            pixelSize = canvasSize
+            origin = CGPoint(x: (canvasSize.width - size.width * scale) / 2, y: (canvasSize.height - size.height * scale) / 2)
+        } else {
+            // Preserve the legacy CLI's source-density contract.
+            scale = max(sourceSize.width / screen.width, sourceSize.height / screen.height)
+            pixelSize = CGSize(width: ceil(size.width * scale) + CGFloat(settings.padding * 2), height: ceil(size.height * scale) + CGFloat(settings.padding * 2))
+            origin = CGPoint(x: settings.padding, y: settings.padding)
+        }
+        guard scale.isFinite, scale > 0, pixelSize.width.isFinite, pixelSize.height.isFinite,
+              pixelSize.width > 0, pixelSize.height > 0, pixelSize.width * pixelSize.height <= 100_000_000 else {
             throw FraloError.message("输出图片过大，请检查截图与所选设备方向或减少边距。")
         }
     }

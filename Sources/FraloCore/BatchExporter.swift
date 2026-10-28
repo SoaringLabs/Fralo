@@ -19,6 +19,7 @@ public struct ExportEntry: Codable, Sendable {
 
 public struct ExportReport: Codable, Sendable {
     public let settings: RenderSettings
+    public var composition: CompositionSettings?
     public let entries: [ExportEntry]
     public let total: Int
     public let cancelled: Bool
@@ -28,17 +29,19 @@ public struct ExportReport: Codable, Sendable {
     public var failed: Int { entries.filter { $0.status == .failed }.count }
     public var unprocessed: Int { total - entries.count }
 
-    enum CodingKeys: String, CodingKey { case settings, entries, total, cancelled, durationSeconds, succeeded, skipped, failed, unprocessed }
+    enum CodingKeys: String, CodingKey { case settings, composition, entries, total, cancelled, durationSeconds, succeeded, skipped, failed, unprocessed }
     public init(settings: RenderSettings, entries: [ExportEntry], total: Int, cancelled: Bool, durationSeconds: Double) {
         self.settings = settings; self.entries = entries; self.total = total; self.cancelled = cancelled; self.durationSeconds = durationSeconds
     }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        composition = try c.decodeIfPresent(CompositionSettings.self, forKey: .composition)
         settings = try c.decode(RenderSettings.self, forKey: .settings); entries = try c.decode([ExportEntry].self, forKey: .entries)
         total = try c.decode(Int.self, forKey: .total); cancelled = try c.decode(Bool.self, forKey: .cancelled); durationSeconds = try c.decode(Double.self, forKey: .durationSeconds)
     }
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(composition, forKey: .composition)
         try c.encode(settings, forKey: .settings); try c.encode(entries, forKey: .entries); try c.encode(total, forKey: .total)
         try c.encode(cancelled, forKey: .cancelled); try c.encode(durationSeconds, forKey: .durationSeconds)
         try c.encode(succeeded, forKey: .succeeded); try c.encode(skipped, forKey: .skipped); try c.encode(failed, forKey: .failed); try c.encode(unprocessed, forKey: .unprocessed)
@@ -52,13 +55,14 @@ public struct ExportProgress: Sendable {
 }
 
 public enum BatchExporter {
-    public static func outputNames(for inputs: [ImageInput]) -> [String] {
+    public static func outputNames(for inputs: [ImageInput], format: ImageFormat = .png) -> [String] {
+        let suffixName = format == .png ? "png" : "jpg"
         var used = Set<String>()
         return inputs.map { input in
             let stem = input.stem.isEmpty ? "图片" : input.stem
-            var candidate = "\(stem)-fralo.png", suffix = 2
+            var candidate = "\(stem)-fralo.\(suffixName)", suffix = 2
             while !used.insert(candidate.lowercased()).inserted {
-                candidate = "\(stem)-fralo-\(suffix).png"; suffix += 1
+                candidate = "\(stem)-fralo-\(suffix).\(suffixName)"; suffix += 1
             }
             return candidate
         }
@@ -66,12 +70,14 @@ public enum BatchExporter {
 
     public static func run(inputs: [ImageInput], settings: RenderSettings, directory: URL, overwrite: Bool = false,
                            cancellation: CancellationToken = CancellationToken(),
-                           outputNames explicitNames: [String]? = nil,
+                           outputNames explicitNames: [String]? = nil, composition: CompositionSettings? = nil, backgroundData: Data? = nil,
                            progress: (ExportProgress) -> Void = { _ in }) throws -> ExportReport {
         let settings = try settings.validated()
+        let composition = try composition?.validated()
+        let backdrop = try backgroundData ?? composition.flatMap { try CompositionRenderer.backgroundData($0) }
         guard !inputs.isEmpty else { throw FraloError.message("没有可导出的图片。") }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let names = explicitNames ?? outputNames(for: inputs)
+        let names = explicitNames ?? outputNames(for: inputs, format: composition?.format ?? .png)
         guard names.count == inputs.count else { throw FraloError.message("导出文件名数量不匹配。") }
         let started = Date()
         var entries: [ExportEntry] = []
@@ -92,8 +98,14 @@ public enum BatchExporter {
                     if !overwrite && FileManager.default.fileExists(atPath: output.path) {
                         return ExportEntry(input: input.name, output: output.path, status: .skipped, reason: "已有同名文件")
                     }
-                    let frame = try FrameRenderer.render(input, settings: settings)
-                    let data = try FrameRenderer.pngData(frame.image)
+                    let data: Data
+                    if let composition {
+                        let frame = try CompositionRenderer.render(input, settings: composition, backgroundData: backdrop)
+                        data = try CompositionRenderer.data(frame.image, settings: composition)
+                    } else {
+                        let frame = try FrameRenderer.render(input, settings: settings)
+                        data = try FrameRenderer.pngData(frame.image)
+                    }
                     let written = try write(data, to: output, overwrite: overwrite)
                     return ExportEntry(input: input.name, output: output.path, status: written ? .success : .skipped, reason: written ? nil : "已有同名文件")
                 } catch {
@@ -103,7 +115,8 @@ public enum BatchExporter {
             entries.append(entry)
             progress(ExportProgress(completed: entries.count, total: inputs.count, currentName: input.name))
         }
-        return ExportReport(settings: settings, entries: entries, total: inputs.count, cancelled: cancellation.isCancelled, durationSeconds: Date().timeIntervalSince(started))
+        var report = ExportReport(settings: settings, entries: entries, total: inputs.count, cancelled: cancellation.isCancelled, durationSeconds: Date().timeIntervalSince(started))
+        report.composition = composition; return report
     }
 
     private static func write(_ data: Data, to destination: URL, overwrite: Bool) throws -> Bool {

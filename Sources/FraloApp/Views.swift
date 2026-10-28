@@ -34,65 +34,6 @@ final class DropContainer: NSView {
 }
 
 @MainActor
-final class BatchTableView: NSTableView {
-    var onDelete: (() -> Void)?
-    override func keyDown(with event: NSEvent) {
-        if event.keyCode == 51 || event.keyCode == 117 { onDelete?() } else { super.keyDown(with: event) }
-    }
-}
-
-@MainActor
-final class ThumbnailCell: NSTableCellView {
-    let thumbnail = NSImageView()
-    let title = label("")
-    let detail = label("", size: 11, secondary: true)
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        thumbnail.imageScaling = .scaleProportionallyUpOrDown
-        thumbnail.translatesAutoresizingMaskIntoConstraints = false
-        let text = stack([title, detail], spacing: 4)
-        text.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(thumbnail); addSubview(text)
-        title.lineBreakMode = .byTruncatingMiddle
-        detail.lineBreakMode = .byTruncatingMiddle
-        NSLayoutConstraint.activate([
-            thumbnail.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
-            thumbnail.centerYAnchor.constraint(equalTo: centerYAnchor), thumbnail.widthAnchor.constraint(equalToConstant: 46), thumbnail.heightAnchor.constraint(equalToConstant: 80),
-            text.leadingAnchor.constraint(equalTo: thumbnail.trailingAnchor, constant: 12), text.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8), text.centerYAnchor.constraint(equalTo: centerYAnchor)
-        ])
-        textField = title; imageView = thumbnail
-    }
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-}
-
-@MainActor
-final class PreviewCanvas: NSView {
-    var image: CGImage? { didSet { needsDisplay = true } }
-    var imageRect = NSRect.zero { didSet { needsDisplay = true } }
-    override var isFlipped: Bool { true }
-    override var acceptsFirstResponder: Bool { true }
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let image else { return }
-        NSGraphicsContext.saveGraphicsState()
-        let rect = imageRect
-        NSBezierPath(rect: rect).addClip()
-        NSColor.controlBackgroundColor.setFill(); rect.fill()
-        let tile: CGFloat = 8
-        NSColor.quaternaryLabelColor.withAlphaComponent(0.10).setFill()
-        var row = 0, y = rect.minY
-        while y < rect.maxY {
-            var x = rect.minX + (row % 2 == 0 ? 0 : tile)
-            while x < rect.maxX { NSRect(x: x, y: y, width: tile, height: tile).fill(); x += tile * 2 }
-            y += tile; row += 1
-        }
-        let native = NSImage(cgImage: image, size: rect.size)
-        native.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
-        NSGraphicsContext.restoreGraphicsState()
-    }
-}
-
-@MainActor
 final class PreviewScrollView: NSScrollView {
     var onResize: (() -> Void)?
     override func layout() { super.layout(); onResize?() }

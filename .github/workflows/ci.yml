@@ -17,10 +17,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      - name: Select Xcode with macOS 26 SDK
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer
       - name: Toolchain
-        run: swift --version
+        run: |
+          swift --version
+          xcrun --sdk macosx --show-sdk-version
       - name: Unit tests
+        env:
+          FRALO_TEST_ARTIFACTS: ${{ runner.temp }}/fralo-test-artifacts
         run: swift test
+      - name: Preserve failing output buffers
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fralo-output-diagnostics
+          path: ${{ runner.temp }}/fralo-test-artifacts
+          if-no-files-found: ignore
       - name: Update feed validation tests
         run: python3 scripts/test_prepare_update.py
       - name: Build App and CLI
