@@ -202,7 +202,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         header.update(name: selectedIndex.map { items[$0].input.name } ?? "Fralo", count: items.count,
                       sidebarHidden: workbench.collapsed || workbench.previewing,
                       inspectorVisible: !workbench.inspectorHidden && !workbench.previewing,
-                      canAdd: !isExporting, canCopy: rendered != nil && !isExporting)
+                      canAdd: !isExporting, canCopy: rendered != nil && !isExporting, canExport: selectedIndex != nil && !isExporting)
         if workbench.collapsed, let focus = window?.firstResponder as? NSView, focus.isDescendant(of: workbench.left) {
             window?.makeFirstResponder(canvas)
         }

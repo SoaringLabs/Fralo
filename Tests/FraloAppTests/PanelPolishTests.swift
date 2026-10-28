@@ -19,23 +19,30 @@ final class PanelPolishTests: XCTestCase {
         let inspector = try XCTUnwrap(root.right.body as? CompositionInspector)
         let actions = try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "workspaceActions" } as? NSToolbarItemGroup)
         let more = try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "more" } as? NSMenuToolbarItem)
-        func toggleInspector() { actions.selectedIndex = 1; NSApp.sendAction(try! XCTUnwrap(actions.action), to: actions.target, from: actions) }
+        let inspectorAction = try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "inspector" })
+        func toggleInspector() { NSApp.sendAction(try! XCTUnwrap(inspectorAction.action), to: inspectorAction.target, from: inspectorAction) }
         func copyCurrent() { actions.selectedIndex = 0; NSApp.sendAction(try! XCTUnwrap(actions.action), to: actions.target, from: actions) }
-        XCTAssertEqual(Array(toolbar.items.prefix(4).map { $0.itemIdentifier.rawValue }), ["add", "sidebar", "sidebarBoundary", "document"])
+        XCTAssertEqual(Array(toolbar.items.prefix(5).map { $0.itemIdentifier }), [.init("add"), .space, .init("sidebar"), .init("sidebarBoundary"), .init("document")])
         XCTAssertEqual(actions.selectionMode, .momentary)
+        XCTAssertEqual(actions.subitems.map(\.label), ["复制当前图片", "导出当前图片"])
+        XCTAssertFalse(actions.subitems[1].isEnabled)
+        XCTAssertEqual(inspectorAction.action, #selector(MainWindowController.toggleInspector(_:)))
+        XCTAssertFalse(try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "document" }).isBordered)
+        XCTAssertEqual(Array(toolbar.items.suffix(5).map(\.itemIdentifier)), [.init("workspaceActions"), .space, .init("inspector"), .space, .init("more")])
         XCTAssertEqual(more.menu.items.filter { !$0.isSeparatorItem }.map(\.title), ["导入文件夹…", "粘贴图片", "移除当前图片", "清空批次", "应用设置…"])
         for size in [NSSize(width: 1030, height: 640), NSSize(width: 1400, height: 1000), NSSize(width: 1900, height: 1000)] {
             window.setContentSize(size); root.layoutSubtreeIfNeeded()
             XCTAssertEqual(root.right.bounds.width, 360, accuracy: 0.1)
             XCTAssertGreaterThan(root.content.bounds.width, 300)
         }
-        XCTAssertEqual(actions.subitems[1].toolTip, "隐藏出图设置"); XCTAssertFalse(actions.subitems[0].isEnabled)
+        XCTAssertEqual(inspectorAction.toolTip, "隐藏出图设置"); XCTAssertFalse(actions.subitems[0].isEnabled)
         let context = try XCTUnwrap(CGContext(data: nil, width: 300, height: 600, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.setFillColor(CGColor(srgbRed: 0.1, green: 0.6, blue: 0.3, alpha: 1)); context.fill(CGRect(x: 0, y: 0, width: 300, height: 600))
         let input = directory.appendingPathComponent("input.png"); try FrameRenderer.pngData(XCTUnwrap(context.makeImage())).write(to: input)
         controller.importURLs([input])
         let canvas = try XCTUnwrap(descendants(root.content).compactMap { $0 as? CanvasSurface }.first)
         for _ in 0..<150 where canvas.image == nil { try await Task.sleep(nanoseconds: 20_000_000) }
+        XCTAssertTrue(actions.subitems[0].isEnabled); XCTAssertTrue(actions.subitems[1].isEnabled)
         let image = try XCTUnwrap(canvas.image), list = try XCTUnwrap(root.left.body as? BatchList)
         inspector.mode.choose(1)
         for _ in 0..<150 where canvas.image === image { try await Task.sleep(nanoseconds: 20_000_000) }
@@ -52,7 +59,7 @@ final class PanelPolishTests: XCTestCase {
         toggleInspector()
         try await Task.sleep(nanoseconds: 350_000_000); root.layoutSubtreeIfNeeded()
         XCTAssertTrue(root.inspectorHidden); XCTAssertTrue(root.right.isHidden)
-        XCTAssertEqual(actions.subitems[1].toolTip, "显示出图设置")
+        XCTAssertEqual(inspectorAction.toolTip, "显示出图设置")
         XCTAssertTrue(window.firstResponder === canvas)
         XCTAssertGreaterThan(root.content.bounds.width, previousWidth + 350)
         XCTAssertTrue(canvas.image === rendered); XCTAssertEqual(list.selectedIndex, 0)
@@ -63,16 +70,20 @@ final class PanelPolishTests: XCTestCase {
         defer { restored.window?.close() }
         XCTAssertTrue(try XCTUnwrap(restored.window?.contentView as? WorkbenchView).inspectorHidden)
         viewing.preview.performClick(nil)
-        XCTAssertTrue(root.previewing); XCTAssertEqual(actions.subitems[1].toolTip, "显示出图设置")
+        XCTAssertTrue(root.previewing); XCTAssertEqual(inspectorAction.toolTip, "显示出图设置")
         XCTAssertTrue(toolbar.items.contains { $0.itemIdentifier.rawValue == "add" })
         toggleInspector()
         try await Task.sleep(nanoseconds: 350_000_000); root.layoutSubtreeIfNeeded()
         XCTAssertFalse(root.previewing); XCTAssertFalse(root.inspectorHidden); XCTAssertFalse(root.right.isHidden)
-        XCTAssertEqual(actions.subitems[1].toolTip, "隐藏出图设置")
+        XCTAssertEqual(inspectorAction.toolTip, "隐藏出图设置")
         XCTAssertTrue(toolbar.items.contains { $0.itemIdentifier.rawValue == "add" })
         XCTAssertNotNil(toolbar.items.first { $0 is NSTrackingSeparatorToolbarItem })
         XCTAssertEqual(root.right.bounds.width, 360, accuracy: 0.1)
         window.setContentSize(NSSize(width: 1900, height: 1000)); root.layoutSubtreeIfNeeded()
+        // Native split/stack layout finishes on the run loop after a window resize.
+        for _ in 0..<20 where viewing.isCompact {
+            try await Task.sleep(nanoseconds: 20_000_000); root.layoutSubtreeIfNeeded()
+        }
         XCTAssertFalse(viewing.isCompact, "A wide preview viewport must restore the regular toolbar spacing")
     }
 

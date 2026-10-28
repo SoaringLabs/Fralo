@@ -37,7 +37,7 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
         toolbar.delegate = self; toolbar.displayMode = .iconOnly; toolbar.allowsUserCustomization = false
     }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.init("add"), .init("sidebar"), .init("sidebarBoundary"), .init("document"), .flexibleSpace, .init("workspaceActions"), .init("more")]
+        [.init("add"), .space, .init("sidebar"), .init("sidebarBoundary"), .init("document"), .flexibleSpace, .init("workspaceActions"), .space, .init("inspector"), .space, .init("more")]
     }
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         toolbarAllowedItemIdentifiers(toolbar).filter { !sidebarHidden || $0.rawValue != "sidebarBoundary" }
@@ -52,10 +52,10 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
             return item
         }
         if id.rawValue == "workspaceActions" {
-            let images = [("doc.on.doc", "复制当前图片"), ("slider.horizontal.3", "出图设置")].map { NSImage(systemSymbolName: $0.0, accessibilityDescription: $0.1)! }
+            let images = [("doc.on.doc", "复制当前图片"), ("square.and.arrow.up", "导出当前图片")].map { NSImage(systemSymbolName: $0.0, accessibilityDescription: $0.1)! }
             let group = NSToolbarItemGroup(itemIdentifier: id, images: images, selectionMode: .momentary,
-                                           labels: ["复制当前图片", "显示或隐藏出图设置"], target: self, action: #selector(performWorkspaceAction(_:)))
-            group.label = "图片操作"; group.controlRepresentation = .expanded; group.isBordered = true
+                                           labels: ["复制当前图片", "导出当前图片"], target: self, action: #selector(performWorkspaceAction(_:)))
+            group.label = "图片输出"; group.controlRepresentation = .expanded; group.isBordered = true
             group.autovalidates = false
             group.subitems.forEach { $0.autovalidates = false }
             actions = group
@@ -71,7 +71,11 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
             item.image = NSImage(systemSymbolName: "sidebar.left", accessibilityDescription: "显示或隐藏图片列表")
             item.label = "图片列表"; item.toolTip = "显示或隐藏图片列表（⌃⌘S）"; item.target = owner; item.action = #selector(MainWindowController.toggleSidebar(_:))
             item.isBordered = true; item.visibilityPriority = .user
-        case "document": item.view = document; item.label = "当前图片"
+        case "inspector":
+            item.image = NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: "出图设置")
+            item.label = "出图设置"; item.toolTip = "隐藏出图设置"
+            item.target = owner; item.action = #selector(MainWindowController.toggleInspector(_:)); item.isBordered = true
+        case "document": item.view = document; item.label = "当前图片"; item.isBordered = false
         default: return nil
         }
         return item
@@ -79,23 +83,24 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
     @objc private func performWorkspaceAction(_ sender: NSToolbarItemGroup) {
         guard let owner else { return }
         if sender.selectedIndex == 0 { owner.copyCurrent(sender) }
-        else if sender.selectedIndex == 1 { owner.toggleInspector(sender) }
+        else if sender.selectedIndex == 1 { owner.exportCurrent(sender) }
     }
-    func update(name: String, count: Int, sidebarHidden: Bool, inspectorVisible: Bool, canAdd: Bool, canCopy: Bool) {
+    func update(name: String, count: Int, sidebarHidden: Bool, inspectorVisible: Bool, canAdd: Bool, canCopy: Bool, canExport: Bool) {
         self.sidebarHidden = sidebarHidden
         document.name.stringValue = name; document.name.toolTip = name
         document.count.stringValue = count == 0 ? "添加图片，开始套框" : "\(count) 张图片"
         let boundary = toolbar.items.firstIndex { $0.itemIdentifier.rawValue == "sidebarBoundary" }
         if sidebarHidden, let boundary { toolbar.removeItem(at: boundary) }
-        else if !sidebarHidden && boundary == nil { toolbar.insertItem(withItemIdentifier: .init("sidebarBoundary"), at: 2) }
+        else if !sidebarHidden && boundary == nil { toolbar.insertItem(withItemIdentifier: .init("sidebarBoundary"), at: 3) }
         toolbar.items.first { $0.itemIdentifier.rawValue == "add" }?.isEnabled = canAdd
+        let title = inspectorVisible ? "隐藏出图设置" : "显示出图设置"
+        toolbar.items.first { $0.itemIdentifier.rawValue == "inspector" }?.toolTip = title
         if let actions {
             actions.subitems[0].isEnabled = canCopy
-            let title = inspectorVisible ? "隐藏出图设置" : "显示出图设置"
-            actions.subitems[1].label = title; actions.subitems[1].toolTip = title
+            actions.subitems[1].isEnabled = canExport
             if let control = actions.view as? NSSegmentedControl {
-                control.setEnabled(canCopy, forSegment: 0)
-                control.setToolTip("复制当前图片", forSegment: 0); control.setToolTip(title, forSegment: 1)
+                control.setEnabled(canCopy, forSegment: 0); control.setEnabled(canExport, forSegment: 1)
+                control.setToolTip("复制当前图片", forSegment: 0); control.setToolTip("导出当前图片", forSegment: 1)
             }
         }
     }

@@ -11,9 +11,9 @@ CLI builds do not require that icon pipeline.
 
 Run from the repository root:
 
-    swift test
-    swift build -c release
-    python3 scripts/verify_cli.py "$(swift build -c release --show-bin-path)/fralo"
+    swift test --build-system native
+    swift build --build-system native -c release
+    python3 scripts/verify_cli.py "$(swift build --build-system native -c release --show-bin-path)/fralo"
     python3 scripts/check_public_source.py
 
 The CLI checks generate ten PNG fixtures in a temporary directory and isolate
@@ -66,3 +66,11 @@ or manual icon placement is needed to build the DMG.
 
 After publication, use the repository's Issues and pull requests.
 The planned repository is https://github.com/SoaringLabs/Fralo; it may not exist yet.
+
+The app and preview scripts currently select SwiftPM's native build backend. With
+the installed Xcode 27 toolchain, the default backend stamps `LC_BUILD_VERSION`
+with `sdk 14.0` even though it compiles using SDK 27; AppKit consequently renders
+the legacy toolbar. The native backend records `minos 14.0`, `sdk 27.0` and enables
+the system's round toolbar buttons and grouped glass. This backend is deprecated
+by SwiftPM; remove the workaround once the default backend records the actual SDK.
+Check the executable with `xcrun vtool -show-build` when changing build tooling.

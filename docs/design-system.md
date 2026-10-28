@@ -98,8 +98,14 @@ Changing appearance does not rerender artwork, rewrite composition/CLI settings 
 
 ## Column-aware native header
 
-The production header follows the window's column ownership. A full-height native `NSSplitViewController` sidebar and `NSTrackingSeparatorToolbarItem` align the left titlebar region with the sidebar divider. Add Images and the sidebar toggle stay in that region. The content region owns the current filename/count, a native momentary toolbar group for Copy/Inspector, and `NSMenuToolbarItem` for More. Window chrome is transparent and has no full-width bottom separator. When the sidebar is hidden, its toolbar separator is removed while Add/Toggle remain reachable.
+The production header follows the window's column ownership. A full-height native `NSSplitViewController` sidebar and `NSTrackingSeparatorToolbarItem` align the left titlebar region with the sidebar divider. Add Images and the sidebar toggle stay in that region. The content region owns the current filename/count, a native momentary toolbar group for Copy/Export Current, an independent Inspector button, and `NSMenuToolbarItem` for More. Window chrome is transparent and has no full-width bottom separator. When the sidebar is hidden, its toolbar separator is removed while Add/Toggle remain reachable.
 
 The previous full-width header and duplicate full-width sidebar Add action are superseded. Native toolbar items own titlebar sizing, hover, menus and hit areas; shared Fralo components continue to own the workbench controls. The right inspector remains 360 pt wide. Its production surface uses native visual-effect material instead of native glass hosting because the latter showed displaced content when a containing split pane moved. Radius, tint, shadow and accessibility fallbacks are retained. The explicit Debug compositor probe may still opt into glass.
 
 The implementation follows [Apple's sectioned toolbar API](https://developer.apple.com/documentation/appkit/nstrackingseparatortoolbaritem) and [full-height sidebar guidance](https://developer.apple.com/videos/play/wwdc2020/10104/). The runnable result and local verification are recorded in workbench-migration.md.
+
+Toolbar groups follow actions rather than proximity: Copy and Export Current share
+a native output group; Inspector and More each have their own round native button.
+Fixed spaces keep Add and Sidebar independent too. Filename/count explicitly use
+`isBordered = false`. Build/preview scripts select the native SwiftPM backend to
+record the actual SDK and allow AppKit to render these shapes; see CONTRIBUTING.md.

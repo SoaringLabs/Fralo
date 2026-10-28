@@ -166,3 +166,32 @@ WorkbenchHeader owns the toolbar and native controls; WorkbenchView owns native 
 Native-window checks exposed stale glass-hosted inspector contents after a containing split pane changed origin. Production therefore selects the shared visual-effect material path with the same panel radius, tint and shadow. FloatingPanel gains an optional glass choice, preserving the default for existing lab scenarios; only the explicit Debug `--panel-render-check` route opts the production window back into glass. The probe regression supplies that option explicitly. No experimental route is added to Release.
 
 All 76 Debug and 68 Release tests passed, with no conflicting-constraint diagnostics. Production-window coverage includes native split/toolbar ownership, tracking-divider identity, preserved batch/artwork/settings/copy output, focus and persisted state, rapid collapse/reveal, minimum/default/wide geometry, readable preview controls and native action/menu wiring. Live checks verified Add opens the file chooser and cancellation preserves all 11 inputs; More opens application settings; the native action group hides/reveals the inspector; light/default, inactive, dark/minimum, collapsed and empty states were inspected. Final screenshots and launch/build provenance are retained in this chat's fralo-sectioned-header folder. Full VoiceOver speech, fullscreen and subjective visual acceptance remain unclaimed. No push, merge or release is included.
+
+
+## Native toolbar grouping — 2026-10-28
+
+Add and Sidebar are separate native circular items. Copy and Export Current share
+one momentary native output group; Inspector and More are independent circular
+items. Fixed toolbar spaces express these boundaries. Filename/count remain
+unbordered text. Export Current reuses the existing save panel and output pipeline;
+empty and busy states use separate availability for Copy and Export. Batch export
+remains in the inspector footer.
+
+Live inspection caught a build-tool issue: Xcode 27's default SwiftPM backend
+recorded `minos 14.0`, `sdk 14.0` in the executable despite compiling with SDK 27.
+`--sdk` and `-sdk_version` did not fix that backend. The native backend records
+`minos 14.0`, `sdk 27.0`, and the same AppKit controls then display the intended
+round and capsule glass. Both preview launchers and packaging now explicitly
+select this backend. It is deprecated by SwiftPM, so this is a documented
+workaround to remove when the default backend records the real SDK. No binary
+restamping, custom glass toolbar, or increase to the deployment minimum is used.
+
+The final native-backend run passes 76 Debug and 68 Release tests. The Release
+resize test now waits for native split/stack layout to settle before checking
+regular preview-control spacing; its immediate assertion had raced that layout.
+Native UI checks cover light/default, dark/minimum, sidebar collapse, empty-state
+output disabling, independent inspector hide/reveal, and Export Current opening
+the correctly named save panel and cancelling without changing the batch.
+Screenshots and launch/build records are in the chat's fralo-toolbar-groups
+preview folder. Older macOS, full VoiceOver speech, fullscreen and human visual
+acceptance remain unverified. No push, merge or release is included.

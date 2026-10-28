@@ -1,12 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
+# Use the native SwiftPM backend: Xcode 27's default backend stamps the deployment target as SDK.
 # Always builds Debug, with a separate bundle identity and isolated settings.
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
 build_only=false
 if [[ "${1:-}" == "--build-only" ]]; then build_only=true; shift; fi
-swift build --package-path "$project_root" --product FraloApp
-binary_directory="$(swift build --package-path "$project_root" --show-bin-path)"
+swift build --build-system native --package-path "$project_root" --product FraloApp
+binary_directory="$(swift build --build-system native --package-path "$project_root" --show-bin-path)"
 preview_bundle="$(python3 - "$project_root" "$binary_directory" <<'PY'
 from pathlib import Path
 import plistlib, shutil, subprocess, sys, tempfile

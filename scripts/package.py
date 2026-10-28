@@ -52,8 +52,8 @@ def main():
             parser.error("DMG layout requires dmgbuild. Run: python3 -m venv .venv; "
                          ".venv/bin/python -m pip install -r scripts/requirements-dmg.txt; "
                          "then use .venv/bin/python scripts/package.py --dmg")
-    run("swift", "build", "-c", args.configuration)
-    binary_dir = Path(subprocess.check_output(["swift", "build", "-c", args.configuration, "--show-bin-path"], cwd=ROOT, text=True).strip())
+    run("swift", "build", "--build-system", "native", "-c", args.configuration)
+    binary_dir = Path(subprocess.check_output(["swift", "build", "--build-system", "native", "-c", args.configuration, "--show-bin-path"], cwd=ROOT, text=True).strip())
     dist = ROOT / "dist"
     dist.mkdir(exist_ok=True)
     app = dist / "Fralo.app"
