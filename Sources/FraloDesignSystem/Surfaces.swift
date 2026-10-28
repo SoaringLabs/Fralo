@@ -353,7 +353,9 @@ public final class CanvasSurface: NSView {
         wantsLayer = true
         CATransaction.begin(); CATransaction.setDisableActions(true)
         if artworkClip.superlayer == nil {
-            artworkClip.masksToBounds = true; artworkClip.isGeometryFlipped = true
+            // The AppKit backing layer already carries this flipped NSView's geometry.
+            // Flipping the standalone clip again mirrors live Y relative to the final raster.
+            artworkClip.masksToBounds = true
             artworkClip.addSublayer(backgroundArtwork); artworkClip.addSublayer(deviceArtwork); artworkClip.addSublayer(artworkGuides)
             layer?.addSublayer(artworkClip)
             artworkGuides.fillColor = nil; artworkGuides.lineWidth = 1

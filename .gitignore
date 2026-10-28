@@ -27,7 +27,6 @@ __pycache__/
 *.p8
 *.key
 *.certSigningRequest
-/AGENTS.md
 
 # Plane workflow response snapshots and local-only artifacts (including historical names).
 /.plane-devflow.local/
