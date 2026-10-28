@@ -149,13 +149,14 @@ public enum CompositionRenderer {
             context.setStrokeColor(CGColor(gray: 0.55, alpha: 1)); context.setLineWidth(3)
             context.addPath(CGPath(roundedRect: CGRect(origin: .zero, size: size).insetBy(dx: 3, dy: 3), cornerWidth: 60, cornerHeight: 60, transform: nil)); context.strokePath()
             context.setFillColor(CGColor(gray: 0.02, alpha: 1)); context.fillEllipse(in: CGRect(x: size.width / 2 - 5, y: 13, width: 10, height: 10))
+        } else if settings.browser == .chrome {
+            ChromeShellArtwork.draw(in: context, width: size.width)
         } else {
             for (i, color) in [ArtworkColor(1, 0.36, 0.33), ArtworkColor(1, 0.75, 0.24), ArtworkColor(0.18, 0.8, 0.3)].enumerated() {
                 context.setFillColor(color.cgColor); context.fillEllipse(in: CGRect(x: 22 + i * 25, y: 24, width: 15, height: 15))
             }
-            let barY: CGFloat = settings.browser == .chrome ? 48 : 14
+            let barY: CGFloat = 14
             fill(CGRect(x: 230, y: barY, width: size.width - 460, height: 36), radius: 9, color: CGColor(gray: 0.98, alpha: 1), context: context)
-            if settings.browser == .chrome { fill(CGRect(x: 130, y: 7, width: 260, height: 34), radius: 8, color: CGColor(gray: 0.99, alpha: 1), context: context) }
             context.setStrokeColor(CGColor(gray: 0.45, alpha: 1)); context.setLineWidth(2)
             for (index, x) in [CGFloat(125), CGFloat(166)].enumerated() {
                 let edge: CGFloat = index == 0 ? 6 : -6
