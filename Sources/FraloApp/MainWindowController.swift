@@ -186,7 +186,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         return inspectorUI
     }
     private func dragArtwork(_ delta: CGPoint, snapping: Bool = true) {
-        guard settings.mode == .background, !isExporting else { return }
+        guard settings.mode == .background, positioningLayers != nil, !isExporting else { return }
         if !artworkDragChanged {
             dragSettingsStart = settings
             // Invalidate any pending final image before the first live transform.
@@ -262,7 +262,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         finishArtworkDrag()
     }
     private func updateCanvasInteraction() {
-        let enabled = settings.mode == .background && selectedIndex != nil && !isExporting
+        let enabled = settings.mode == .background && selectedIndex != nil && positioningLayers != nil && !isExporting
         canvas.allowsPositioning = enabled
         let target = inspectorUI.dragBackground ? "背景取景" : "设备位置"
         let help = enabled ? "拖动调整" + target + "；按 ⌥ 和方向键微调。上下键切换图片，Esc 返回编辑。" : "上下键切换图片，Tab 切换焦点，Esc 返回编辑。"
@@ -703,7 +703,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             menuItem.title = workbench.previewing ? "返回编辑" : "成品预览"; return !items.isEmpty
         case #selector(previousImage(_:)): return !isExporting && (selectedIndex ?? 0) > 0
         case #selector(nextImage(_:)): return !isExporting && selectedIndex.map { $0 + 1 < items.count } == true
-        case #selector(nudgeArtwork(_:)): return !isExporting && !editingText && selectedIndex != nil && settings.mode == .background
+        case #selector(nudgeArtwork(_:)): return canvas.allowsPositioning && !editingText
         default: break
         }
         if menuItem.action == #selector(showSettings(_:)) { return true }

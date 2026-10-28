@@ -37,12 +37,14 @@ final class PanelRenderingProbe: NSObject {
             let opacity = panel.layer?.shadowOpacity ?? 0
             restore.append { [weak panel] in panel?.layer?.shadowOpacity = opacity }
         }
+        #if compiler(>=6.4) // The interactive-glass diagnostic requires the SDK shipped with Xcode 27.
         if #available(macOS 27.0, *) {
             for glass in views.compactMap({ $0 as? NSGlassEffectView }) {
                 let interactive = glass.effectIsInteractive
                 restore.append { [weak glass] in glass?.effectIsInteractive = interactive }
             }
         }
+        #endif
         if showsControls {
             bar.orientation = .horizontal; bar.spacing = 6; bar.alignment = .centerY
             let label = NSTextField(labelWithString: "面板诊断"); label.font = .systemFont(ofSize: 11)
@@ -75,9 +77,12 @@ final class PanelRenderingProbe: NSObject {
         switch value {
         case .baseline: break
         case .staticGlass:
+            #if compiler(>=6.4)
             if #available(macOS 27.0, *), let root = window?.contentView {
                 Self.descendants(root).compactMap { $0 as? NSGlassEffectView }.forEach { $0.effectIsInteractive = false }
             }
+            #endif
+            break
         case .nativeShadow: panels.forEach { $0.layer?.shadowOpacity = 0 }
         case .clipped: surfaces.forEach { $0.layer?.masksToBounds = true }
         }
@@ -92,9 +97,11 @@ final class PanelRenderingProbe: NSObject {
     private func record(_ phase: String) {
         guard let report else { return }
         var glassState: [Bool] = []
+        #if compiler(>=6.4)
         if #available(macOS 27.0, *), let root = window?.contentView {
             glassState = Self.descendants(root).compactMap { ($0 as? NSGlassEffectView)?.effectIsInteractive }
         }
+        #endif
         events.append(["phase": phase, "uptime": ProcessInfo.processInfo.systemUptime, "mode": mode.rawValue,
             "windowKey": window?.isKeyWindow ?? false, "appActive": NSApp.isActive,
             "interactiveGlass": glassState, "panelClipping": surfaces.map { $0.layer?.masksToBounds ?? false },

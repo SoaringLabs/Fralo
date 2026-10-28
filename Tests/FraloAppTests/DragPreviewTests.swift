@@ -78,6 +78,44 @@ final class DragPreviewTests: XCTestCase {
             XCTAssertEqual(board.data(forType: .png), try (format == .png ? CompositionRenderer.data(expected.image, settings: saved) : FrameRenderer.pngData(expected.image)), "Copy must contain the final composition with the existing PNG/JPEG contract")
         }
     }
+    @MainActor func testPendingReplacementCannotBeCancelledByDraggingStaleArtwork() async throws {
+        _ = NSApplication.shared
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let suite = "fralo-pending-drag-\(UUID())", defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let store = SettingsStore(url: directory.appendingPathComponent("settings.json"))
+        var settings = CompositionSettings(); settings.mode = .background; settings.background = .solid
+        try CompositionStore(legacy: store).save(settings)
+        let controller = MainWindowController(store: store, preferences: defaults, restoreWindow: false)
+        let window = try XCTUnwrap(controller.window)
+        defer { window.close(); defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: directory) }
+        func descendants(_ v: NSView) -> [NSView] { [v] + v.subviews.flatMap { descendants($0) } }
+        let root = try XCTUnwrap(window.contentView)
+        let canvas = try XCTUnwrap(descendants(root).compactMap { $0 as? CanvasSurface }.first)
+        let inspector = try XCTUnwrap(descendants(root).compactMap { $0 as? CompositionInspector }.first)
+        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/FraloApp/Development/Fixtures/03-journal.png")
+        controller.importURLs([source])
+        for _ in 0..<500 where canvas.image == nil { try await Task.sleep(nanoseconds: 10_000_000) }
+        let initial = try XCTUnwrap(canvas.image)
+        inspector.devicePicker.choose(1)
+        let generation = controller.previewRequest
+        XCTAssertFalse(canvas.allowsPositioning, "Old pixels are not a prepared layer set for the new device")
+        let point = canvas.convert(CGPoint(x: canvas.imageRect.midX, y: canvas.imageRect.midY), to: nil)
+        func event(_ type: NSEvent.EventType, _ offset: CGFloat) throws -> NSEvent {
+            try XCTUnwrap(NSEvent.mouseEvent(with: type, location: CGPoint(x: point.x + offset, y: point.y), modifierFlags: [],
+                timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
+        }
+        canvas.mouseDown(with: try event(.leftMouseDown, 0))
+        canvas.mouseDragged(with: try event(.leftMouseDragged, 80))
+        canvas.onDrag?(CGPoint(x: 0.1, y: 0)) // A stale callback must be rejected by the owner too.
+        canvas.mouseUp(with: try event(.leftMouseUp, 80))
+        XCTAssertEqual(controller.previewRequest, generation, "Dragging old pixels must not cancel the pending replacement")
+        XCTAssertEqual(try CompositionStore(legacy: store).load().deviceX, 0)
+        for _ in 0..<500 where canvas.image === initial { try await Task.sleep(nanoseconds: 10_000_000) }
+        XCTAssertFalse(canvas.image === initial); XCTAssertTrue(canvas.allowsPositioning)
+        XCTAssertFalse(canvas.isPositioningArtwork)
+    }
+
     /// Opt-in visible-window cadence probe. Run separately from the test suite and UI QA.
     @MainActor func testVisibleDragCadence() async throws {
         guard let reportPath = ProcessInfo.processInfo.environment["FRALO_LIVE_DRAG_REPORT"] else {

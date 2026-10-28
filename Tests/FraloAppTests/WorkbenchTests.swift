@@ -141,6 +141,7 @@ final class WorkbenchTests: XCTestCase {
         inspector.dragBackground = true
         inspector.devicePicker.choose(1)
         inspector.devicePicker.choose(0)
+        for _ in 0..<150 where !canvas.allowsPositioning { try await Task.sleep(nanoseconds: 20_000_000) }
         XCTAssertFalse(inspector.dragBackground, "Editing the device must leave background dragging")
         let point = canvas.convert(NSPoint(x: canvas.imageRect.midX, y: canvas.imageRect.midY), to: nil)
         let down = try XCTUnwrap(NSEvent.mouseEvent(with: .leftMouseDown, location: point, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
@@ -185,7 +186,19 @@ final class WorkbenchTests: XCTestCase {
         let data = try XCTUnwrap(board.data(forType: .png))
         let image = try ImageInput(data: data, name: "copied.png").decode()
         let expected = try CompositionRenderer.render(ImageInput(url: source), settings: settings)
-        XCTAssertEqual(data, try FrameRenderer.pngData(expected.image), "Copy must use the raw composition even when the preview format is JPEG")
+        let expectedData = try FrameRenderer.pngData(expected.image)
+        if data != expectedData {
+            // Preserve the original assertion and failing buffers, rather than losing a rare output discrepancy.
+            let diagnosticRoot = ProcessInfo.processInfo.environment["FRALO_TEST_ARTIFACTS"].map { URL(fileURLWithPath: $0) } ?? FileManager.default.temporaryDirectory
+            let diagnostics = diagnosticRoot.appendingPathComponent("fralo-copy-mismatch-\(UUID())")
+            try FileManager.default.createDirectory(at: diagnostics, withIntermediateDirectories: true)
+            try data.write(to: diagnostics.appendingPathComponent("copied.png"))
+            try expectedData.write(to: diagnostics.appendingPathComponent("expected.png"))
+            try Data(contentsOf: source).write(to: diagnostics.appendingPathComponent("source.png"))
+            try JSONEncoder().encode(settings).write(to: diagnostics.appendingPathComponent("settings.json"))
+            print("[CopyMismatch] Failing buffers preserved at \(diagnostics.path)")
+        }
+        XCTAssertEqual(data, expectedData, "Copy must use the raw composition even when the preview format is JPEG")
         XCTAssertEqual(image.width, expected.image.width)
     }
 

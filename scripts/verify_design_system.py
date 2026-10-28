@@ -44,7 +44,7 @@ def code_identity(binary):
 
 
 def binary_path(configuration):
-    path = subprocess.check_output(['swift', 'build', '-c', configuration, '--show-bin-path'], cwd=ROOT, text=True).strip()
+    path = subprocess.check_output(['swift', 'build', '--build-system', 'native', '-c', configuration, '--show-bin-path'], cwd=ROOT, text=True).strip()
     return Path(path) / 'FraloApp'
 
 

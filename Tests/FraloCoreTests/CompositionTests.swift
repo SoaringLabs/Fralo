@@ -4,6 +4,22 @@ import ImageIO
 @testable import FraloCore
 
 final class CompositionTests: XCTestCase {
+    func testPackagedResourcesResolveInsideAppBeforeBuildFallback() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let hostURL = directory.appendingPathComponent("Host.app")
+        let resources = hostURL.appendingPathComponent("Contents/Resources")
+        try FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
+        let info: [String: String] = ["CFBundleIdentifier": "app.fralo.resource-test", "CFBundlePackageType": "APPL"]
+        try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0).write(to: hostURL.appendingPathComponent("Contents/Info.plist"))
+        let copied = resources.appendingPathComponent("Fralo_FraloCore.bundle")
+        try FileManager.default.copyItem(at: CompositionRenderer.resourceBundle().bundleURL, to: copied)
+        let host = try XCTUnwrap(Bundle(url: hostURL))
+        let resolved = CompositionRenderer.resourceBundle(in: host)
+        XCTAssertEqual(resolved.bundleURL.standardizedFileURL, copied.standardizedFileURL)
+        XCTAssertNotNil(resolved.url(forResource: "warm-gray", withExtension: "png", subdirectory: "Resources/Backgrounds"))
+    }
+
     private func input() throws -> ImageInput {
         let c = try XCTUnwrap(CompositionRenderer.bitmap(CGSize(width: 400, height: 100)))
         c.setFillColor(CGColor(gray: 1, alpha: 1)); c.fill(CGRect(x: 0, y: 0, width: 400, height: 100))

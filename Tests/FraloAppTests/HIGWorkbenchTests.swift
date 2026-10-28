@@ -48,11 +48,12 @@ final class HIGWorkbenchTests: XCTestCase {
         window.makeFirstResponder(canvas)
         let command = NSMenuItem(title: "向右移动", action: #selector(MainWindowController.nudgeArtwork(_:)), keyEquivalent: "")
         command.representedObject = NSValue(point: CGPoint(x: 1, y: 0))
+        for _ in 0..<1500 where !canvas.allowsPositioning { try await Task.sleep(nanoseconds: 5_000_000) }
         XCTAssertTrue(controller.validateMenuItem(command)); controller.nudgeArtwork(command)
         XCTAssertEqual(try CompositionStore(legacy: store).load().deviceX, 1 / 2400, accuracy: 0.000001)
         controller.undoChange(nil); XCTAssertEqual(try CompositionStore(legacy: store).load().deviceX, 0)
         controller.redoChange(nil); XCTAssertEqual(try CompositionStore(legacy: store).load().deviceX, 1 / 2400, accuracy: 0.000001)
-        for _ in 0..<1500 where canvas.image == nil { try await Task.sleep(nanoseconds: 5_000_000) }
+        for _ in 0..<1500 where !canvas.allowsPositioning { try await Task.sleep(nanoseconds: 5_000_000) }
         window.contentView?.layoutSubtreeIfNeeded()
         let p = canvas.convert(CGPoint(x: canvas.imageRect.midX, y: canvas.imageRect.midY), to: nil)
         func event(_ type: NSEvent.EventType, _ dx: CGFloat) throws -> NSEvent {

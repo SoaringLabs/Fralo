@@ -9,6 +9,7 @@ final class ArtworkDirectionTests: XCTestCase {
         let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 448, height: 448), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false; defer { window.close() }
         let canvas = CanvasSurface(frame: CGRect(x: 0, y: 0, width: 448, height: 448))
+        canvas.allowsPositioning = true
         canvas.showsTransparencyGrid = false; canvas.zoom = 1
         window.contentView = canvas
         let initial = CGRect(x: 180, y: 170, width: 40, height: 60)

@@ -72,7 +72,6 @@ public final class MaterialSurface: NSView {
         }
         if #available(macOS 26.0, *), let glass = nativeGlass as? NSGlassEffectView {
             glass.cornerRadius = cornerRadius
-            if #available(macOS 27.0, *) { glass.effectIsInteractive = false }
         }
         panelTint.isHidden = role != .panel
         fallbackView.isHidden = !preferences.effectiveReduceTransparency
@@ -333,7 +332,15 @@ public final class CanvasSurface: NSView {
     public var zoom: CGFloat? { didSet { needsDisplay = true } }
     public override var isFlipped: Bool { true }
     public override var acceptsFirstResponder: Bool { true }
-    public var allowsPositioning = false { didSet { window?.invalidateCursorRects(for: self) } }
+    public var allowsPositioning = false {
+        didSet {
+            if !allowsPositioning {
+                dragPoint = nil
+                if positioningCursorPushed { NSCursor.pop(); positioningCursorPushed = false }
+            }
+            window?.invalidateCursorRects(for: self)
+        }
+    }
     public override func resetCursorRects() {
         super.resetCursorRects()
         if allowsPositioning { addCursorRect(imageRect, cursor: .openHand) }
@@ -412,12 +419,13 @@ public final class CanvasSurface: NSView {
     private var dragPoint: CGPoint?
     private var positioningCursorPushed = false
     public override func mouseDown(with event: NSEvent) {
-        window?.makeFirstResponder(self); dragPoint = convert(event.locationInWindow, from: nil)
+        window?.makeFirstResponder(self); dragPoint = allowsPositioning ? convert(event.locationInWindow, from: nil) : nil
         if allowsPositioning && !positioningCursorPushed { NSCursor.closedHand.push(); positioningCursorPushed = true }
     }
     public override func mouseDragged(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        if let previous = dragPoint, imageRect.width > 0, imageRect.height > 0 {
+        guard allowsPositioning, let previous = dragPoint else { return }
+        if imageRect.width > 0, imageRect.height > 0 {
             onDrag?(CGPoint(x: (point.x - previous.x) / imageRect.width, y: (point.y - previous.y) / imageRect.height))
         }
         dragPoint = point

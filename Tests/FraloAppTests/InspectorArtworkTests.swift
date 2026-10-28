@@ -5,6 +5,22 @@ import FraloDesignSystem
 @testable import FraloApp
 
 final class InspectorArtworkTests: XCTestCase {
+    @MainActor func testPackagedResourcesResolveInsideAppBeforeBuildFallback() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let hostURL = directory.appendingPathComponent("Host.app")
+        let resources = hostURL.appendingPathComponent("Contents/Resources")
+        try FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
+        let info: [String: String] = ["CFBundleIdentifier": "app.fralo.resource-test", "CFBundlePackageType": "APPL"]
+        try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0).write(to: hostURL.appendingPathComponent("Contents/Info.plist"))
+        let copied = resources.appendingPathComponent("Fralo_FraloApp.bundle")
+        try FileManager.default.copyItem(at: InspectorArtwork.resourceBundle().bundleURL, to: copied)
+        let host = try XCTUnwrap(Bundle(url: hostURL))
+        let resolved = InspectorArtwork.resourceBundle(in: host)
+        XCTAssertEqual(resolved.bundleURL.standardizedFileURL, copied.standardizedFileURL)
+        XCTAssertNotNil(resolved.url(forResource: "phone-portrait", withExtension: "png", subdirectory: "Resources/InspectorDemos"))
+    }
+
     @MainActor func testDirectionKeepsControlIdentityKeyboardFocusAndEditsRealSettings() async throws {
         _ = NSApplication.shared
         let inspector = CompositionInspector(settings: CompositionSettings())

@@ -27,6 +27,7 @@ if len(frameworks) != 1:
 shutil.copytree(frameworks[0], app / 'Contents/Frameworks/Sparkle.framework', symlinks=True)
 shutil.copytree(root / 'Sources/FraloApp/Development/Fixtures', resources / 'DesignLabFixtures')
 shutil.copytree(binary / 'Fralo_FraloCore.bundle', resources / 'Fralo_FraloCore.bundle')
+shutil.copytree(binary / 'Fralo_FraloApp.bundle', resources / 'Fralo_FraloApp.bundle')
 info = {
     'CFBundleName': 'Fralo Design Lab', 'CFBundleDisplayName': 'Fralo Design Lab',
     'CFBundleIdentifier': 'app.fralo.designlab.local', 'CFBundleExecutable': 'FraloApp',

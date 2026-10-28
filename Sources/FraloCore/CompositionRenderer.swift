@@ -45,6 +45,11 @@ public struct CompositionPreviewLayers {
 
 /// Deterministic image assembly. Never inspects screenshot content or changes its crop.
 public enum CompositionRenderer {
+    /// SwiftPM's native accessor searches the app root; signed apps store resources in Contents/Resources.
+    static func resourceBundle(in host: Bundle = .main) -> Bundle {
+        if let url = host.resourceURL?.appendingPathComponent("Fralo_FraloCore.bundle"), let bundle = Bundle(url: url) { return bundle }
+        return .module
+    }
     private static let strongestShadowBlur: CGFloat = 42
     private static let shadowOffsetY: CGFloat = 12
     public static func backgroundData(_ settings: CompositionSettings) throws -> Data? {
@@ -59,7 +64,7 @@ public enum CompositionRenderer {
             return try Data(contentsOf: URL(fileURLWithPath: path))
         default: return nil
         }
-        guard let url = Bundle.module.url(forResource: name, withExtension: "png", subdirectory: "Resources/Backgrounds") else {
+        guard let url = resourceBundle().url(forResource: name, withExtension: "png", subdirectory: "Resources/Backgrounds") else {
             throw FraloError.message("找不到内置背景素材：\(name)")
         }
         return try Data(contentsOf: url)

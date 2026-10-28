@@ -5,7 +5,8 @@ Fralo is maintained by [Soaring Labs](https://github.com/SoaringLabs), with
 
 ## Development
 
-Use macOS with Xcode / Swift and Python 3. The package targets macOS 14.
+Use macOS with Xcode 26.3 or newer (macOS 26 SDK) and Python 3. The package
+targets macOS 14; runtime availability checks retain older-system fallbacks.
 Full App packaging compiles the layered icon with Xcode 27's actool; tests and
 CLI builds do not require that icon pipeline.
 
