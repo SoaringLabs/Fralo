@@ -79,8 +79,9 @@ final class DockedSidebar: NSView {
         scroll.automaticallyAdjustsContentInsets = false
         if abs(scroll.contentInsets.top - top) > 0.5 {
             let wasAtTop = abs(scroll.contentView.bounds.minY + scroll.contentInsets.top) < 1
+            // AppKit also applies contentInsets to the scroller; a matching
+            // scrollerInsets.top would add the fixed heading's height twice.
             scroll.contentInsets = NSEdgeInsets(top: top, left: 0, bottom: 0, right: 0)
-            scroll.scrollerInsets = NSEdgeInsets(top: top, left: 0, bottom: 0, right: 0)
             if wasAtTop {
                 scroll.contentView.scroll(to: NSPoint(x: 0, y: -top))
                 scroll.reflectScrolledClipView(scroll.contentView)

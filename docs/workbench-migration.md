@@ -320,7 +320,7 @@ FRALO-8 restores the production left column's native vertical scrollbar and
 lets the list scroll underneath its fixed image heading. macOS 26 uses a native
 split-item accessory; 26.1+ selects the system soft scroll edge after the
 automatic style showed a hard border. The compatibility path uses a within-window
-header material with content and scroller insets. Rows retain their 10 pt outer
+header material with a content inset protecting the first row. Rows retain their 10 pt outer
 spacing, and collapsing transfers focus out of both the list and the new native
 heading accessory. The image count now uses full label contrast.
 
@@ -442,3 +442,26 @@ longer than the180ms transition and did not independently capture intermediate
 frames; smooth interpolation is established by the native rendered-frame test,
 not those endpoint screenshots. The latest preview restores the user's most
 recent04-sample.png selection and scroll0.013215859.
+
+### Compatibility scrollbar alignment — 2026-10-30
+
+The macOS 14/15 compatibility path no longer adds a separate scroller inset:
+AppKit already applies the content inset to the scroller. The duplicate inset
+placed the track at 128 pt when the fixed heading ended at 64 pt. Keeping only
+the content inset aligns the track with the heading and retains first-row
+protection. The macOS 26+ native accessory path and the accepted knob artwork,
+spacing and fade are unchanged. This retains the native hierarchy and behavior
+described in Apple's [sidebar guidance](https://developer.apple.com/design/human-interface-guidelines/sidebars).
+
+The new production-component regression forces the compatibility path, checks
+both legacy and overlay scrollers at two window sizes, and asserts track-top
+alignment, full remaining track height and first-row visibility. It failed all
+four alignment cases before the fix and passes afterward. All 8 scrolling tests,
+the 59-test related suite on recheck, and the native Release build pass.
+
+The first related-suite run hit the previously recorded PNG-copy byte mismatch;
+its copied/expected/source images and settings were preserved outside Git. The
+unchanged copy test passed in isolation and in the related-suite recheck. No
+renderer or copy assertion was changed, and the intermittent cause remains
+unconfirmed. Tests exercised the compatibility path on the current OS; macOS
+14/15 hardware and full VoiceOver remain unverified.

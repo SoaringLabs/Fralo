@@ -83,6 +83,34 @@ final class SidebarScrollingTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(table.convert(table.rect(ofRow: 0), to: sidebar).minY, header.convert(header.bounds, to: sidebar).maxY)
     }
 
+    @MainActor func testCompatibilityScrollerAlignsWithHeadingAfterResizeInBothStyles() async throws {
+        _ = NSApplication.shared
+        let list = BatchList(entries: (0..<30).map { BatchEntry(id: String($0), title: "image-\($0).png") })
+        let header = NSTextField(labelWithString: "图片 30")
+        let sidebar = DockedSidebar(header: header, body: list, footer: NSView(), usesNativeHeader: false)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 280, height: 640), styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; defer { window.close() }
+        window.contentView = sidebar
+        let headingContainer = try XCTUnwrap(header.superview)
+        let table = try XCTUnwrap(list.documentView as? NSTableView)
+        for style in [NSScroller.Style.legacy, .overlay] {
+            list.scrollerStyle = style
+            for size in [NSSize(width: 280, height: 640), NSSize(width: 320, height: 900)] {
+                window.setContentSize(size); sidebar.layoutSubtreeIfNeeded(); list.tile()
+                let heading = headingContainer.convert(headingContainer.bounds, to: sidebar)
+                let scroller = try XCTUnwrap(list.verticalScroller)
+                let track = scroller.convert(scroller.bounds, to: sidebar)
+                XCTAssertEqual(track.minY, heading.maxY, accuracy: 1,
+                               "The scroller must start immediately below the fixed heading, without a second header-sized gap")
+                XCTAssertEqual(track.maxY, list.convert(list.bounds, to: sidebar).maxY, accuracy: 1,
+                               "The scroller keeps the full remaining list height")
+                list.select(0); sidebar.layoutSubtreeIfNeeded()
+                XCTAssertGreaterThanOrEqual(table.convert(table.rect(ofRow: 0), to: sidebar).minY, heading.maxY - 1,
+                                            "Removing the extra scroller inset must retain first-row protection")
+            }
+        }
+    }
+
     @MainActor func testSidebarScrollerPaintsASixPointKnobWithoutATrack() async throws {
         _ = NSApplication.shared
         let list = BatchList(entries: (0..<30).map { BatchEntry(id: String($0), title: "image-\($0).png") })
