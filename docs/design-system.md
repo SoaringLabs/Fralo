@@ -116,3 +116,46 @@ between icon centers). Adjacent toolbar items merge into one system glass
 surface, without the divider or tighter spacing produced by NSToolbarItemGroup's
 segmented representation. Tooltip, accessibility label, enabled state and target
 action remain native and independent for each button.
+
+
+### Sidebar scrolling
+
+The production batch sidebar uses a native `NSScroller` with a six-point rounded
+knob and no painted track. `SidebarScroller` overrides only native part drawing
+and the knob's horizontal hit rectangle, keeping AppKit dragging, paging,
+overlay fading and accessibility behavior. The larger native hit target remains
+independent of the thin artwork. Both legacy/Always and overlay modes retain the
+same narrow, transparent-track appearance; visibility still follows the native
+preference, without changing the user's global settings. The knob rests at low
+contrast, darkens when the pointer enters its native hit area or during native
+knob tracking, and returns to its idle color on exit/release. Color emphasis uses the native
+AppKit animator with the design system's 180 ms selection timing and an ease-in/out
+curve. Rapid reversals retarget the current value. Reduce Motion cancels the fade
+and applies its endpoint immediately. A passive local pointer-event
+observer also updates the state when a click or scroll relocates the pointer
+without an intermediate tracking-area boundary event; it returns native events
+unchanged. Increased contrast strengthens both states rather than adding a track
+or changing width.
+
+The inspector and lab panels retain their existing hidden indicators. The scroll
+viewport retains native clip/scroller tiling. Rows use a 10 pt leading inset and
+a 15 pt trailing budget measured from the scroll view's outer edge, subtracting
+any native gutter instead of adding it again. The sidebar scroller uses native
+small-control metrics, with a hit area wider than its six-point artwork.
+Selection and keyboard focus share the row bounds. This leaves 7 pt between the
+card and knob in both styles, while long labels stay outside the native hit area.
+
+On macOS 26 the fixed image heading is a split-item top accessory, which supplies
+safe-area insets and the system scroll edge effect. macOS 26.1 and later use the
+native soft edge to match the supplied reference: automatic produced a hard edge
+for the unboxed title. The count uses full label contrast to stay readable
+on the material. macOS 14/15 use a fixed `headerView` material with within-window
+blending and explicit content/scroller insets; Reduce Transparency makes this
+compatibility header opaque. Both paths keep the first and keyboard-selected
+rows below the heading, and include the heading in sidebar focus ownership.
+
+This follows [Apple's scroll-edge guidance](https://developer.apple.com/design/human-interface-guidelines/scroll-views)
+and [split item accessory guidance](https://developer.apple.com/videos/play/wwdc2025/310/).
+The soft edge is a deliberate choice based on the user reference and requires
+legibility checks in light/dark appearances; it is not a claim that Find My uses
+the same internal implementation.

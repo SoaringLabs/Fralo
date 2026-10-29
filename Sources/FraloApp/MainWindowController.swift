@@ -92,7 +92,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         center.view = DropContainer()
         (center.view as? DropContainer)?.onDrop = { [weak self] in self?.importURLs($0) }
         let title = FraloStyle.text("图片"); title.font = .systemFont(ofSize: 13, weight: .semibold)
-        batchCount.font = .monospacedDigitSystemFont(ofSize: 13, weight: .medium); batchCount.textColor = .tertiaryLabelColor
+        batchCount.font = .monospacedDigitSystemFont(ofSize: 13, weight: .medium); batchCount.textColor = .labelColor
         addButton.onPress = { [weak self] in self?.addImages(nil) }
         let heading = FraloStyle.stack([title, batchCount, NSView(), addButton], axis: .horizontal, spacing: 6)
         let left = DockedSidebar(header: heading, body: list, footer: NSView())
@@ -290,7 +290,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
                       sidebarHidden: workbench.collapsed || workbench.previewing,
                       inspectorVisible: !workbench.inspectorHidden && !workbench.previewing,
                       canAdd: !isExporting, canCopy: rendered != nil && !isExporting, canExport: selectedIndex != nil && !isExporting)
-        if workbench.collapsed, let focus = window?.firstResponder as? NSView, focus.isDescendant(of: workbench.left) {
+        if workbench.collapsed, let focus = window?.firstResponder as? NSView, workbench.left.containsSidebarView(focus) {
             window?.makeFirstResponder(canvas)
         }
         preferences.set(workbench.collapsed, forKey: "sidebarCollapsed")
@@ -329,7 +329,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             togglePreview(); workbench.setCollapsed(false, animated: true)
             preferences.set(false, forKey: "sidebarCollapsed"); window?.makeFirstResponder(list.documentView); return
         }
-        let focusWasInList = (window?.firstResponder as? NSView).map { $0.isDescendant(of: workbench.left) } ?? false
+        let focusWasInList = (window?.firstResponder as? NSView).map { workbench.left.containsSidebarView($0) } ?? false
         workbench.setCollapsed(!workbench.collapsed, animated: true)
         preferences.set(workbench.collapsed, forKey: "sidebarCollapsed")
         if !workbench.previewing && (!workbench.collapsed || focusWasInList) {

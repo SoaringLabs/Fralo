@@ -312,3 +312,156 @@ unconfirmed. The original assertion and renderer were not relaxed or changed to
 hide it. The initial failure and subsequent diagnostics remain in the local
 verification bundle. This is a recorded test uncertainty, not a demonstrated
 HIG fix or proof that an output issue was resolved.
+
+
+## Sidebar scrollbars and content underlap — 2026-10-30
+
+FRALO-8 restores the production left column's native vertical scrollbar and
+lets the list scroll underneath its fixed image heading. macOS 26 uses a native
+split-item accessory; 26.1+ selects the system soft scroll edge after the
+automatic style showed a hard border. The compatibility path uses a within-window
+header material with a content inset protecting the first row. Rows retain their 10 pt outer
+spacing, and collapsing transfers focus out of both the list and the new native
+heading accessory. The image count now uses full label contrast.
+
+The right inspector keeps its existing scrollbar behavior. No composition,
+rendering, export or original-image handling changes are included. Human
+acceptance, merge and release remain separate stages.
+
+Verification: the full Debug suite passed 103 tests with one opt-in desktop
+performance probe skipped. After the row-inset, header-focus and soft-edge
+refinements, all 43 affected sidebar/design-system/HIG tests passed. The final
+count-color-only refinement was built and checked in the native dark window.
+Release builds, all ten CLI checks, public-source scanning and diff whitespace
+checks passed. Native macOS 27 checks cover light/default and dark/minimum,
+Always/When Scrolling/Automatic scrollbar modes using isolated app preferences,
+scrollbar dragging, real wheel scrolling, both list ends, keyboard selection,
+heading click interception, collapse/reopen, empty/short lists and inspector
+indicator preservation. The generated-fixture preview uses a separate bundle
+identity and temporary composition settings; the existing preview was preserved.
+
+The compatibility path was exercised by tests on the current OS; macOS 14/15/26
+hardware was not tested. Full VoiceOver speech, system-wide live preference
+switching, and Reduce Transparency / Increase Contrast UI checks remain pending.
+System soft edges still have a subtle lower boundary; no pixel-identical Find My
+reproduction or complete HIG/accessibility certification is claimed.
+
+
+### Trackless scrollbar correction — 2026-10-30
+
+User comparison with Find My rejected the first scrollbar appearance: the native
+legacy style showed a broad knob and a background slot. This supersedes the
+previous assumption that choosing the preferred native style was sufficient to
+match the reference. The new target is a six-point rounded knob with no track in
+resting, scrolling, hover and drag states, including Always mode.
+
+`SidebarScroller` keeps native scrolling/tracking and customizes only supported
+NSScroller part drawing and the knob's horizontal hit rectangle. The track part
+paints nothing, the knob is six points wide with a three-point trailing inset,
+and the native hit area remains broader. Both native styles are supported;
+no global setting is changed to obtain the appearance. This follows Apple's
+[NSScroller parts customization contract](https://developer.apple.com/documentation/appkit/nsscroller/iscompatiblewithoverlayscrollers).
+No Find My private implementation is assumed.
+
+A rendering regression test failed on the old implementation (nontransparent
+slot, oversized knob) and passed after the change in light/dark and legacy/overlay
+modes. All 44 affected sidebar/design-system/HIG tests and the Release build pass.
+The fixed heading, content underlap, row insets and inspector policy are retained.
+
+
+Native validation of the correction confirms a roughly six-point, trackless knob
+in light/default and dark/minimum windows, including resting, hover and scroll
+states. Legacy/Always thumb dragging was exercised in both appearances and moved
+the actual list to both ends. Overlay/WhenScrolling wheel scrolling and appearance
+were observed; visible-overlay thumb dragging remains unverified because the
+indicator faded during automated attempts. Do not infer a passed drag check from
+AX value assignment. The pixel test also checks that painted knob pixels map to
+the native knob hit part in both modes. The final preview restores the user's
+selection and scroll position, with only one instance retained. Temporary app
+preference overrides were removed; global settings were not changed.
+
+
+### Scrollbar hover feedback and spacing — 2026-10-30
+
+The next supplied comparison requires a pale resting knob, a darker hover/drag
+state and a tighter gap. The previous knob used one constant opacity, and legacy
+layout combined a reserved gutter with row padding, leaving about 19 pt from the
+card to the knob. Overlay layout instead left about 2 pt.
+
+The scroller now tracks pointer entry/exit and native knob tracking, with distinct
+idle/active semantic-color opacities. Width remains six points and the slot paints
+nothing. Native clip/scroller tiling is retained, using small-control metrics
+for the sidebar and a total trailing-margin budget that subtracts the native
+gutter before adding row padding. Separate leading/trailing row insets keep the
+thumbnail's left alignment, selection and focus consistent and yield a seven-point
+card-to-knob gap in both styles. Long filenames stay clear of the native scroller
+hit rectangle. Tracking areas remain active during mouse drags; native knob
+tracking retains the active color until release without replacing mouseDown.
+
+Both reported defects were reproduced by regression tests before the change.
+All 46 affected sidebar/design-system/HIG tests now pass, including light/dark
+hover darkening and exit restoration, both native styles' gap bounds, long-label
+clearance, the trackless artwork and native hit mapping. Release builds pass.
+
+
+Final native validation uses the original12-image selection/scroll state. In the
+light window the measured thumb gray levels were about198 at rest,151 after
+pointer press/stay and198 after clicking away; dark/minimum measured110/154/110,
+using brighter feedback for dark appearance. The six-point width and seven-point
+gap remain stable without a track or extra color strip. Actual dragging changes
+the list's scroll value without selecting a different row; a temporary long-name
+fixture truncates in the middle and stays outside the scroller target. It was
+removed before restoring the user's12-image preview.
+
+The final scroller adds a passive local-event observer to synchronize hover when
+a pointer jumps on click/scroll without a boundary event. Its five sidebar tests
+were rerun and passed after the earlier46-test affected run. The desktop tool
+cannot generate a standalone unpressed mouse move, so pure hover is covered by
+tracking-event rendering tests but still needs direct human confirmation; the
+native screenshots verify press/stay/away transitions. Older OS hardware,
+VoiceOver and live accessibility-preference tests remain unperformed.
+
+
+### Smooth scrollbar feedback — 2026-10-30
+
+The user confirmed ordinary unpressed hover entry/exit on the previous build and
+requested a gradual color transition. A custom animatable scalar now interpolates
+the knob opacity through AppKit's animator proxy, reusing FraloMotion's180ms
+selection duration and ease-in/out timing. Reversals continue from the current
+value per the native animator contract. Reduce Motion uses a zero-duration proxy
+to cancel any in-flight transition and applies the endpoint immediately. No shape,
+track, hit geometry, row margin or scroll handling changes are included.
+
+A rendered-frame regression test reproduced the old immediate jump, missing
+intermediate values and discontinuous reversal, then passed with the animation.
+The explicit Reduce Motion test confirms immediate endpoints and unchanged hit
+geometry. All48 affected sidebar/design-system/HIG tests and the Release build
+pass. Native preview checks retain6pt/no-track artwork,7pt gap, correct endpoint
+colors and real dragging without selection changes. The screenshot pipeline took
+longer than the180ms transition and did not independently capture intermediate
+frames; smooth interpolation is established by the native rendered-frame test,
+not those endpoint screenshots. The latest preview restores the user's most
+recent04-sample.png selection and scroll0.013215859.
+
+### Compatibility scrollbar alignment — 2026-10-30
+
+The macOS 14/15 compatibility path no longer adds a separate scroller inset:
+AppKit already applies the content inset to the scroller. The duplicate inset
+placed the track at 128 pt when the fixed heading ended at 64 pt. Keeping only
+the content inset aligns the track with the heading and retains first-row
+protection. The macOS 26+ native accessory path and the accepted knob artwork,
+spacing and fade are unchanged. This retains the native hierarchy and behavior
+described in Apple's [sidebar guidance](https://developer.apple.com/design/human-interface-guidelines/sidebars).
+
+The new production-component regression forces the compatibility path, checks
+both legacy and overlay scrollers at two window sizes, and asserts track-top
+alignment, full remaining track height and first-row visibility. It failed all
+four alignment cases before the fix and passes afterward. All 8 scrolling tests,
+the 59-test related suite on recheck, and the native Release build pass.
+
+The first related-suite run hit the previously recorded PNG-copy byte mismatch;
+its copied/expected/source images and settings were preserved outside Git. The
+unchanged copy test passed in isolation and in the related-suite recheck. No
+renderer or copy assertion was changed, and the intermittent cause remains
+unconfirmed. Tests exercised the compatibility path on the current OS; macOS
+14/15 hardware and full VoiceOver remain unverified.

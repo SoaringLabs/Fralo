@@ -135,7 +135,7 @@ final class PanelPolishTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(root.left.frame.width, 230)
             XCTAssertGreaterThan(root.content.frame.width, 300)
             XCTAssertEqual(root.left.layer?.shadowOpacity ?? 0, 0)
-            let header = try XCTUnwrap(descendants(root.left).compactMap { $0 as? NSStackView }.first)
+            let header = root.left.heading
             XCTAssertGreaterThanOrEqual(header.convert(header.bounds, to: root).minY, root.safeAreaInsets.top)
         }
         controller.toggleInspector(nil) // Explicitly open settings for this focus-preservation test.
