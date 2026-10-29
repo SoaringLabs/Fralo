@@ -1,8 +1,9 @@
 {
-  "version": 2,
-  "states": {},
-  "status_sync": {
-    "enabled": false
+  "version": 1,
+  "states": {
+    "in_progress": "49418483-eb95-4c4c-9890-3416439bca07",
+    "in_review": "7ff92d2a-ef6c-45a9-a5c7-c06dd15572a6",
+    "done": "d4e70d77-9a8d-4c86-8544-4516ef4a8384"
   },
   "plane": {
     "api_url": "https://api.plane.so",
