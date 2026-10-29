@@ -49,7 +49,9 @@ final class ArtworkDirectionTests: XCTestCase {
             for n in count { XCTAssertGreaterThan(n, 100, "Snapshot must contain the actual colored artwork pixels") }
             return (0..<3).map { CGPoint(x: Double(xsum[$0]) / Double(max(1, count[$0])), y: Double(ysum[$0]) / Double(max(1, count[$0]))) }
         }
-        for target in ["device", "background"] {
+        let gutters = NSEdgeInsets(top: 14, left: 0, bottom: 30, right: 0)
+        for (target, insets) in [("device", NSEdgeInsetsZero), ("background", NSEdgeInsetsZero), ("device", gutters), ("background", gutters)] {
+            canvas.viewingInsets = insets
             for delta in [CGPoint(x: -30, y: 0), CGPoint(x: 30, y: 0), CGPoint(x: 0, y: -50), CGPoint(x: 0, y: 50), CGPoint(x: -30, y: -50), CGPoint(x: 30, y: -50), CGPoint(x: -30, y: 50), CGPoint(x: 30, y: 50)] {
                 canvas.image = NSImage(cgImage: background, size: size)
                 let backdrop = target == "device" ? background : try image(CGSize(width: 800, height: 800), marker: initial.offsetBy(dx: 200, dy: 200))

@@ -382,6 +382,8 @@ public final class CanvasSurface: NSView {
         }
     }
     public var zoom: CGFloat? { didSet { needsDisplay = true } }
+    /// Viewing-only gutters keep Fit artwork and scroll limits clear of floating controls.
+    public var viewingInsets = NSEdgeInsetsZero { didSet { needsDisplay = true } }
     public override var isFlipped: Bool { true }
     public override var acceptsFirstResponder: Bool { true }
     public var allowsPositioning = false {
@@ -497,10 +499,12 @@ public final class CanvasSurface: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     public var imageRect: NSRect {
         guard let image, image.size.width > 0, image.size.height > 0 else { return .zero }
-        let fit = max(0, min((bounds.width - 32) / image.size.width, (bounds.height - 32) / image.size.height))
+        let width = max(0, bounds.width - viewingInsets.left - viewingInsets.right)
+        let height = max(0, bounds.height - viewingInsets.top - viewingInsets.bottom)
+        let fit = max(0, min((width - 32) / image.size.width, (height - 32) / image.size.height))
         let factor = zoom ?? fit
         let size = NSSize(width: image.size.width * factor, height: image.size.height * factor)
-        return NSRect(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2, width: size.width, height: size.height)
+        return NSRect(x: viewingInsets.left + (width - size.width) / 2, y: viewingInsets.top + (height - size.height) / 2, width: size.width, height: size.height)
     }
     public override func draw(_ dirtyRect: NSRect) {
         guard let image else { return }

@@ -1,12 +1,19 @@
 import AppKit
+import FraloDesignSystem
 
 @MainActor
 private final class HeaderDocument: NSView {
     let name = NSTextField(labelWithString: "Fralo")
     let count = NSTextField(labelWithString: "")
+    private let protection = MaterialSurface(.panel, radius: 8, useNativeGlass: false)
+    var protectsText = false { didSet { protection.isHidden = !protectsText } }
     override var intrinsicContentSize: NSSize { NSSize(width: 220, height: 34) }
     init() {
         super.init(frame: NSRect(x: 0, y: 0, width: 220, height: 34))
+        // Only the file information needs a local backing when scrolled artwork is beneath
+        // it. The rest of the titlebar remains clear until hover/focus/menu engagement.
+        protection.frame = bounds; protection.autoresizingMask = [.width, .height]
+        protection.material = .headerView; protection.isHidden = true; addSubview(protection)
         name.font = .systemFont(ofSize: 14, weight: .semibold)
         name.lineBreakMode = .byTruncatingMiddle; name.maximumNumberOfLines = 1
         count.font = .monospacedDigitSystemFont(ofSize: 11.5, weight: .regular); count.textColor = .secondaryLabelColor
@@ -30,6 +37,12 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
     private let menu: NSMenu
     private let document = HeaderDocument()
     private var sidebarHidden = false
+    var controlViews: [NSView] { toolbar.items.compactMap(\.view) }
+    var controlMenus: [NSMenu] { [menu] }
+    var protectsDocument: Bool {
+        get { document.protectsText }
+        set { document.protectsText = newValue }
+    }
 
     init(owner: MainWindowController, splitView: NSSplitView, menu: NSMenu, sidebarHidden: Bool) {
         self.owner = owner; self.splitView = splitView; self.menu = menu

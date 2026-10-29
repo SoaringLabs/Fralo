@@ -18,6 +18,12 @@ final class WorkbenchView: NSView {
     let left: DockedSidebar
     let right: FloatingPanel
     let content: NSView
+    let headerBackdrop = CanvasChrome(.top)
+    var headerHeight: CGFloat {
+        // Full-height split items can report a zero safe-area inset. The public window
+        // layout rect still describes the actual unified titlebar/toolbar obstruction.
+        max(region.safeAreaInsets.top, window.map { $0.frame.height - $0.contentLayoutRect.height } ?? 0)
+    }
     private let region = WorkspaceRegion()
     private(set) var sidebarItem: NSSplitViewItem!
     private var sidebarObservation: NSKeyValueObservation?
@@ -51,7 +57,7 @@ final class WorkbenchView: NSView {
                                          view.topAnchor.constraint(equalTo: topAnchor), view.bottomAnchor.constraint(equalTo: bottomAnchor)])
         }
         stage.autoresizingMask = [.width, .height]; stage.frame = region.bounds
-        for view in [stage, content, right] { region.addSubview(view) }
+        for view in [stage, content, headerBackdrop, right] { region.addSubview(view) }
         region.onLayout = { [weak self] in
             guard let self else { return }
             if !self.animatingInspector { self.arrangeWorkspace() }
@@ -73,6 +79,7 @@ final class WorkbenchView: NSView {
         sidebarItem.allowsFullHeightLayout = true; sidebarItem.titlebarSeparatorStyle = .none
         let workspaceController = NSViewController(); workspaceController.view = region
         let main = NSSplitViewItem(viewController: workspaceController)
+        main.allowsFullHeightLayout = true
         main.minimumThickness = 740; main.titlebarSeparatorStyle = .none
         controller.addSplitViewItem(sidebarItem); controller.addSplitViewItem(main)
         left.configureHeader(for: sidebarItem)
@@ -142,12 +149,13 @@ final class WorkbenchView: NSView {
         let area = region.bounds
         // The floating inspector keeps a 10 pt inset from the window edge.
         let edge: CGFloat = 10, gap: CGFloat = 24, width = Self.inspectorWidth
-        let chrome = region.safeAreaInsets.top
+        let chrome = headerHeight
         let top: CGFloat = chrome + 8
         let height = max(0, area.height - top - edge)
         let rightRect = NSRect(x: inspectorHidden || previewing ? area.width + edge : area.width - edge - width, y: top, width: width, height: height)
         let end = inspectorHidden || previewing ? area.width - gap : rightRect.minX - gap
-        let centerRect = NSRect(x: gap, y: top, width: max(0, end - gap), height: max(0, area.height - top))
+        let centerRect = NSRect(x: gap, y: 0, width: max(0, end - gap), height: area.height)
+        headerBackdrop.frame = NSRect(x: 0, y: 0, width: area.width, height: chrome + 12)
         for (view, frame) in [(right as NSView, rightRect), (content, centerRect)] {
             if animated { view.animator().frame = frame } else { view.frame = frame }
         }

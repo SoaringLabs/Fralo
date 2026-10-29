@@ -1,5 +1,6 @@
 #if FRALO_DEV
 import AppKit
+import FraloDesignSystem
 
 /// This entire type and its entry points are absent from a Release compilation.
 @MainActor
@@ -14,6 +15,18 @@ final class DevelopmentEntry: NSObject {
         window.setContentSize(NSSize(width: min(parts[0], visible.width), height: min(parts[1], visible.height - 52)))
         if CommandLine.arguments.contains("--preview-collapsed"), let workbench = window.contentView as? WorkbenchView { workbench.collapsed = true }
         window.center()
+        // Strengthen accessibility only in this preview; never change the user's OS settings.
+        var preferences = DesignPreferences()
+        preferences.reduceTransparency = CommandLine.arguments.contains("--preview-reduce-transparency")
+        preferences.reduceMotion = CommandLine.arguments.contains("--preview-reduce-motion")
+        preferences.increaseContrast = CommandLine.arguments.contains("--preview-increase-contrast")
+        func apply(_ view: NSView) {
+            (view as? CanvasChrome)?.preferences = preferences
+            (view as? MaterialSurface)?.preferences = preferences
+            (view as? SymbolButton)?.preferences = preferences
+            view.subviews.forEach(apply)
+        }
+        if let content = window.contentView { apply(content) }
     }
     static var labOnly: Bool { CommandLine.arguments.contains("--design-lab-only") }
     private(set) var controller: DesignLabController?
