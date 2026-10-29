@@ -537,63 +537,64 @@ public final class CanvasSurface: NSView {
     }
 }
 
+/// Floating canvas controls: `[ − 59% ⌄ + ] | [▦]`. The zoom readout is itself the preset menu;
+/// the steppers and the checkerboard toggle are native borderless symbol buttons.
 @MainActor
 public final class ViewToolbar: NSView {
-    public let surface = MaterialSurface(.panel, radius: 18)
-    public let zoom = ChoiceMenu(["适应窗口", "100%", "50%"], label: "查看倍率")
+    public static let height: CGFloat = 36
+    public let surface = MaterialSurface(.panel, radius: ViewToolbar.height / 2)
+    public let zoom = ChoiceMenu(["适应窗口", "100%", "50%"], label: "缩放比例")
+    public let zoomOut = SymbolButton("minus", label: "缩小")
+    public let zoomIn = SymbolButton("plus", label: "放大")
+    /// Status shown in the zoom readout: the current percentage or brief feedback such as “已复制”.
     public let dimensions = FraloStyle.text("—", role: .detail, secondary: true)
     public let composition = ChoiceMenu(["4:3"], label: "画布比例")
-    private let statusHost = NSView()
     private let progress = NSProgressIndicator()
-    private let activity: NSStackView
-    private var statusWidth: NSLayoutConstraint!
     private var row: NSStackView!
     public private(set) var isCompact = false
     private var pendingActivity: DispatchWorkItem?
     private var activityVersion = 0
     public private(set) var isUpdatingPreview = false
-    public var showsComposition = false { didSet { composition.isHidden = !showsComposition; statusHost.isHidden = showsComposition } }
-    public let preview = ActionButton("透明区域", role: .quiet, symbol: "checkerboard.rectangle")
+    public var showsComposition = false { didSet { composition.isHidden = !showsComposition; zoom.isHidden = showsComposition } }
+    public let preview = SymbolButton("checkerboard.rectangle", label: "显示透明区域", toggles: true)
     public init() {
-        activity = FraloStyle.stack([progress, FraloStyle.text("更新预览…", role: .detail, secondary: true)], axis: .horizontal, spacing: 6)
         super.init(frame: .zero)
         surface.translatesAutoresizingMaskIntoConstraints = false; addSubview(surface)
         zoom.showsSurface = false; composition.showsSurface = false; composition.isHidden = true
-        zoom.leadingSymbol = "display"
-        progress.style = .spinning; progress.controlSize = .small; progress.isDisplayedWhenStopped = true
-        progress.setAccessibilityLabel("正在更新预览")
-        progress.widthAnchor.constraint(equalToConstant: 14).isActive = true
-        progress.heightAnchor.constraint(equalToConstant: 14).isActive = true
-        activity.isHidden = true
-        for view in [dimensions, activity] {
-            view.translatesAutoresizingMaskIntoConstraints = false; statusHost.addSubview(view)
-            NSLayoutConstraint.activate([view.centerXAnchor.constraint(equalTo: statusHost.centerXAnchor), view.centerYAnchor.constraint(equalTo: statusHost.centerYAnchor), view.widthAnchor.constraint(lessThanOrEqualTo: statusHost.widthAnchor)])
-        }
-        statusWidth = statusHost.widthAnchor.constraint(equalToConstant: 128); statusWidth.isActive = true
-        statusHost.heightAnchor.constraint(equalToConstant: 28).isActive = true
-        func divider() -> NSView {
-            let view = NSView(); view.wantsLayer = true; view.layer?.backgroundColor = NSColor.separatorColor.withAlphaComponent(0.4).cgColor
-            view.widthAnchor.constraint(equalToConstant: 1).isActive = true; view.heightAnchor.constraint(equalToConstant: 22).isActive = true
-            return view
-        }
-        row = FraloStyle.stack([zoom, divider(), statusHost, composition, divider(), preview], axis: .horizontal, spacing: 10)
+        zoom.font = .monospacedDigitSystemFont(ofSize: 13, weight: .regular)
+        zoom.widthAnchor.constraint(greaterThanOrEqualToConstant: 72).isActive = true
+        progress.style = .spinning; progress.controlSize = .small; progress.isDisplayedWhenStopped = false
+        progress.setAccessibilityLabel("正在更新预览"); progress.translatesAutoresizingMaskIntoConstraints = false
+        let divider = NSBox(); divider.boxType = .separator
+        divider.widthAnchor.constraint(equalToConstant: 1).isActive = true; divider.heightAnchor.constraint(equalToConstant: 16).isActive = true
+        row = FraloStyle.stack([zoomOut, zoom, zoomIn, composition, divider, preview], axis: .horizontal, spacing: 2)
+        row.setCustomSpacing(8, after: zoomIn); row.setCustomSpacing(8, after: composition); row.setCustomSpacing(8, after: divider)
         row.translatesAutoresizingMaskIntoConstraints = false; surface.contentView.addSubview(row)
+        // The spinner takes the readout's place while a render is slow, so no action shifts.
+        surface.contentView.addSubview(progress)
         NSLayoutConstraint.activate([
             surface.leadingAnchor.constraint(equalTo: leadingAnchor), surface.trailingAnchor.constraint(equalTo: trailingAnchor),
             surface.topAnchor.constraint(equalTo: topAnchor), surface.bottomAnchor.constraint(equalTo: bottomAnchor),
-            row.leadingAnchor.constraint(equalTo: surface.contentView.leadingAnchor, constant: 12), row.trailingAnchor.constraint(equalTo: surface.contentView.trailingAnchor, constant: -12),
-            row.topAnchor.constraint(equalTo: surface.contentView.topAnchor, constant: 4), row.bottomAnchor.constraint(equalTo: surface.contentView.bottomAnchor, constant: -4)
+            row.leadingAnchor.constraint(equalTo: surface.contentView.leadingAnchor, constant: 6), row.trailingAnchor.constraint(equalTo: surface.contentView.trailingAnchor, constant: -6),
+            row.centerYAnchor.constraint(equalTo: surface.contentView.centerYAnchor),
+            progress.centerXAnchor.constraint(equalTo: zoom.centerXAnchor, constant: -6), progress.centerYAnchor.constraint(equalTo: zoom.centerYAnchor),
+            progress.widthAnchor.constraint(equalToConstant: 14), progress.heightAnchor.constraint(equalToConstant: 14)
         ])
+        showStatus("—")
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     deinit { pendingActivity?.cancel() }
+    /// Shows `text` in the zoom readout; `detail` becomes its tooltip (e.g. the output pixel size).
+    public func showStatus(_ text: String, detail: String? = nil) {
+        dimensions.stringValue = text
+        if let detail { dimensions.toolTip = detail; zoom.toolTip = "缩放比例 · " + detail }
+        zoom.displayTitle = isUpdatingPreview ? "" : text
+    }
     public func fitControls(to availableWidth: CGFloat) {
         let compact = availableWidth > 0 && availableWidth < 440
         if compact != isCompact {
             isCompact = compact
-            statusWidth.constant = compact ? 84 : 128
-            row.spacing = compact ? 6 : 10
-            zoom.leadingSymbol = compact ? nil : "display"
+            row.spacing = compact ? 0 : 2
         }
     }
     public func beginPreviewUpdate() {
@@ -603,8 +604,9 @@ public final class ViewToolbar: NSView {
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, self.activityVersion == version else { return }
-                self.isUpdatingPreview = true; self.activity.isHidden = false; self.dimensions.isHidden = true
+                self.isUpdatingPreview = true; self.zoom.displayTitle = ""
                 if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion { self.progress.startAnimation(nil) }
+                else { self.zoom.displayTitle = "…" }
             }
         }
         pendingActivity = work
@@ -612,7 +614,7 @@ public final class ViewToolbar: NSView {
     }
     public func finishPreviewUpdate() {
         pendingActivity?.cancel(); pendingActivity = nil; activityVersion += 1
-        isUpdatingPreview = false; progress.stopAnimation(nil); activity.isHidden = true; dimensions.isHidden = false
+        isUpdatingPreview = false; progress.stopAnimation(nil); zoom.displayTitle = dimensions.stringValue
     }
 }
 

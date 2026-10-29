@@ -233,7 +233,7 @@ final class ScenarioWorkbench: NSView {
             })
             statusView = status; addSubview(status)
         } else { canvas.image = sampleImage() }
-        if let image = canvas.image { toolbar.dimensions.stringValue = "\(Int(image.size.width)) × \(Int(image.size.height)) · 样例" }
+        if let image = canvas.image { toolbar.showStatus("\(Int(image.size.width)) × \(Int(image.size.height)) · 样例") }
         fixtureLabel.stringValue = state.samples.missingFixtures ? "开发素材未找到，请使用 scripts/run-design-lab.sh 启动" : state.scenario.device == 0 ? "现有 Core 手机样例 · 窗口材质不进入图片" : "布局夹具 · 外框为示意，不代表新渲染业务已完成"
         needsLayout = true
     }

@@ -127,6 +127,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         view.addItem(.separator())
         item(view, "适应窗口", #selector(MainWindowController.fitPreview(_:)), "0")
         item(view, "实际像素", #selector(MainWindowController.actualPixels(_:)), "1")
+        item(view, "放大", #selector(MainWindowController.zoomIn(_:)), "+")
+        // ⌘= reaches “放大” without Shift on layouts where + is shifted.
+        item(view, "放大", #selector(MainWindowController.zoomIn(_:)), "=")
+        view.items.last?.isHidden = true; view.items.last?.allowsKeyEquivalentWhenHidden = true
+        item(view, "缩小", #selector(MainWindowController.zoomOut(_:)), "-")
+        item(view, "显示透明区域", #selector(MainWindowController.toggleTransparencyGrid(_:)))
         let appearance = NSMenuItem(title: "外观", action: nil, keyEquivalent: ""); appearance.submenu = controller.appearanceMenu(); view.addItem(appearance)
 
         let window = NSMenu(title: "窗口"); let windowItem = NSMenuItem(title: "窗口", action: nil, keyEquivalent: ""); windowItem.submenu = window; bar.addItem(windowItem)

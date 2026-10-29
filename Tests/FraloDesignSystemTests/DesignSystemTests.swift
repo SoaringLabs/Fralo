@@ -113,6 +113,35 @@ final class DesignSystemTests: XCTestCase {
         XCTAssertEqual(button.accessibilityLabel(), "导出全部")
     }
 
+    @MainActor func testMomentaryClicksNeverLeaveAStaleOnState() {
+        _ = NSApplication.shared
+        let button = IconButton("plus", label: "添加图片")
+        for _ in 0..<3 { button.performClick(nil) }
+        XCTAssertEqual(button.state, .off, "A plain action must not look pressed after the click")
+        button.state = .on; button.performClick(nil)
+        XCTAssertEqual(button.state, .on, "Only the owner changes a toggle's state")
+    }
+
+    @MainActor func testIconButtonsShareOneFrameRegardlessOfSymbolAlignment() {
+        _ = NSApplication.shared
+        let toolbar = ViewToolbar(); toolbar.frame = NSRect(x: 0, y: 0, width: 260, height: ViewToolbar.height)
+        toolbar.layoutSubtreeIfNeeded()
+        let side = FraloStyle.Button.compactHeight
+        for button in [toolbar.zoomOut, toolbar.zoomIn, toolbar.preview] {
+            XCTAssertEqual(button.frame.size, NSSize(width: side, height: side), "“minus” and “plus” must draw identical hover surfaces")
+        }
+        XCTAssertEqual(toolbar.zoomOut.frame.midY, toolbar.zoomIn.frame.midY, accuracy: 0.01)
+        for _ in 0..<3 { toolbar.zoomIn.performClick(nil) }
+        XCTAssertEqual(toolbar.zoomIn.state, .off)
+        toolbar.preview.performClick(nil)
+        XCTAssertEqual(toolbar.preview.state, .off, "The owner, not the click, turns the transparency toggle on")
+        XCTAssertEqual(toolbar.preview.accessibilityRole(), .checkBox)
+        toolbar.preview.state = .on
+        XCTAssertEqual(toolbar.preview.accessibilityValue() as? Bool, true)
+        toolbar.zoomIn.isHovered = true; toolbar.zoomIn.isEnabled = false
+        XCTAssertFalse(toolbar.zoomIn.isHovered, "A disabled button drops its hover surface")
+    }
+
     @MainActor func testActionButtonTabLeavesTheControlInBothDirections() async {
         _ = NSApplication.shared
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 300), styleMask: [.titled], backing: .buffered, defer: false)

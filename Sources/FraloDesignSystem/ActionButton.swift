@@ -25,7 +25,15 @@ public class ActionButton: NSButton {
         get { super.isEnabled }
         set { requestedEnabled = newValue; super.isEnabled = newValue && !isBusy; refresh() }
     }
+    /// The surface is drawn from bounds, so symbol alignment insets (which differ between e.g. “minus”
+    /// and “plus”) must not resize the frame.
+    public override var alignmentRectInsets: NSEdgeInsets { .init(top: 0, left: 0, bottom: 0, right: 0) }
     public override var acceptsFirstResponder: Bool { isEnabled }
+    /// Like native buttons, a mouse click acts without pulling keyboard focus off the canvas or a field.
+    public override func becomeFirstResponder() -> Bool {
+        if NSApp.currentEvent?.type == .leftMouseDown && !NSApp.isFullKeyboardAccessEnabled { return false }
+        return super.becomeFirstResponder()
+    }
     public override var isFlipped: Bool { true }
     public override var intrinsicContentSize: NSSize {
         if title.isEmpty { return NSSize(width: buttonHeight, height: buttonHeight) }
@@ -57,7 +65,13 @@ public class ActionButton: NSButton {
         if let accessibilityObserver { NSWorkspace.shared.notificationCenter.removeObserver(accessibilityObserver) }
     }
 
-    @objc private func activate(_ sender: Any?) { if isEnabled && !isBusy { onPress?() } }
+    /// The cell flips `state` on every click even for momentary buttons; only the owner sets it,
+    /// so a press never leaves a stale “on” surface behind.
+    @objc private func activate(_ sender: Any?) {
+        if super.state != assignedState { super.state = assignedState; needsDisplay = true }
+        if isEnabled && !isBusy { onPress?() }
+    }
+    private var assignedState: NSControl.StateValue = .off
     public override func keyDown(with event: NSEvent) {
         if event.keyCode == 48 {
             if event.modifierFlags.contains(.shift) { window?.selectKeyView(preceding: self) }
@@ -67,7 +81,7 @@ public class ActionButton: NSButton {
     public override func highlight(_ flag: Bool) { super.highlight(flag); needsDisplay = true }
     public override var state: NSControl.StateValue {
         didSet {
-            needsDisplay = true
+            assignedState = state; needsDisplay = true
             if accessibilityRole() == .checkBox { setAccessibilityValue(state == .on) }
         }
     }

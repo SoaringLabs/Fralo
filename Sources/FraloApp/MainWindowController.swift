@@ -23,7 +23,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private let viewing = ViewToolbar()
     private let exportAction = ExportAction(count: 0)
     private let batchCount = FraloStyle.text("0", role: .body)
-    private let addButton = IconButton("plus", label: "添加图片")
+    private let addButton = SymbolButton("plus", label: "添加图片")
     private var transparencyGrid = false
     private let filename = FraloStyle.text("", role: .heading), position = FraloStyle.text("", role: .caption, secondary: true)
     private let previewScroll = PreviewScrollView()
@@ -134,7 +134,8 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         viewing.composition.removeAllItems(); viewing.composition.addItems(withTitles: CanvasRatio.allCases.map(\.rawValue))
         viewing.composition.onChange = { [weak self] index in self?.inspectorUI.chooseCanvas(CanvasRatio.allCases[index]) }
         viewing.preview.onPress = { [weak self] in self?.toggleTransparencyGrid() }
-        viewing.preview.setAccessibilityLabel("显示透明区域")
+        viewing.zoomOut.onPress = { [weak self] in self?.zoomOut(nil) }
+        viewing.zoomIn.onPress = { [weak self] in self?.zoomIn(nil) }
         viewing.translatesAutoresizingMaskIntoConstraints = false; footer.addSubview(viewing)
         canvas.onPrevious = { [weak self] in self?.moveSelection(-1) }
         canvas.onNext = { [weak self] in self?.moveSelection(1) }
@@ -142,7 +143,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         NSLayoutConstraint.activate([
             previewScroll.topAnchor.constraint(equalTo: center.view.topAnchor, constant: 16), previewScroll.leadingAnchor.constraint(equalTo: center.view.leadingAnchor), previewScroll.trailingAnchor.constraint(equalTo: center.view.trailingAnchor), previewScroll.bottomAnchor.constraint(equalTo: footer.topAnchor),
             footer.leadingAnchor.constraint(equalTo: center.view.leadingAnchor), footer.trailingAnchor.constraint(equalTo: center.view.trailingAnchor), footer.bottomAnchor.constraint(equalTo: center.view.bottomAnchor), footer.heightAnchor.constraint(equalToConstant: 76),
-            viewing.centerXAnchor.constraint(equalTo: footer.centerXAnchor), viewing.centerYAnchor.constraint(equalTo: footer.centerYAnchor), viewing.widthAnchor.constraint(lessThanOrEqualTo: footer.widthAnchor), viewing.heightAnchor.constraint(equalToConstant: 48)
+            viewing.centerXAnchor.constraint(equalTo: footer.centerXAnchor), viewing.centerYAnchor.constraint(equalTo: footer.centerYAnchor), viewing.widthAnchor.constraint(lessThanOrEqualTo: footer.widthAnchor), viewing.heightAnchor.constraint(equalToConstant: ViewToolbar.height)
         ])
         empty.translatesAutoresizingMaskIntoConstraints = false; center.view.addSubview(empty)
         let icon = emptyIcon
@@ -452,7 +453,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     }
     private func requestPreview(preservePositioning: Bool = false) {
         copyFeedback?.cancel()
-        if viewing.dimensions.stringValue == "已复制图片" { viewing.dimensions.stringValue = "" }
+        if viewing.dimensions.stringValue == "已复制" { viewing.showStatus("") }
         if !preservePositioning {
             dragSettingsStart = nil
             artworkDragChanged = false; dragDevicePosition = nil; positioningLayers = nil
@@ -556,19 +557,29 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         let size = NSSize(width: pixels.width * factor, height: pixels.height * factor)
         let document = NSSize(width: max(available.width, size.width + 8), height: max(available.height, size.height + 32))
         canvas.setFrameSize(document); canvas.zoom = factor
-        if viewing.dimensions.stringValue != "已复制图片" { viewing.dimensions.stringValue = "\(Int((factor * backing * 100).rounded()))%" }
-        viewing.dimensions.toolTip = "\(Int(pixels.width)) × \(Int(pixels.height)) px"
+        let percent = viewing.dimensions.stringValue == "已复制" ? "已复制" : "\(Int((factor * backing * 100).rounded()))%"
+        viewing.showStatus(percent, detail: "\(Int(pixels.width)) × \(Int(pixels.height)) px")
+        // Presets keep their checkmark; a stepped zoom between presets selects none.
+        let presets: [CGFloat?] = [nil, 0.25, 0.5, 1, 2]
+        if let match = presets.firstIndex(where: { $0 == zoom }) { fitMenu.selectItem(at: match) } else { fitMenu.select(nil) }
+        viewing.zoomOut.isEnabled = currentZoom > Self.zoomLevels.first! * 1.01
+        viewing.zoomIn.isEnabled = currentZoom < Self.zoomLevels.last! * 0.99
         viewing.showsComposition = false
         viewing.composition.selectItem(at: CanvasRatio.allCases.firstIndex(of: settings.canvas) ?? 1)
         viewing.composition.displayTitle = "\(settings.canvas.rawValue) · \(Int(pixels.width)) × \(Int(pixels.height))"
     }
-    @objc func fitPreview(_ sender: Any?) { zoom = nil; fitMenu.selectItem(at: 0); layoutPreview() }
-    @objc func actualPixels(_ sender: Any?) { zoom = 1; fitMenu.selectItem(at: 3); layoutPreview() }
-    @objc private func zoomIn(_ sender: Any?) { setZoom(by: 1.25) }
-    @objc private func zoomOut(_ sender: Any?) { setZoom(by: 0.8) }
+    @objc func fitPreview(_ sender: Any?) { zoom = nil; layoutPreview() }
+    @objc func actualPixels(_ sender: Any?) { zoom = 1; layoutPreview() }
+    @objc func zoomIn(_ sender: Any?) { setZoom(by: 1.25) }
+    @objc func zoomOut(_ sender: Any?) { setZoom(by: 0.8) }
+    /// Standard magnifications, as in Preview: stepping lands on familiar percentages, never 27% or 34%.
+    static let zoomLevels: [CGFloat] = [0.05, 0.1, 0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4, 6, 8]
+    private var currentZoom: CGFloat { zoom ?? ((canvas.zoom ?? 0) * (window?.backingScaleFactor ?? 2)) }
     private func setZoom(by multiplier: CGFloat) {
-        let current = zoom ?? ((canvas.imageRect.width / max(1, rendered?.pixelSize.width ?? 1)) * (window?.backingScaleFactor ?? 2))
-        zoom = min(8, max(0.05, current * multiplier)); layoutPreview()
+        let current = currentZoom, levels = Self.zoomLevels
+        let next = multiplier > 1 ? levels.first { $0 > current * 1.01 } : levels.last { $0 < current * 0.99 }
+        guard let next else { return }
+        zoom = next; layoutPreview()
     }
     @objc private func zoomMenuChanged(_ sender: Any?) {
         zoom = [nil, CGFloat(0.25), CGFloat(0.5), CGFloat(1), CGFloat(2)][fitMenu.indexOfSelectedItem]; layoutPreview()
@@ -581,13 +592,13 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             let data = settings.format == .png ? try CompositionRenderer.data(rendered.image, settings: settings) : try FrameRenderer.pngData(rendered.image)
             pasteboard.clearContents(); pasteboard.setData(data, forType: .png)
             let generation = previewRequest
-            copyFeedback?.cancel(); viewing.dimensions.stringValue = "已复制图片"
+            copyFeedback?.cancel(); viewing.showStatus("已复制")
             NSAccessibility.post(element: canvas, notification: .announcementRequested,
                 userInfo: [.announcement: "已复制当前图片", .priority: NSAccessibilityPriorityLevel.medium.rawValue])
             let feedback = DispatchWorkItem { [weak self] in
                 MainActor.assumeIsolated {
-                    guard let self, self.previewRequest == generation, self.viewing.dimensions.stringValue == "已复制图片" else { return }
-                    self.viewing.dimensions.stringValue = ""; self.layoutPreview()
+                    guard let self, self.previewRequest == generation, self.viewing.dimensions.stringValue == "已复制" else { return }
+                    self.viewing.showStatus(""); self.layoutPreview()
                 }
             }
             copyFeedback = feedback; DispatchQueue.main.asyncAfter(deadline: .now() + 1.6, execute: feedback)
@@ -729,7 +740,10 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         if menuItem.action == #selector(removeSelected(_:)) { return selectedIndex != nil && !editingText }
         if menuItem.action == #selector(exportCurrent(_:)) { return selectedIndex != nil }
         if menuItem.action == #selector(exportAll(_:)) || menuItem.action == #selector(newBatch(_:)) { return !items.isEmpty }
+        if menuItem.action == #selector(zoomIn(_:)) { return canvas.image != nil && viewing.zoomIn.isEnabled }
+        if menuItem.action == #selector(zoomOut(_:)) { return canvas.image != nil && viewing.zoomOut.isEnabled }
         if menuItem.action == #selector(fitPreview(_:)) || menuItem.action == #selector(actualPixels(_:)) { return canvas.image != nil }
+        if menuItem.action == #selector(toggleTransparencyGrid(_:)) { menuItem.state = transparencyGrid ? .on : .off; return canvas.image != nil }
         return true
     }
     /// “1 / 4 · iPhone 18 Pro · 竖屏”: position in the batch, then the device being framed.
@@ -745,7 +759,6 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     }
     @objc func toggleTransparencyGrid(_ sender: Any? = nil) {
         transparencyGrid.toggle(); viewing.preview.state = transparencyGrid ? .on : .off
-        viewing.preview.setAccessibilityValue(transparencyGrid ? 1 : 0)
         applyCanvasBacking()
     }
     /// The checkerboard shows the export's transparent bounds; otherwise the device sits on the stage
