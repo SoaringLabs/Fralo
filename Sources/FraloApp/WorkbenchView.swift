@@ -12,7 +12,9 @@ private final class WorkspaceRegion: NSView {
 @MainActor
 final class WorkbenchView: NSView {
     let splitView = NSSplitView()
-    let workspace = MaterialSurface(.workspace)
+    /// Native behind-window blur for the stage behind the content column, so artwork and the
+    /// floating inspector sit on the desktop-tinted backdrop. The system sidebar keeps its own material.
+    let stage = MaterialSurface(.workspace)
     let left: DockedSidebar
     let right: FloatingPanel
     let content: NSView
@@ -33,6 +35,7 @@ final class WorkbenchView: NSView {
     private var animatingInspector = false
     private var transition = 0
     override var isFlipped: Bool { true }
+    static let inspectorWidth: CGFloat = 312
 
     init(left: DockedSidebar, right: FloatingPanel, content: NSView) {
         self.left = left; self.right = right; self.content = content
@@ -42,10 +45,13 @@ final class WorkbenchView: NSView {
         left.frame = NSRect(x: 0, y: 0, width: 230, height: bounds.height)
         region.frame = NSRect(x: 231, y: 0, width: bounds.width - 231, height: bounds.height)
         splitView.isVertical = true; splitView.dividerStyle = .thin
-        splitView.translatesAutoresizingMaskIntoConstraints = false; addSubview(splitView)
-        NSLayoutConstraint.activate([splitView.leadingAnchor.constraint(equalTo: leadingAnchor), splitView.trailingAnchor.constraint(equalTo: trailingAnchor),
-                                     splitView.topAnchor.constraint(equalTo: topAnchor), splitView.bottomAnchor.constraint(equalTo: bottomAnchor)])
-        for view in [workspace, content, right] { region.addSubview(view) }
+        for view in [splitView] {
+            view.translatesAutoresizingMaskIntoConstraints = false; addSubview(view)
+            NSLayoutConstraint.activate([view.leadingAnchor.constraint(equalTo: leadingAnchor), view.trailingAnchor.constraint(equalTo: trailingAnchor),
+                                         view.topAnchor.constraint(equalTo: topAnchor), view.bottomAnchor.constraint(equalTo: bottomAnchor)])
+        }
+        stage.autoresizingMask = [.width, .height]; stage.frame = region.bounds
+        for view in [stage, content, right] { region.addSubview(view) }
         region.onLayout = { [weak self] in
             guard let self else { return }
             if !self.animatingInspector { self.arrangeWorkspace() }
@@ -59,8 +65,9 @@ final class WorkbenchView: NSView {
         controller.splitView = splitView
         controller.view = self
         let sidebarController = NSViewController(); sidebarController.view = left
+        // The system sidebar owns its material, edge and titlebar band, so the toggle matches other Mac apps.
         sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebarController)
-        sidebarItem.minimumThickness = 230; sidebarItem.maximumThickness = 280
+        sidebarItem.minimumThickness = 250; sidebarItem.maximumThickness = 300
         sidebarItem.preferredThicknessFraction = 0.18; sidebarItem.holdingPriority = .defaultHigh
         sidebarItem.canCollapse = true; sidebarItem.canCollapseFromWindowResize = false
         sidebarItem.allowsFullHeightLayout = true; sidebarItem.titlebarSeparatorStyle = .none
@@ -132,16 +139,14 @@ final class WorkbenchView: NSView {
     }
     private func arrangeWorkspace(animated: Bool = false) {
         let area = region.bounds
-        workspace.frame = area
-        let margin: CGFloat = 24, gap: CGFloat = 24
+        // The floating inspector keeps a 10 pt inset from the window edge.
+        let edge: CGFloat = 10, gap: CGFloat = 24, width = Self.inspectorWidth
         let chrome = region.safeAreaInsets.top
-        let compact = area.height - chrome < 720
-        let top: CGFloat = chrome + (compact ? 22 : 30)
-        let bottom: CGFloat = compact ? 22 : 62
-        let height = max(0, area.height - top - bottom)
-        let rightRect = NSRect(x: inspectorHidden || previewing ? area.width + margin : area.width - margin - 360, y: top, width: 360, height: height)
-        let end = inspectorHidden || previewing ? area.width - margin : rightRect.minX - gap
-        let centerRect = NSRect(x: margin, y: top, width: max(0, end - margin), height: height + (compact ? 0 : 30))
+        let top: CGFloat = chrome + 8
+        let height = max(0, area.height - top - edge)
+        let rightRect = NSRect(x: inspectorHidden || previewing ? area.width + edge : area.width - edge - width, y: top, width: width, height: height)
+        let end = inspectorHidden || previewing ? area.width - gap : rightRect.minX - gap
+        let centerRect = NSRect(x: gap, y: top, width: max(0, end - gap), height: max(0, area.height - top))
         for (view, frame) in [(right as NSView, rightRect), (content, centerRect)] {
             if animated { view.animator().frame = frame } else { view.frame = frame }
         }

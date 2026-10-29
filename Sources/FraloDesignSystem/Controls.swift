@@ -288,14 +288,17 @@ public final class ExportAction: NSStackView {
     public var onExportCurrent: (() -> Void)?
     public var count = 0 { didSet { primary.title = "导出全部 · \(count) 张"; refresh() } }
     public var isEnabled = true { didSet { refresh() } }
+    private let divider = NSView()
     public init(count: Int) {
         super.init(frame: .zero)
         orientation = .horizontal; alignment = .centerY; spacing = 0; distribution = .fill
-        wantsLayer = true; layer?.cornerRadius = 11
+        wantsLayer = true; layer?.cornerRadius = 20
+        layer?.shadowColor = NSColor.black.cgColor; layer?.shadowOffset = NSSize(width: 0, height: -4); layer?.shadowRadius = 7
         // Keep custom-drawn button content in its own backing when the window loses focus.
         primary.wantsLayer = true; disclosure.wantsLayer = true
         primary.drawsSurface = false; disclosure.drawsSurface = false
-        let divider = NSView(); divider.wantsLayer = true; divider.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.22).cgColor
+        divider.wantsLayer = true
+        primary.font = .systemFont(ofSize: 13.5, weight: .semibold)
         addArrangedSubview(primary); addArrangedSubview(divider); addArrangedSubview(disclosure)
         NSLayoutConstraint.activate([heightAnchor.constraint(equalToConstant: 40), primary.heightAnchor.constraint(equalTo: heightAnchor),
             disclosure.heightAnchor.constraint(equalTo: heightAnchor), disclosure.widthAnchor.constraint(equalToConstant: 34),
@@ -308,9 +311,15 @@ public final class ExportAction: NSStackView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     private func refresh() {
         primary.isEnabled = isEnabled && count > 0; disclosure.isEnabled = primary.isEnabled
+        // A neutral capsule: near-black in light appearance, near-white in dark appearance.
+        let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        let tint = dark ? NSColor(srgbRed: 0.96, green: 0.96, blue: 0.97, alpha: 1) : NSColor(srgbRed: 0.11, green: 0.11, blue: 0.12, alpha: 1)
+        primary.primaryTint = tint; disclosure.primaryTint = tint
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            let accent = ActionButton.primaryColors().background
-            layer?.backgroundColor = (primary.isEnabled ? accent : NSColor.quaternaryLabelColor).cgColor
+            let fill = ActionButton.primaryColors(accent: tint).background
+            layer?.backgroundColor = (primary.isEnabled ? fill : NSColor.quaternaryLabelColor).cgColor
+            layer?.shadowOpacity = primary.isEnabled ? 0.14 : 0
+            divider.layer?.backgroundColor = (dark ? NSColor.black.withAlphaComponent(0.14) : NSColor.white.withAlphaComponent(0.18)).cgColor
         }
     }
     public override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); refresh() }

@@ -197,7 +197,8 @@ final class DesignSystemTests: XCTestCase {
             XCTAssertTrue(failed.accessibilityLabel()?.contains("加载失败") == true)
             XCTAssertTrue(failed.toolTip?.contains(name) == true)
             let normal = ThumbnailRow(entry: entries[0], compact: compact)
-            XCTAssertNil(normal.textField, "The filename must not compete with the thumbnail")
+            if compact { XCTAssertNil(normal.textField, "The compact rail shows thumbnails only") }
+            else { XCTAssertEqual(normal.textField?.stringValue, entries[0].title, "The list row names its framed thumbnail") }
         }
     }
 

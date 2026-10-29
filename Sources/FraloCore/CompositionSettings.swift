@@ -34,6 +34,8 @@ public struct ArtworkColor: Codable, Equatable, Sendable {
 public struct CompositionSettings: Codable, Equatable, Sendable {
     public var schemaVersion = 1
     public var display: DisplayKind = .phone
+    /// Phone frames offered in the GUI. Earlier generations stay CLI-only.
+    public var phoneModel: DeviceModel = .iPhone18ProMax
     public var orientation: Orientation = .portrait
     public var browser: BrowserStyle = .safari
     public var windowRatio: WindowRatio = .standard
@@ -60,22 +62,25 @@ public struct CompositionSettings: Codable, Equatable, Sendable {
     public var deviceCanvasSize: CGSize {
         switch display {
         case .phone:
-            return orientation == .portrait ? CGSize(width: 1530, height: 3036) : CGSize(width: 3036, height: 1530)
+            // Tight frame bounds at 1:1 screen pixels, so native screenshots are placed without resampling.
+            return FrameGeometry(model: phoneModel).orientedSize(orientation)
         case .tablet:
             return orientation == .portrait ? CGSize(width: 2400, height: 3200) : CGSize(width: 3200, height: 2400)
         case .browser:
             return CGSize(width: 3000, height: (3000 / windowRatio.ratio).rounded())
         }
     }
+    public static let phoneModels: [DeviceModel] = [.iPhone18Pro, .iPhone18ProMax]
     public init() {}
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, display, orientation, browser, windowRatio, mode, canvas, deviceScale, deviceX, deviceY, deviceOpacity, background, backgroundColor, localBackgroundPath, backgroundScale, backgroundX, backgroundY, backgroundOpacity, transparentShadow, backgroundShadow, format, jpegQuality, jpegFill, pngLossless, pngQuality
+        case schemaVersion, display, phoneModel, orientation, browser, windowRatio, mode, canvas, deviceScale, deviceX, deviceY, deviceOpacity, background, backgroundColor, localBackgroundPath, backgroundScale, backgroundX, backgroundY, backgroundOpacity, transparentShadow, backgroundShadow, format, jpegQuality, jpegFill, pngLossless, pngQuality
     }
     public init(from decoder: Decoder) throws {
         self.init()
         let values = try decoder.container(keyedBy: CodingKeys.self)
         schemaVersion = try values.decode(Int.self, forKey: .schemaVersion)
         display = try values.decode(DisplayKind.self, forKey: .display)
+        phoneModel = try values.decodeIfPresent(DeviceModel.self, forKey: .phoneModel) ?? .iPhone18ProMax
         orientation = try values.decode(Orientation.self, forKey: .orientation)
         browser = try values.decode(BrowserStyle.self, forKey: .browser)
         windowRatio = try values.decode(WindowRatio.self, forKey: .windowRatio)
@@ -104,7 +109,7 @@ public struct CompositionSettings: Codable, Equatable, Sendable {
         let values: [(Double, ClosedRange<Double>)] = [(deviceScale, 0.1...1.5), (deviceX, -1...1), (deviceY, -1...1),
             (deviceOpacity, 0...1), (backgroundScale, 1...4), (backgroundX, -1...1), (backgroundY, -1...1),
             (backgroundOpacity, 0...1), (jpegQuality, 0.1...1), (pngQuality, 0.1...1)]
-        guard schemaVersion == 1, values.allSatisfy({ $0.0.isFinite && $0.1.contains($0.0) }), backgroundColor.isValid, jpegFill.isValid else {
+        guard schemaVersion == 1, values.allSatisfy({ $0.0.isFinite && $0.1.contains($0.0) }), backgroundColor.isValid, jpegFill.isValid, Self.phoneModels.contains(phoneModel) else {
             throw FraloError.message("成图配置包含不支持的版本或无效数值。")
         }
         return self

@@ -70,7 +70,7 @@ final class CompositionTests: XCTestCase {
             for orientation in Orientation.allCases {
                 for ratio in WindowRatio.allCases where display == .browser || ratio == .standard {
                     var settings = CompositionSettings(); settings.display = display; settings.orientation = orientation; settings.windowRatio = ratio
-                    let portrait = display == .phone ? CGSize(width: 1530, height: 3036) : CGSize(width: 2400, height: 3200)
+                    let portrait = display == .phone ? CGSize(width: 1444, height: 2964) : CGSize(width: 2400, height: 3200)
                     let browserSize: CGSize
                     switch ratio {
                     case .standard: browserSize = CGSize(width: 3000, height: 1875)
@@ -96,6 +96,39 @@ final class CompositionTests: XCTestCase {
             }
         }
     }
+    func testPhoneModelsExportTightFrameAtNativeScreenPixels() throws {
+        let expected: [(DeviceModel, CGSize, CGSize)] = [(.iPhone18Pro, CGSize(width: 1206, height: 2622), CGSize(width: 1318, height: 2708)),
+                                                        (.iPhone18ProMax, CGSize(width: 1320, height: 2868), CGSize(width: 1444, height: 2964))]
+        for (model, screen, frame) in expected {
+            for orientation in Orientation.allCases {
+                var settings = CompositionSettings(); settings.phoneModel = model; settings.orientation = orientation
+                let portrait = orientation == .portrait
+                XCTAssertEqual(settings.deviceCanvasSize, portrait ? frame : CGSize(width: frame.height, height: frame.width))
+                let source = portrait ? screen : CGSize(width: screen.height, height: screen.width)
+                let plan = try RenderPlan(sourceSize: source, settings: RenderSettings(model: model, orientation: orientation), containSource: true, canvasSize: settings.deviceCanvasSize)
+                XCTAssertEqual(plan.scale, 1, "Native screenshots must not be resampled")
+                XCTAssertEqual(plan.screen.size, source)
+                XCTAssertEqual(plan.screen.origin.x.rounded(), plan.screen.origin.x)
+                XCTAssertEqual(plan.screen.origin.y.rounded(), plan.screen.origin.y)
+                let result = try CompositionRenderer.render(try solidInput(source), settings: settings, maxDimension: 200)
+                XCTAssertEqual(result.pixelSize, settings.deviceCanvasSize)
+            }
+        }
+    }
+
+    func testPhoneModelDefaultsToProMaxAndRejectsCLIOnlyGenerations() throws {
+        var settings = CompositionSettings()
+        XCTAssertEqual(settings.phoneModel, .iPhone18ProMax)
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(settings)) as? [String: Any])
+        json.removeValue(forKey: "phoneModel")
+        let legacy = try JSONDecoder().decode(CompositionSettings.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(legacy.phoneModel, .iPhone18ProMax)
+        settings.phoneModel = .iPhone18Pro
+        XCTAssertEqual(try JSONDecoder().decode(CompositionSettings.self, from: JSONEncoder().encode(settings)).phoneModel, .iPhone18Pro)
+        settings.phoneModel = .iPhone17Pro
+        XCTAssertThrowsError(try settings.validated())
+    }
+
     func testShadowHasClearOuterEdgesAndDoesNotResizeDevice() throws {
         let source = try input()
         for display in DisplayKind.allCases {

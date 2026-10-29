@@ -68,7 +68,8 @@ public final class MaterialSurface: NSView {
             layer?.borderWidth = role == .panel ? (preferences.effectiveIncreaseContrast ? 1 : 0.5) : 0
             fallbackView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
             fallbackView.layer?.cornerRadius = cornerRadius
-            panelTint.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.82).cgColor
+            // Translucent enough for the blurred desktop behind the stage to read through, opaque enough to separate layers.
+            panelTint.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.55).cgColor
         }
         if #available(macOS 26.0, *), let glass = nativeGlass as? NSGlassEffectView {
             glass.cornerRadius = cornerRadius
@@ -201,24 +202,36 @@ public final class ThumbnailRow: NSTableCellView {
         image.contentTintColor = entry.failed ? .systemRed : .secondaryLabelColor
         image.translatesAutoresizingMaskIntoConstraints = false
         addSubview(image)
-        let inset: CGFloat = compact ? 7 : 12
-        NSLayoutConstraint.activate([
+        let inset: CGFloat = 7
+        if compact { NSLayoutConstraint.activate([
             image.leadingAnchor.constraint(equalTo: leadingAnchor, constant: inset),
             image.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -inset),
             image.topAnchor.constraint(equalTo: topAnchor, constant: inset),
-            image.bottomAnchor.constraint(equalTo: bottomAnchor, constant: entry.failed && !compact ? -28 : -inset)
-        ])
-        if entry.failed && !compact {
-            let detail = FraloStyle.text("无法读取", role: .detail); detail.textColor = .systemRed
-            detail.translatesAutoresizingMaskIntoConstraints = false; addSubview(detail)
-            NSLayoutConstraint.activate([detail.centerXAnchor.constraint(equalTo: centerXAnchor), detail.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8)])
-            textField = detail
-        }
+            image.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -inset)
+        ]) }
+        if !compact { layoutDetailed(entry, image: image) }
         imageView = image
         toolTip = entry.title + (entry.failed ? " · 无法读取" : "")
         setAccessibilityLabel(entry.title + (entry.failed ? "，加载失败" : ""))
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+    /// Framed thumbnail, then file name and pixel size.
+    private func layoutDetailed(_ entry: BatchEntry, image: NSImageView) {
+        let name = FraloStyle.text(entry.title); name.font = .systemFont(ofSize: 13, weight: .medium)
+        let detail = FraloStyle.text(entry.failed ? "无法读取" : entry.detail, role: .caption)
+        detail.font = .monospacedDigitSystemFont(ofSize: 11.5, weight: .regular)
+        detail.textColor = entry.failed ? .systemRed : .tertiaryLabelColor
+        let text = FraloStyle.stack([name, detail], spacing: 3)
+        text.translatesAutoresizingMaskIntoConstraints = false; addSubview(text)
+        NSLayoutConstraint.activate([
+            image.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8), image.centerYAnchor.constraint(equalTo: centerYAnchor),
+            image.widthAnchor.constraint(equalToConstant: 44), image.heightAnchor.constraint(equalToConstant: 78),
+            text.leadingAnchor.constraint(equalTo: image.trailingAnchor, constant: 12), text.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -8),
+            text.centerYAnchor.constraint(equalTo: centerYAnchor),
+            name.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, constant: -72)
+        ])
+        textField = name
+    }
 }
 
 @MainActor
@@ -241,8 +254,9 @@ private final class BatchNavigationTable: NSTableView {
             NSMenu.popUpContextMenu(menu, with: event, for: self)
         }
     }
-    override var focusRingMaskBounds: NSRect { selectedRow >= 0 ? rect(ofRow: selectedRow).insetBy(dx: 1, dy: 5) : .zero }
-    override func drawFocusRingMask() { NSBezierPath(roundedRect: focusRingMaskBounds, xRadius: 11, yRadius: 11).fill() }
+    var compact = false
+    override var focusRingMaskBounds: NSRect { selectedRow >= 0 ? rect(ofRow: selectedRow).insetBy(dx: 1, dy: compact ? 5 : 1) : .zero }
+    override func drawFocusRingMask() { NSBezierPath(roundedRect: focusRingMaskBounds, xRadius: 12, yRadius: 12).fill() }
     override func keyDown(with event: NSEvent) {
         focusRingType = .exterior
         if (event.keyCode == 51 || event.keyCode == 117), let onDelete { onDelete() }
@@ -252,7 +266,10 @@ private final class BatchNavigationTable: NSTableView {
 
 @MainActor
 private final class BatchSelectionRow: NSTableRowView {
+    var compact = true
+    private var dark: Bool { effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua }
     override func drawBackground(in dirtyRect: NSRect) {
+        guard compact else { return }
         NSColor.controlBackgroundColor.withAlphaComponent(0.55).setFill()
         NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 5), xRadius: 11, yRadius: 11).fill()
         NSColor.labelColor.withAlphaComponent(0.10).setStroke()
@@ -262,6 +279,11 @@ private final class BatchSelectionRow: NSTableRowView {
     override var isEmphasized: Bool { get { true } set {} }
     override var interiorBackgroundStyle: NSView.BackgroundStyle { .normal }
     override func drawSelection(in dirtyRect: NSRect) {
+        guard compact else {
+            // A neutral wash, not an accent block: the framed thumbnail stays the strongest element.
+            (dark ? NSColor.white.withAlphaComponent(0.09) : NSColor.black.withAlphaComponent(0.06)).setFill()
+            NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 12, yRadius: 12).fill(); return
+        }
         NSColor.controlAccentColor.withAlphaComponent(0.17).setFill()
         let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 5), xRadius: 11, yRadius: 11)
         path.fill(); NSColor.controlAccentColor.setStroke(); path.lineWidth = 1.5; path.stroke()
@@ -281,7 +303,7 @@ public final class BatchList: PanelScrollView, NSTableViewDataSource, NSTableVie
         self.compact = compact
         super.init(frame: .zero)
         table.headerView = nil; table.style = .plain; table.rowHeight = compact ? 72 : FraloStyle.Workbench.rowHeight; table.backgroundColor = .clear
-        table.intercellSpacing = NSSize(width: 0, height: compact ? 6 : 10)
+        table.intercellSpacing = NSSize(width: 0, height: compact ? 6 : 2); table.compact = compact
         table.allowsMultipleSelection = false; table.allowsEmptySelection = false
         let column = NSTableColumn(identifier: .init("source")); column.minWidth = 0; table.addTableColumn(column)
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
@@ -315,7 +337,7 @@ public final class BatchList: PanelScrollView, NSTableViewDataSource, NSTableVie
     }
     public func numberOfRows(in tableView: NSTableView) -> Int { entries.count }
     public func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? { ThumbnailRow(entry: entries[row], compact: compact) }
-    public func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? { BatchSelectionRow() }
+    public func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? { let view = BatchSelectionRow(); view.compact = compact; return view }
     public func tableViewSelectionDidChange(_ notification: Notification) { table.noteFocusRingMaskChanged(); if !updating, let selectedIndex { onSelection?(selectedIndex) } }
 }
 
@@ -323,6 +345,8 @@ public final class BatchList: PanelScrollView, NSTableViewDataSource, NSTableVie
 public final class CanvasSurface: NSView {
     public var showsTransparencyGrid = true { didSet { needsDisplay = true } }
     public var showsElevation = false { didSet { needsDisplay = true } }
+    /// A soft contact shadow under transparent artwork on the stage. Viewing only.
+    public var showsStageShadow = false { didSet { needsDisplay = true } }
     public var image: NSImage? {
         didSet {
             needsDisplay = true
@@ -461,6 +485,14 @@ public final class CanvasSurface: NSView {
             NSColor.black.withAlphaComponent(0.12).setFill(); rect.fill()
             NSGraphicsContext.restoreGraphicsState()
         }
+        if showsStageShadow && !isPositioningArtwork {
+            let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            NSGraphicsContext.saveGraphicsState()
+            let shadow = NSShadow(); shadow.shadowColor = NSColor(srgbRed: dark ? 0 : 0.27, green: dark ? 0 : 0.2, blue: dark ? 0 : 0.12, alpha: dark ? 0.55 : 0.28)
+            shadow.shadowBlurRadius = 34; shadow.shadowOffset = NSSize(width: 0, height: -16); shadow.set()
+            image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
+            NSGraphicsContext.restoreGraphicsState()
+        }
         NSGraphicsContext.saveGraphicsState()
         NSBezierPath(rect: rect).addClip()
         // Preview backing only. Its colors must never enter the exported image.
@@ -521,7 +553,7 @@ public final class ViewToolbar: NSView {
     private var activityVersion = 0
     public private(set) var isUpdatingPreview = false
     public var showsComposition = false { didSet { composition.isHidden = !showsComposition; statusHost.isHidden = showsComposition } }
-    public let preview = ActionButton("成品预览", role: .quiet, symbol: "photo")
+    public let preview = ActionButton("透明区域", role: .quiet, symbol: "checkerboard.rectangle")
     public init() {
         activity = FraloStyle.stack([progress, FraloStyle.text("更新预览…", role: .detail, secondary: true)], axis: .horizontal, spacing: 6)
         super.init(frame: .zero)

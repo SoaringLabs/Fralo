@@ -99,7 +99,7 @@ public final class ValuePicker: NSControl {
         let changed = index != selection; selection = index
         for (index, button) in buttons.enumerated() {
             button.state = index == selection ? .on : .off
-            button.font = .systemFont(ofSize: controlHeight >= 40 ? 14 : 13, weight: index == selection ? .semibold : .medium)
+            button.font = .systemFont(ofSize: controlHeight >= 40 ? 14 : controlHeight < 28 ? 12 : 13, weight: index == selection ? .semibold : .medium)
             let title = NSAttributedString(string: button.title, attributes: [.font: button.font!,
                 .foregroundColor: index == selection ? NSColor.labelColor : NSColor.secondaryLabelColor])
             button.attributedTitle = title; button.attributedAlternateTitle = title

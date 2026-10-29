@@ -15,9 +15,9 @@ public enum FraloStyle {
     }
 
     public enum Workbench {
-        public static let panelRadius: CGFloat = 24
+        public static let panelRadius: CGFloat = 18
         public static let panelInset: CGFloat = 18
-        public static let rowHeight: CGFloat = 100
+        public static let rowHeight: CGFloat = 94
         public static let controlHeight: CGFloat = 30
     }
 

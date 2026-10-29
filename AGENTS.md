@@ -13,3 +13,12 @@
 
 - [Designing for macOS](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos)
 - [Layout](https://developer.apple.com/design/human-interface-guidelines/layout), [Sidebars](https://developer.apple.com/design/human-interface-guidelines/sidebars), [Accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility)
+
+
+<claude-mem-context>
+# Memory Context
+
+# [Fralo] recent context, 2026-10-29 12:18am GMT+8
+
+No previous sessions found.
+</claude-mem-context>

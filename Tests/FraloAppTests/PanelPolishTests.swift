@@ -24,7 +24,7 @@ final class PanelPolishTests: XCTestCase {
         let inspectorAction = try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "inspector" })
         func toggleInspector() { NSApp.sendAction(try! XCTUnwrap(inspectorAction.action), to: inspectorAction.target, from: inspectorAction) }
         func copyCurrent() { let item = actions[0]; NSApp.sendAction(try! XCTUnwrap(item.action), to: item.target, from: item) }
-        XCTAssertEqual(Array(toolbar.items.prefix(6).map { $0.itemIdentifier }), [.flexibleSpace, .init("add"), .space, .init("sidebar"), .init("sidebarBoundary"), .init("document")])
+        XCTAssertEqual(Array(toolbar.items.prefix(4).map { $0.itemIdentifier }), [.flexibleSpace, .init("sidebar"), .init("sidebarBoundary"), .init("document")])
         XCTAssertEqual(actions.map(\.action), [#selector(MainWindowController.copyCurrent(_:)), #selector(MainWindowController.exportCurrent(_:))])
         XCTAssertTrue(actions.allSatisfy { $0.target === controller && $0.isBordered })
         XCTAssertEqual(actions.map(\.label), ["复制当前图片", "导出当前图片"])
@@ -32,10 +32,10 @@ final class PanelPolishTests: XCTestCase {
         XCTAssertEqual(inspectorAction.action, #selector(MainWindowController.toggleInspector(_:)))
         XCTAssertFalse(try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "document" }).isBordered)
         XCTAssertEqual(Array(toolbar.items.suffix(6).map(\.itemIdentifier)), [.init("copyCurrent"), .init("exportCurrent"), .space, .init("inspector"), .space, .init("more")])
-        XCTAssertEqual(more.menu.items.filter { !$0.isSeparatorItem }.map(\.title), ["导入文件夹…", "粘贴图片", "移除当前图片", "清空批次", "应用设置…"])
+        XCTAssertEqual(more.menu.items.filter { !$0.isSeparatorItem }.map(\.title), ["添加图片…", "导入文件夹…", "粘贴图片", "移除当前图片", "清空批次", "应用设置…"])
         for size in [NSSize(width: 1030, height: 640), NSSize(width: 1400, height: 1000), NSSize(width: 1900, height: 1000)] {
             window.setContentSize(size); root.layoutSubtreeIfNeeded()
-            XCTAssertEqual(root.right.bounds.width, 360, accuracy: 0.1)
+            XCTAssertEqual(root.right.bounds.width, WorkbenchView.inspectorWidth, accuracy: 0.1)
             XCTAssertGreaterThan(root.content.bounds.width, 300)
         }
         XCTAssertEqual(inspectorAction.toolTip, "显示出图设置"); XCTAssertTrue(root.inspectorHidden); XCTAssertFalse(actions[0].isEnabled)
@@ -57,14 +57,14 @@ final class PanelPolishTests: XCTestCase {
         XCTAssertTrue(viewing.isCompact)
         XCTAssertGreaterThanOrEqual(viewing.zoom.bounds.width, viewing.zoom.intrinsicContentSize.width - 1, "The fixed inspector must not truncate the zoom action at minimum width")
         let previousWidth = root.content.bounds.width
-        let field = try XCTUnwrap(descendants(inspector).compactMap { $0 as? NSTextField }.first { $0.isEditable && !$0.isHiddenOrHasHiddenAncestor })
+        let field = inspector.devicePicker
         XCTAssertTrue(window.makeFirstResponder(field))
         toggleInspector()
         try await Task.sleep(nanoseconds: 350_000_000); root.layoutSubtreeIfNeeded()
         XCTAssertTrue(root.inspectorHidden); XCTAssertTrue(root.right.isHidden)
         XCTAssertEqual(inspectorAction.toolTip, "显示出图设置")
         XCTAssertTrue(window.firstResponder === canvas)
-        XCTAssertGreaterThan(root.content.bounds.width, previousWidth + 350)
+        XCTAssertGreaterThan(root.content.bounds.width, previousWidth + WorkbenchView.inspectorWidth - 20)
         XCTAssertTrue(canvas.image === rendered); XCTAssertEqual(list.selectedIndex, 0)
         XCTAssertEqual(try encoder.encode(CompositionStore(legacy: store).load()), stored)
         copyCurrent()
@@ -73,15 +73,19 @@ final class PanelPolishTests: XCTestCase {
         defer { restored.window?.close() }
         XCTAssertTrue(try XCTUnwrap(restored.window?.contentView as? WorkbenchView).inspectorHidden)
         viewing.preview.performClick(nil)
+        XCTAssertEqual(viewing.preview.state, .on); XCTAssertTrue(canvas.showsTransparencyGrid, "The floating bar toggles the transparent-bounds checkerboard")
+        XCTAssertFalse(root.previewing)
+        viewing.preview.performClick(nil); XCTAssertEqual(viewing.preview.state, .off)
+        controller.togglePreview(nil)
         XCTAssertTrue(root.previewing); XCTAssertEqual(inspectorAction.toolTip, "显示出图设置")
-        XCTAssertTrue(toolbar.items.contains { $0.itemIdentifier.rawValue == "add" })
+        XCTAssertTrue(toolbar.items.contains { $0.itemIdentifier.rawValue == "add" }, "Previewing hides the list, so the toolbar offers “+”")
         toggleInspector()
         try await Task.sleep(nanoseconds: 350_000_000); root.layoutSubtreeIfNeeded()
         XCTAssertFalse(root.previewing); XCTAssertFalse(root.inspectorHidden); XCTAssertFalse(root.right.isHidden)
         XCTAssertEqual(inspectorAction.toolTip, "隐藏出图设置")
-        XCTAssertTrue(toolbar.items.contains { $0.itemIdentifier.rawValue == "add" })
+        XCTAssertFalse(toolbar.items.contains { $0.itemIdentifier.rawValue == "add" }, "The list header owns “+” while the list is visible")
         XCTAssertNotNil(toolbar.items.first { $0 is NSTrackingSeparatorToolbarItem })
-        XCTAssertEqual(root.right.bounds.width, 360, accuracy: 0.1)
+        XCTAssertEqual(root.right.bounds.width, WorkbenchView.inspectorWidth, accuracy: 0.1)
         window.setContentSize(NSSize(width: 1900, height: 1000)); root.layoutSubtreeIfNeeded()
         // Native split/stack layout finishes on the run loop after a window resize.
         for _ in 0..<20 where viewing.isCompact {
@@ -116,15 +120,14 @@ final class PanelPolishTests: XCTestCase {
             XCTAssertEqual(root.left.frame.height, root.bounds.height)
             XCTAssertGreaterThanOrEqual(root.left.frame.width, 230)
             XCTAssertGreaterThan(root.content.frame.width, 300)
-            XCTAssertEqual(root.left.surface.cornerRadius, 0)
             XCTAssertEqual(root.left.layer?.shadowOpacity ?? 0, 0)
-            let header = root.left.subviews.compactMap { $0 as? NSStackView }.first!
+            let header = try XCTUnwrap(descendants(root.left).compactMap { $0 as? NSStackView }.first)
             XCTAssertGreaterThanOrEqual(header.convert(header.bounds, to: root).minY, root.safeAreaInsets.top)
         }
         controller.toggleInspector(nil) // Explicitly open settings for this focus-preservation test.
         let inspector = try XCTUnwrap(root.right.body as? CompositionInspector)
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
-        let field = try XCTUnwrap(descendants(inspector).compactMap { $0 as? NSTextField }.first { $0.isEditable && !$0.isHiddenOrHasHiddenAncestor })
+        let field = inspector.devicePicker
         XCTAssertTrue(window.makeFirstResponder(field))
         let responder = window.firstResponder
         controller.toggleSidebar(nil)
@@ -217,7 +220,8 @@ final class PanelPolishTests: XCTestCase {
                 XCTAssertEqual(try XCTUnwrap(canvas.image).size, size)
                 XCTAssertEqual(try XCTUnwrap(canvas.zoom), fitZoom, accuracy: 0.0001)
                 XCTAssertEqual(canvas.imageRect, fitRect)
-                XCTAssertEqual(viewing.dimensions.stringValue, "\(Int(size.width)) × \(Int(size.height))")
+                XCTAssertTrue(viewing.dimensions.stringValue.hasSuffix("%"), "The floating bar shows the zoom; pixel size lives in the inspector footer")
+                XCTAssertEqual(viewing.dimensions.toolTip, "\(Int(size.width)) × \(Int(size.height)) px")
             }
             controller.actualPixels(nil); root.layoutSubtreeIfNeeded()
             let actualZoom = try XCTUnwrap(canvas.zoom), actualRect = canvas.imageRect
@@ -243,7 +247,8 @@ final class PanelPolishTests: XCTestCase {
         let scroll = try XCTUnwrap(inspector.subviews.first as? NSScrollView)
         let document = try XCTUnwrap(scroll.documentView)
         XCTAssertTrue(inspector.exportSettings.isDescendant(of: document), "Export format and JPEG parameters must scroll with the other settings")
-        XCTAssertTrue(inspector.outputInfo.isDescendant(of: document), "The output summary belongs to the scrolling settings")
+        XCTAssertFalse(inspector.outputInfo.isDescendant(of: document), "Output size stays in the fixed footer above the export action")
+        XCTAssertTrue(inspector.outputInfo.isDescendant(of: root.right))
         XCTAssertFalse(inspector.mode.isDescendant(of: document), "The mode selector stays pinned above the scrolling form")
         // Reproduce the user's always-visible native scrollbar preference without changing the OS.
         scroll.scrollerStyle = .legacy
@@ -310,17 +315,14 @@ final class PanelPolishTests: XCTestCase {
         XCTAssertFalse(canvas.image === first, "The real preview still follows the selected input")
         XCTAssertEqual(try illustration(), before, "The inspector demo must not follow the selected input")
         let inspector = try XCTUnwrap(root.right.body as? CompositionInspector)
-        XCTAssertTrue(inspector.calculateSize.isEnabled)
-        inspector.calculateSize.performClick(nil)
-        for _ in 0..<150 where !inspector.outputSize.stringValue.hasPrefix("预计 ") { try await Task.sleep(nanoseconds: 20_000_000) }
-        XCTAssertTrue(inspector.outputSize.stringValue.hasPrefix("预计 "))
-        XCTAssertTrue(inspector.calculateSize.isHidden, "Retain the computed count until input or settings change")
-        let compression = try XCTUnwrap(descendants(inspector).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == "PNG 压缩" })
+        for _ in 0..<150 where !inspector.outputSize.stringValue.hasPrefix("约 ") { try await Task.sleep(nanoseconds: 20_000_000) }
+        XCTAssertTrue(inspector.outputSize.stringValue.hasSuffix(" / 张"), "The per-image size is estimated automatically after each preview")
+        let compression = try XCTUnwrap(descendants(inspector).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == "PNG 体积" })
         let previous = canvas.image; compression.choose(1)
         for _ in 0..<250 where canvas.image === previous { try await Task.sleep(nanoseconds: 20_000_000) }
         XCTAssertFalse(inspector.settings.pngLossless)
         XCTAssertFalse(canvas.image === previous)
-        XCTAssertTrue(inspector.outputSize.stringValue.hasPrefix("预计 "), "Reuse PNG preview encoding to report bytes without another render")
+        XCTAssertTrue(inspector.outputSize.stringValue.hasPrefix("约 "), "Reuse PNG preview encoding to report bytes without another render")
     }
 
 }
