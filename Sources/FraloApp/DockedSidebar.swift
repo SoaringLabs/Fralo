@@ -39,12 +39,16 @@ final class DockedSidebar: NSView {
         if let scroll = body as? NSScrollView {
             scroll.hasVerticalScroller = true
             scroll.verticalScroller = SidebarScroller()
+            scroll.verticalScroller?.controlSize = .small
             // Keep native visibility preferences, but draw the same thin, trackless
             // knob in both legacy/Always and overlay presentation.
             scroll.scrollerStyle = NSScroller.preferredScrollerStyle
             scroll.scrollerKnobStyle = .default
-            // Keep selection cards inset while the native scroller owns the edge.
-            (scroll as? BatchList)?.rowHorizontalInset = 10
+            // One inset budget: 15pt to the right edge leaves a 7pt gap to the
+            // six-point knob, in both native styles, without a second gutter.
+            if let list = scroll as? BatchList {
+                list.rowHorizontalInset = 10; list.rowTrailingMargin = 15
+            }
         }
         setAccessibilityElement(false)
         setAccessibilityLabel("图片列表")

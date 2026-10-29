@@ -125,4 +125,56 @@ final class SidebarScrollingTests: XCTestCase {
         }
     }
 
+    @MainActor func testSidebarKnobHoverDarkensAndExitRestoresItsIdleColor() async throws {
+        _ = NSApplication.shared
+        let scroller = SidebarScroller(frame: NSRect(x: 0, y: 0, width: 17, height: 240))
+        scroller.scrollerStyle = .legacy; scroller.knobProportion = 0.3; scroller.doubleValue = 0.4
+        func maxAlpha() throws -> CGFloat {
+            let bitmap = try XCTUnwrap(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 17, pixelsHigh: 240,
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+            memset(bitmap.bitmapData!, 0, bitmap.bytesPerRow * bitmap.pixelsHigh)
+            NSGraphicsContext.saveGraphicsState(); defer { NSGraphicsContext.restoreGraphicsState() }
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
+            scroller.effectiveAppearance.performAsCurrentDrawingAppearance { scroller.drawKnob() }
+            return (0..<17).flatMap { x in (0..<240).map { bitmap.colorAt(x: x, y: $0)?.alphaComponent ?? 0 } }.max() ?? 0
+        }
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            scroller.appearance = NSAppearance(named: appearance)
+            let idle = try maxAlpha()
+            let enter = try XCTUnwrap(NSEvent.enterExitEvent(with: .mouseEntered, location: .zero, modifierFlags: [], timestamp: 0,
+                windowNumber: 0, context: nil, eventNumber: 1, trackingNumber: 1, userData: nil))
+            scroller.mouseEntered(with: enter)
+            XCTAssertGreaterThan(try maxAlpha(), idle + 0.1, "Hover must visibly darken the knob")
+            let exit = try XCTUnwrap(NSEvent.enterExitEvent(with: .mouseExited, location: .zero, modifierFlags: [], timestamp: 0,
+                windowNumber: 0, context: nil, eventNumber: 2, trackingNumber: 1, userData: nil))
+            scroller.mouseExited(with: exit)
+            XCTAssertEqual(try maxAlpha(), idle, accuracy: 0.01, "Pointer exit restores the pale idle color")
+        }
+    }
+
+    @MainActor func testSidebarCardKeepsSevenPointGapToTheKnobInBothNativeStyles() async throws {
+        _ = NSApplication.shared
+        let list = BatchList(entries: (0..<30).map { BatchEntry(id: String($0), title: String(repeating: "long-screenshot-name-", count: 10) + "\($0).png") })
+        let sidebar = DockedSidebar(header: NSTextField(labelWithString: "图片 30"), body: list, footer: NSView(), usesNativeHeader: false)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 280, height: 640), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; defer { window.close() }
+        window.contentView = sidebar
+        let table = try XCTUnwrap(list.documentView as? NSTableView)
+        for style in [NSScroller.Style.legacy, .overlay] {
+            list.scrollerStyle = style; list.tile(); sidebar.layoutSubtreeIfNeeded(); list.select(10)
+            let scroller = try XCTUnwrap(list.verticalScroller)
+            let selection = table.convert(table.focusRingMaskBounds, to: sidebar)
+            let knobLeft = scroller.convert(NSPoint(x: scroller.bounds.maxX - 9, y: scroller.bounds.midY), to: sidebar).x
+            let gap = knobLeft - selection.maxX
+            XCTAssertGreaterThanOrEqual(gap, 6)
+            XCTAssertLessThanOrEqual(gap, 8, "The reserved gutter and card padding must not add two separate gaps")
+            let cell = try XCTUnwrap(table.view(atColumn: 0, row: 10, makeIfNecessary: true) as? NSTableCellView)
+            cell.layoutSubtreeIfNeeded()
+            let name = try XCTUnwrap(cell.textField)
+            XCTAssertLessThanOrEqual(name.convert(name.bounds, to: sidebar).maxX,
+                                     scroller.convert(scroller.bounds, to: sidebar).minX - 4,
+                                     "Long names stay clear of the broader native scroller hit target")
+        }
+    }
+
 }

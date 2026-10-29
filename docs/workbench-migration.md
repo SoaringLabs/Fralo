@@ -379,3 +379,44 @@ AX value assignment. The pixel test also checks that painted knob pixels map to
 the native knob hit part in both modes. The final preview restores the user's
 selection and scroll position, with only one instance retained. Temporary app
 preference overrides were removed; global settings were not changed.
+
+
+### Scrollbar hover feedback and spacing — 2026-10-30
+
+The next supplied comparison requires a pale resting knob, a darker hover/drag
+state and a tighter gap. The previous knob used one constant opacity, and legacy
+layout combined a reserved gutter with row padding, leaving about 19 pt from the
+card to the knob. Overlay layout instead left about 2 pt.
+
+The scroller now tracks pointer entry/exit and native knob tracking, with distinct
+idle/active semantic-color opacities. Width remains six points and the slot paints
+nothing. Native clip/scroller tiling is retained, using small-control metrics
+for the sidebar and a total trailing-margin budget that subtracts the native
+gutter before adding row padding. Separate leading/trailing row insets keep the
+thumbnail's left alignment, selection and focus consistent and yield a seven-point
+card-to-knob gap in both styles. Long filenames stay clear of the native scroller
+hit rectangle. Tracking areas remain active during mouse drags; native knob
+tracking retains the active color until release without replacing mouseDown.
+
+Both reported defects were reproduced by regression tests before the change.
+All 46 affected sidebar/design-system/HIG tests now pass, including light/dark
+hover darkening and exit restoration, both native styles' gap bounds, long-label
+clearance, the trackless artwork and native hit mapping. Release builds pass.
+
+
+Final native validation uses the original12-image selection/scroll state. In the
+light window the measured thumb gray levels were about198 at rest,151 after
+pointer press/stay and198 after clicking away; dark/minimum measured110/154/110,
+using brighter feedback for dark appearance. The six-point width and seven-point
+gap remain stable without a track or extra color strip. Actual dragging changes
+the list's scroll value without selecting a different row; a temporary long-name
+fixture truncates in the middle and stays outside the scroller target. It was
+removed before restoring the user's12-image preview.
+
+The final scroller adds a passive local-event observer to synchronize hover when
+a pointer jumps on click/scroll without a boundary event. Its five sidebar tests
+were rerun and passed after the earlier46-test affected run. The desktop tool
+cannot generate a standalone unpressed mouse move, so pure hover is covered by
+tracking-event rendering tests but still needs direct human confirmation; the
+native screenshots verify press/stay/away transitions. Older OS hardware,
+VoiceOver and live accessibility-preference tests remain unperformed.

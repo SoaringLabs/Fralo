@@ -126,12 +126,21 @@ and the knob's horizontal hit rectangle, keeping AppKit dragging, paging,
 overlay fading and accessibility behavior. The larger native hit target remains
 independent of the thin artwork. Both legacy/Always and overlay modes retain the
 same narrow, transparent-track appearance; visibility still follows the native
-preference, without changing the user's global settings. Increased contrast
-strengthens the knob color rather than adding a track.
+preference, without changing the user's global settings. The knob rests at low
+contrast, darkens when the pointer enters its native hit area or during native
+knob tracking, and returns to its idle color on exit/release. A passive local pointer-event
+observer also updates the state when a click or scroll relocates the pointer
+without an intermediate tracking-area boundary event; it returns native events
+unchanged. Increased contrast strengthens both states rather than adding a track
+or changing width.
 
 The inspector and lab panels retain their existing hidden indicators. The scroll
-viewport fills the sidebar, while 10 pt horizontal row insets keep thumbnails,
-selection and keyboard focus aligned independently of scrollbar metrics.
+viewport retains native clip/scroller tiling. Rows use a 10 pt leading inset and
+a 15 pt trailing budget measured from the scroll view's outer edge, subtracting
+any native gutter instead of adding it again. The sidebar scroller uses native
+small-control metrics, with a hit area wider than its six-point artwork.
+Selection and keyboard focus share the row bounds. This leaves 7 pt between the
+card and knob in both styles, while long labels stay outside the native hit area.
 
 On macOS 26 the fixed image heading is a split-item top accessory, which supplies
 safe-area insets and the system scroll edge effect. macOS 26.1 and later use the
