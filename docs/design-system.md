@@ -116,3 +116,27 @@ between icon centers). Adjacent toolbar items merge into one system glass
 surface, without the divider or tighter spacing produced by NSToolbarItemGroup's
 segmented representation. Tooltip, accessibility label, enabled state and target
 action remain native and independent for each button.
+
+
+### Sidebar scrolling
+
+The production batch sidebar opts into native vertical scrollbars, with the current
+`NSScroller.preferredScrollerStyle`; the inspector and lab panels retain their
+existing hidden indicators. The scroll viewport fills the sidebar, while 10 pt
+horizontal row insets keep thumbnails, selection and keyboard focus aligned
+independently of overlay or legacy scrollbar gutters.
+
+On macOS 26 the fixed image heading is a split-item top accessory, which supplies
+safe-area insets and the system scroll edge effect. macOS 26.1 and later use the
+native soft edge to match the supplied reference: automatic produced a hard edge
+for the unboxed title. The count uses full label contrast to stay readable
+on the material. macOS 14/15 use a fixed `headerView` material with within-window
+blending and explicit content/scroller insets; Reduce Transparency makes this
+compatibility header opaque. Both paths keep the first and keyboard-selected
+rows below the heading, and include the heading in sidebar focus ownership.
+
+This follows [Apple's scroll-edge guidance](https://developer.apple.com/design/human-interface-guidelines/scroll-views)
+and [split item accessory guidance](https://developer.apple.com/videos/play/wwdc2025/310/).
+The soft edge is a deliberate choice based on the user reference and requires
+legibility checks in light/dark appearances; it is not a claim that Find My uses
+the same internal implementation.

@@ -75,6 +75,7 @@ final class WorkbenchView: NSView {
         let main = NSSplitViewItem(viewController: workspaceController)
         main.minimumThickness = 740; main.titlebarSeparatorStyle = .none
         controller.addSplitViewItem(sidebarItem); controller.addSplitViewItem(main)
+        left.configureHeader(for: sidebarItem)
         sidebarObservation = sidebarItem.observe(\.isCollapsed, options: [.new]) { [weak self] item, _ in
             MainActor.assumeIsolated {
                 guard let self, !self.previewing, !self.movingSidebar, self.storedCollapsed != item.isCollapsed else { return }

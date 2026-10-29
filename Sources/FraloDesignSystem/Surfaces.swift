@@ -194,7 +194,7 @@ public struct BatchEntry {
 
 @MainActor
 public final class ThumbnailRow: NSTableCellView {
-    public init(entry: BatchEntry, compact: Bool = false) {
+    public init(entry: BatchEntry, compact: Bool = false, horizontalInset: CGFloat = 0) {
         super.init(frame: .zero)
         let image = NSImageView()
         image.image = entry.image ?? NSImage(systemSymbolName: entry.failed ? "exclamationmark.triangle" : "photo", accessibilityDescription: nil)
@@ -209,14 +209,14 @@ public final class ThumbnailRow: NSTableCellView {
             image.topAnchor.constraint(equalTo: topAnchor, constant: inset),
             image.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -inset)
         ]) }
-        if !compact { layoutDetailed(entry, image: image) }
+        if !compact { layoutDetailed(entry, image: image, horizontalInset: horizontalInset) }
         imageView = image
         toolTip = entry.title + (entry.failed ? " · 无法读取" : "")
         setAccessibilityLabel(entry.title + (entry.failed ? "，加载失败" : ""))
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     /// Framed thumbnail, then file name and pixel size.
-    private func layoutDetailed(_ entry: BatchEntry, image: NSImageView) {
+    private func layoutDetailed(_ entry: BatchEntry, image: NSImageView, horizontalInset: CGFloat) {
         let name = FraloStyle.text(entry.title); name.font = .systemFont(ofSize: 13, weight: .medium)
         let detail = FraloStyle.text(entry.failed ? "无法读取" : entry.detail, role: .caption)
         detail.font = .monospacedDigitSystemFont(ofSize: 11.5, weight: .regular)
@@ -224,9 +224,9 @@ public final class ThumbnailRow: NSTableCellView {
         let text = FraloStyle.stack([name, detail], spacing: 3)
         text.translatesAutoresizingMaskIntoConstraints = false; addSubview(text)
         NSLayoutConstraint.activate([
-            image.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8), image.centerYAnchor.constraint(equalTo: centerYAnchor),
+            image.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8 + horizontalInset), image.centerYAnchor.constraint(equalTo: centerYAnchor),
             image.widthAnchor.constraint(equalToConstant: 44), image.heightAnchor.constraint(equalToConstant: 78),
-            text.leadingAnchor.constraint(equalTo: image.trailingAnchor, constant: 12), text.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -8),
+            text.leadingAnchor.constraint(equalTo: image.trailingAnchor, constant: 12), text.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -8 - horizontalInset),
             text.centerYAnchor.constraint(equalTo: centerYAnchor),
             name.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, constant: -72)
         ])
@@ -255,7 +255,8 @@ private final class BatchNavigationTable: NSTableView {
         }
     }
     var compact = false
-    override var focusRingMaskBounds: NSRect { selectedRow >= 0 ? rect(ofRow: selectedRow).insetBy(dx: 1, dy: compact ? 5 : 1) : .zero }
+    var rowHorizontalInset: CGFloat = 0
+    override var focusRingMaskBounds: NSRect { selectedRow >= 0 ? rect(ofRow: selectedRow).insetBy(dx: 1 + rowHorizontalInset, dy: compact ? 5 : 1) : .zero }
     override func drawFocusRingMask() { NSBezierPath(roundedRect: focusRingMaskBounds, xRadius: 12, yRadius: 12).fill() }
     override func keyDown(with event: NSEvent) {
         focusRingType = .exterior
@@ -267,6 +268,7 @@ private final class BatchNavigationTable: NSTableView {
 @MainActor
 private final class BatchSelectionRow: NSTableRowView {
     var compact = true
+    var horizontalInset: CGFloat = 0
     private var dark: Bool { effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua }
     override func drawBackground(in dirtyRect: NSRect) {
         guard compact else { return }
@@ -282,7 +284,7 @@ private final class BatchSelectionRow: NSTableRowView {
         guard compact else {
             // A neutral wash, not an accent block: the framed thumbnail stays the strongest element.
             (dark ? NSColor.white.withAlphaComponent(0.09) : NSColor.black.withAlphaComponent(0.06)).setFill()
-            NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 12, yRadius: 12).fill(); return
+            NSBezierPath(roundedRect: bounds.insetBy(dx: 1 + horizontalInset, dy: 1), xRadius: 12, yRadius: 12).fill(); return
         }
         NSColor.controlAccentColor.withAlphaComponent(0.17).setFill()
         let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 5), xRadius: 11, yRadius: 11)
@@ -295,6 +297,10 @@ public final class BatchList: PanelScrollView, NSTableViewDataSource, NSTableVie
     private let table = BatchNavigationTable()
     private var updating = false
     private let compact: Bool
+    /// Row content/selection inset, independent of the scroller at the viewport edge.
+    public var rowHorizontalInset: CGFloat = 0 {
+        didSet { table.rowHorizontalInset = rowHorizontalInset; table.reloadData() }
+    }
     public var onDelete: (() -> Void)?
     public private(set) var entries: [BatchEntry] = []
     public var onSelection: ((Int) -> Void)?
@@ -336,8 +342,8 @@ public final class BatchList: PanelScrollView, NSTableViewDataSource, NSTableVie
         select(min(entries.count - 1, max(0, (selectedIndex ?? 0) + delta)))
     }
     public func numberOfRows(in tableView: NSTableView) -> Int { entries.count }
-    public func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? { ThumbnailRow(entry: entries[row], compact: compact) }
-    public func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? { let view = BatchSelectionRow(); view.compact = compact; return view }
+    public func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? { ThumbnailRow(entry: entries[row], compact: compact, horizontalInset: rowHorizontalInset) }
+    public func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? { let view = BatchSelectionRow(); view.compact = compact; view.horizontalInset = rowHorizontalInset; return view }
     public func tableViewSelectionDidChange(_ notification: Notification) { table.noteFocusRingMaskChanged(); if !updating, let selectedIndex { onSelection?(selectedIndex) } }
 }
 

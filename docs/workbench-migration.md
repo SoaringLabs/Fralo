@@ -312,3 +312,36 @@ unconfirmed. The original assertion and renderer were not relaxed or changed to
 hide it. The initial failure and subsequent diagnostics remain in the local
 verification bundle. This is a recorded test uncertainty, not a demonstrated
 HIG fix or proof that an output issue was resolved.
+
+
+## Sidebar scrollbars and content underlap — 2026-10-30
+
+FRALO-8 restores the production left column's native vertical scrollbar and
+lets the list scroll underneath its fixed image heading. macOS 26 uses a native
+split-item accessory; 26.1+ selects the system soft scroll edge after the
+automatic style showed a hard border. The compatibility path uses a within-window
+header material with content and scroller insets. Rows retain their 10 pt outer
+spacing, and collapsing transfers focus out of both the list and the new native
+heading accessory. The image count now uses full label contrast.
+
+The right inspector keeps its existing scrollbar behavior. No composition,
+rendering, export or original-image handling changes are included. Human
+acceptance, merge and release remain separate stages.
+
+Verification: the full Debug suite passed 103 tests with one opt-in desktop
+performance probe skipped. After the row-inset, header-focus and soft-edge
+refinements, all 43 affected sidebar/design-system/HIG tests passed. The final
+count-color-only refinement was built and checked in the native dark window.
+Release builds, all ten CLI checks, public-source scanning and diff whitespace
+checks passed. Native macOS 27 checks cover light/default and dark/minimum,
+Always/When Scrolling/Automatic scrollbar modes using isolated app preferences,
+scrollbar dragging, real wheel scrolling, both list ends, keyboard selection,
+heading click interception, collapse/reopen, empty/short lists and inspector
+indicator preservation. The generated-fixture preview uses a separate bundle
+identity and temporary composition settings; the existing preview was preserved.
+
+The compatibility path was exercised by tests on the current OS; macOS 14/15/26
+hardware was not tested. Full VoiceOver speech, system-wide live preference
+switching, and Reduce Transparency / Increase Contrast UI checks remain pending.
+System soft edges still have a subtle lower boundary; no pixel-identical Find My
+reproduction or complete HIG/accessibility certification is claimed.
