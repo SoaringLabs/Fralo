@@ -24,8 +24,6 @@ final class DevelopmentTests: XCTestCase {
         defer { probe.stop() }
         let originalClipping = root.right.surface.layer?.masksToBounds
         let originalShadow = root.right.layer?.shadowOpacity
-        let workspaceMaterial = root.workspace.material
-        let workspaceAlpha = root.workspace.effect.alphaValue
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
         #if compiler(>=6.4)
         if #available(macOS 27.0, *) {
@@ -49,8 +47,6 @@ final class DevelopmentTests: XCTestCase {
         #endif
         XCTAssertEqual(root.right.surface.layer?.masksToBounds, originalClipping)
         XCTAssertEqual(root.right.layer?.shadowOpacity, originalShadow)
-        XCTAssertEqual(root.workspace.material, workspaceMaterial)
-        XCTAssertEqual(root.workspace.effect.alphaValue, workspaceAlpha)
         XCTAssertEqual(try CompositionStore(legacy: store).load(), before)
         XCTAssertFalse(FileManager.default.fileExists(atPath: store.url.path))
     }

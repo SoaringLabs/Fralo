@@ -5,15 +5,18 @@ public struct VisualChoiceItem {
     public let detail: String
     public let symbol: String
     public var image: NSImage?
-    public init(_ title: String, detail: String = "", symbol: String = "photo", image: NSImage? = nil) {
-        self.title = title; self.detail = detail; self.symbol = symbol; self.image = image
+    /// Unavailable choices stay visible (e.g. “即将支持”) but cannot be selected.
+    public var isAvailable: Bool
+    public init(_ title: String, detail: String = "", symbol: String = "photo", image: NSImage? = nil, available: Bool = true) {
+        self.title = title; self.detail = detail; self.symbol = symbol; self.image = image; self.isAvailable = available
     }
 }
 
 /// A real radio group: images explain choices; mouse, keyboard and accessibility share one edit path.
 @MainActor
 public final class VisualChoiceGroup: NSControl {
-    public enum Layout { case row, tiles(columns: Int, height: CGFloat) }
+    /// `options`: compact one-line cards (symbol, title, check) for choices that need no artwork.
+    public enum Layout { case row, tiles(columns: Int, height: CGFloat), options(columns: Int) }
     private let arrangement: Layout
     private var cards: [VisualChoiceCard] = []
     private var selection: Int?
@@ -26,8 +29,12 @@ public final class VisualChoiceGroup: NSControl {
     public override var isFlipped: Bool { true }
     public override var acceptsFirstResponder: Bool { isEnabled }
     public override var isEnabled: Bool { didSet { cards.forEach { $0.isEnabled = isEnabled } } }
-    private var columns: Int { if case .tiles(let count, _) = arrangement { return max(1, count) }; return 1 }
-    private var rowHeight: CGFloat { if case .tiles(_, let height) = arrangement { return height }; return 72 }
+    private var columns: Int {
+        switch arrangement { case .tiles(let count, _), .options(let count): return max(1, count); case .row: return 1 }
+    }
+    private var rowHeight: CGFloat {
+        switch arrangement { case .tiles(_, let height): return height; case .options: return 44; case .row: return 72 }
+    }
     public override var intrinsicContentSize: NSSize {
         let rows = (cards.count + columns - 1) / columns
         return NSSize(width: 280, height: CGFloat(rows) * rowHeight + CGFloat(max(0, rows - 1)) * 8)
@@ -39,7 +46,8 @@ public final class VisualChoiceGroup: NSControl {
         super.init(frame: .zero)
         setAccessibilityElement(true); setAccessibilityRole(.radioGroup); setAccessibilityLabel(label)
         for (index, item) in items.enumerated() {
-            let card = VisualChoiceCard(item: item, horizontal: { if case .row = layout { return true }; return false }(), captionsBelow: captionsBelow)
+            let style: VisualChoiceCard.Style = { switch layout { case .row: return .row; case .options: return .option; case .tiles: return .tile } }()
+            let card = VisualChoiceCard(item: item, style: style, captionsBelow: captionsBelow)
             card.tag = index; card.target = self; card.action = #selector(pressed(_:))
             cards.append(card); addSubview(card)
         }
@@ -62,7 +70,9 @@ public final class VisualChoiceGroup: NSControl {
         if NSApp.currentEvent?.type == .keyDown { focusRingType = .exterior }
         return super.becomeFirstResponder()
     }
-    public func choose(_ index: Int) { guard isEnabled else { return }; select(index, notify: true) }
+    public func choose(_ index: Int) {
+        guard isEnabled, cards.indices.contains(index), cards[index].item.isAvailable else { return }; select(index, notify: true)
+    }
     private func select(_ index: Int?, notify: Bool) {
         if let index, !cards.indices.contains(index) { return }
         let changed = index != selection; selection = index
@@ -96,8 +106,10 @@ public final class VisualChoiceGroup: NSControl {
 
 @MainActor
 private final class VisualChoiceCard: NSButton {
-    private let item: VisualChoiceItem
-    private let horizontal: Bool
+    enum Style { case tile, row, option }
+    let item: VisualChoiceItem
+    private let style: Style
+    private var horizontal: Bool { style != .tile }
     private let captionsBelow: Bool
     private var hovered = false
     private var tracking: NSTrackingArea?
@@ -107,12 +119,13 @@ private final class VisualChoiceCard: NSButton {
     override var isEnabled: Bool { didSet { needsDisplay = true } }
     override var isFlipped: Bool { true }
     var surfaceBounds: NSRect { NSRect(x: 0, y: 0, width: bounds.width, height: bounds.height - (captionsBelow ? 24 : 0)) }
-    init(item: VisualChoiceItem, horizontal: Bool, captionsBelow: Bool) {
-        self.item = item; self.horizontal = horizontal; self.captionsBelow = captionsBelow && !horizontal; artwork = item.image
+    init(item: VisualChoiceItem, style: Style, captionsBelow: Bool) {
+        self.item = item; self.style = style; self.captionsBelow = captionsBelow && style == .tile; artwork = item.image
         super.init(frame: .zero)
         title = item.title; setButtonType(.pushOnPushOff); isBordered = false; refusesFirstResponder = true
         setAccessibilityElement(true); setAccessibilityRole(.radioButton)
         setAccessibilityLabel(item.title + (item.detail.isEmpty ? "" : "，" + item.detail)); toolTip = item.title
+        if !item.isAvailable { setAccessibilityEnabled(false) }
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); needsDisplay = true }
@@ -125,13 +138,19 @@ private final class VisualChoiceCard: NSButton {
     override func mouseEntered(with event: NSEvent) { hovered = true; needsDisplay = true }
     override func mouseExited(with event: NSEvent) { hovered = false; needsDisplay = true }
     override func draw(_ dirtyRect: NSRect) {
+        if !item.isAvailable {
+            // Dim the whole card, including its caption, like a disabled control.
+            NSGraphicsContext.current?.cgContext.setAlpha(0.42)
+        }
+        if style == .option { drawOption(); return }
         let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         let rect = surfaceBounds.insetBy(dx: 1, dy: 1)
         let path = NSBezierPath(roundedRect: rect, xRadius: 12, yRadius: 12)
         let pressed = cell?.isHighlighted == true && isEnabled
         let neutral = NSColor(white: dark ? 1 : 0, alpha: pressed ? 0.10 : hovered && isEnabled ? 0.075 : 0.035)
         let accented = chosen && isEnabled && !horizontal
-        (accented ? NSColor.controlAccentColor.withAlphaComponent(dark ? 0.14 : 0.08) : neutral).setFill(); path.fill()
+        // Selection keeps a neutral fill; the accent ring and check carry the state.
+        (accented ? NSColor(white: dark ? 1 : 0, alpha: dark ? 0.09 : 0.06) : neutral).setFill(); path.fill()
         (accented ? NSColor.controlAccentColor.withAlphaComponent(0.90) : NSColor.labelColor.withAlphaComponent(preferences.effectiveIncreaseContrast ? 0.65 : 0.09)).setStroke()
         path.lineWidth = accented || preferences.effectiveIncreaseContrast ? 1.5 : 0.5; path.stroke()
         let imageArea = horizontal ? NSRect(x: 14, y: 10, width: 56, height: bounds.height - 20)
@@ -153,6 +172,33 @@ private final class VisualChoiceCard: NSButton {
             withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: paragraph])
         if chosen && isEnabled, let mark = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil)?.withSymbolConfiguration(.init(paletteColors: [.white, .controlAccentColor])) {
             mark.draw(in: NSRect(x: bounds.width - 24, y: 10, width: 14, height: 14), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        }
+    }
+    /// One-line choice: symbol, title and a trailing check, e.g. 竖屏 / 横屏.
+    private func drawOption() {
+        let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        let rect = bounds.insetBy(dx: 1, dy: 1)
+        let path = NSBezierPath(roundedRect: rect, xRadius: 12, yRadius: 12)
+        let pressed = cell?.isHighlighted == true && isEnabled
+        let accented = chosen && isEnabled
+        let fill = accented ? NSColor(white: dark ? 1 : 0, alpha: dark ? 0.09 : 0.06)
+            : NSColor(white: dark ? 1 : 0, alpha: pressed ? 0.10 : hovered && isEnabled ? 0.075 : dark ? 0.06 : 0.045)
+        fill.setFill(); path.fill()
+        if accented || preferences.effectiveIncreaseContrast {
+            (accented ? NSColor.controlAccentColor : NSColor.labelColor.withAlphaComponent(0.65)).setStroke()
+            path.lineWidth = 1.5; path.stroke()
+        }
+        if let symbol = NSImage(systemSymbolName: item.symbol, accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 17, weight: .regular).applying(.init(paletteColors: [isEnabled ? .secondaryLabelColor : .disabledControlTextColor]))) {
+            let size = symbol.size
+            symbol.draw(in: NSRect(x: 12 + (22 - size.width) / 2, y: bounds.midY - size.height / 2, width: size.width, height: size.height),
+                        from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        }
+        let paragraph = NSMutableParagraphStyle(); paragraph.lineBreakMode = .byTruncatingTail
+        (item.title as NSString).draw(in: NSRect(x: 44, y: bounds.midY - 9, width: max(0, bounds.width - 44 - 32), height: 18),
+            withAttributes: [.font: NSFont.systemFont(ofSize: 12.5, weight: .semibold), .foregroundColor: isEnabled ? NSColor.labelColor : .disabledControlTextColor, .paragraphStyle: paragraph])
+        if accented, let mark = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil)?.withSymbolConfiguration(.init(paletteColors: [.white, .controlAccentColor])) {
+            mark.draw(in: NSRect(x: bounds.width - 26, y: bounds.midY - 8, width: 16, height: 16), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
         }
     }
 }

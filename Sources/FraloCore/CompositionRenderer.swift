@@ -77,7 +77,7 @@ public enum CompositionRenderer {
         let nativeSize: CGSize
         switch settings.display {
         case .phone:
-            let frame = try FrameRenderer.render(input, settings: RenderSettings(orientation: settings.orientation), maxDimension: limit, containSource: true, canvasSize: settings.deviceCanvasSize)
+            let frame = try FrameRenderer.render(input, settings: RenderSettings(model: settings.phoneModel, orientation: settings.orientation), maxDimension: limit, containSource: true, canvasSize: settings.deviceCanvasSize)
             device = frame.image; nativeSize = frame.plan.pixelSize
         case .tablet, .browser:
             let frame = try shell(input, settings: settings, maxDimension: limit); device = frame.image; nativeSize = frame.pixelSize

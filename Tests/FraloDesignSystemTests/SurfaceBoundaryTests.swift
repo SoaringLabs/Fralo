@@ -11,7 +11,7 @@ final class SurfaceBoundaryTests: XCTestCase {
         XCTAssertFalse(backing.isHidden)
         for name: NSAppearance.Name in [.aqua, .darkAqua] {
             panel.appearance = NSAppearance(named: name); panel.refresh()
-            XCTAssertGreaterThan(try XCTUnwrap(backing.layer?.backgroundColor).alpha, 0.8)
+            XCTAssertEqual(try XCTUnwrap(backing.layer?.backgroundColor).alpha, 0.55, accuracy: 0.01, "Panels stay translucent over the blurred stage")
         }
         #if compiler(>=6.4)
         if #available(macOS 27.0, *) {

@@ -1,30 +1,24 @@
 import AppKit
 import XCTest
 @testable import FraloApp
+import FraloCore
 
 final class SidebarBoundaryTests: XCTestCase {
-    @MainActor func testSidebarTintResolvesAgainWhenAppearanceChangesAndBoundarySpansPane() async throws {
+    @MainActor func testSidebarUsesTheSystemSidebarItem() async throws {
         _ = NSApplication.shared
-        let sidebar = DockedSidebar(header: NSView(), body: NSView(), footer: NSView())
-        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 240, height: 640), styleMask: [.titled], backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false; defer { window.close() }
-        window.contentView = sidebar
-        var channels: [CGFloat] = []
-        for appearance: NSAppearance.Name in [.aqua, .darkAqua, .aqua] {
-            window.appearance = NSAppearance(named: appearance)
-            try await Task.sleep(nanoseconds: 20_000_000)
-            sidebar.needsLayout = true; sidebar.layoutSubtreeIfNeeded()
-            let color = try XCTUnwrap(sidebar.hierarchyTint.fillColor.usingColorSpace(.sRGB))
-            channels.append(color.redComponent)
-            XCTAssertEqual(color.alphaComponent, 0.32, accuracy: 0.001)
-            // NSBox reserves drawing outsets around its one-point separator alignment rect.
-            let edge = sidebar.boundarySeparator.alignmentRect(forFrame: sidebar.boundarySeparator.frame)
-            XCTAssertEqual(edge.width, 1, accuracy: 0.001)
-            XCTAssertEqual(edge.maxX, sidebar.bounds.maxX, accuracy: 0.001)
-            XCTAssertEqual(edge.height, sidebar.bounds.height, accuracy: 0.001)
-            XCTAssertTrue(sidebar.clipsToBounds, "The boundary must stay inside the pane while it collapses")
-        }
-        XCTAssertLessThan(channels[1], channels[0] - 0.2, "Dark mode must not keep the light tint resolved during initialization")
-        XCTAssertEqual(channels[0], channels[2], accuracy: 0.001)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let suite = "fralo-sidebar-\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: directory) }
+        let controller = MainWindowController(store: SettingsStore(url: directory.appendingPathComponent("settings.json")), preferences: defaults, restoreWindow: false)
+        let window = try XCTUnwrap(controller.window); defer { window.close() }
+        let root = try XCTUnwrap(window.contentView as? WorkbenchView)
+        XCTAssertEqual(root.sidebarItem.behavior, .sidebar, "The system sidebar owns material, edges and titlebar band")
+        XCTAssertNil(root.left.layer?.backgroundColor, "The content stays clear so the system sidebar material shows")
+        XCTAssertFalse(root.stage.isDescendant(of: root.left), "The stage material belongs to the content column only")
+        let toggle = try XCTUnwrap(window.toolbar?.items.first { $0.itemIdentifier.rawValue == "sidebar" })
+        XCTAssertTrue(toggle.isBordered)
+        controller.toggleSidebar(nil)
+        XCTAssertTrue(toggle.isBordered, "The toggle keeps the same glass button whether the list is shown or hidden")
     }
 }

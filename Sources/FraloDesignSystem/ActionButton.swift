@@ -8,6 +8,8 @@ public class ActionButton: NSButton {
     public let size: Size
     public let role: Role
     public var drawsSurface = true { didSet { needsDisplay = true } }
+    /// Primary fill in place of the accent color, e.g. the neutral export capsule.
+    public var primaryTint: NSColor? { didSet { needsDisplay = true } }
     public var onPress: (() -> Void)?
     public var preferences = DesignPreferences() { didSet { refresh() } }
     private let explicitLabel: String?
@@ -130,7 +132,7 @@ public class ActionButton: NSButton {
         var hasSurface = true
         switch role {
         case .primary:
-            let colors = Self.primaryColors(hovered: isHovered, pressed: pressed)
+            let colors = Self.primaryColors(accent: primaryTint ?? .controlAccentColor, hovered: isHovered, pressed: pressed)
             fill = colors.background; ink = colors.foreground
             edge = fill.blended(withFraction: 0.18, of: .black) ?? fill
         case .secondary:

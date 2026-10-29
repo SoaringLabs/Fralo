@@ -23,7 +23,7 @@ final class WorkbenchTests: XCTestCase {
         let device = inspector.devicePicker
         XCTAssertTrue(descendants(inspector).compactMap { $0 as? InspectorTabs }.isEmpty)
         func backgroundHeading() throws -> NSTextField {
-            try XCTUnwrap(descendants(inspector).compactMap { $0 as? NSTextField }.first { $0.stringValue == "背景与画布" })
+            try XCTUnwrap(descendants(inspector).compactMap { $0 as? NSTextField }.first { $0.stringValue == "背景" })
         }
         XCTAssertTrue(try backgroundHeading().isHiddenOrHasHiddenAncestor)
         inspector.mode.choose(1)
@@ -53,17 +53,20 @@ final class WorkbenchTests: XCTestCase {
         XCTAssertFalse(inspector.exportSettings.isHiddenOrHasHiddenAncestor)
         XCTAssertNotEqual(device.focusRingType, .none)
         let toolbar = try XCTUnwrap(window.toolbar)
+        XCTAssertFalse(toolbar.items.contains { $0.itemIdentifier.rawValue == "add" })
+        XCTAssertNotNil(toolbar.items.first { $0 is NSTrackingSeparatorToolbarItem })
+        let toggle = try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "sidebar" })
+        XCTAssertTrue(toggle.isBordered, "The toggle keeps the standard glass toolbar button with the list visible")
+        controller.toggleSidebar(nil); root.layoutSubtreeIfNeeded()
+        XCTAssertTrue(toggle.isBordered, "The toggle keeps the same glass button with the list hidden")
         let add = try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "add" })
         XCTAssertEqual(add.action, #selector(MainWindowController.addImages(_:)))
         XCTAssertTrue(add.isEnabled); XCTAssertNotNil(add.image)
-        XCTAssertNotNil(toolbar.items.first { $0 is NSTrackingSeparatorToolbarItem })
-        controller.toggleSidebar(nil); root.layoutSubtreeIfNeeded()
-        XCTAssertTrue(toolbar.items.contains { $0.itemIdentifier.rawValue == "add" })
         XCTAssertFalse(toolbar.items.contains { $0 is NSTrackingSeparatorToolbarItem })
 
     }
 
-    @MainActor func testWorkspaceWindowAllowsBehindWindowMaterial() async throws {
+    @MainActor func testStageKeepsBehindWindowMaterialBesideTheSystemSidebar() async throws {
         _ = NSApplication.shared
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -72,15 +75,14 @@ final class WorkbenchTests: XCTestCase {
         let controller = MainWindowController(store: SettingsStore(url: directory.appendingPathComponent("settings.json")), preferences: defaults, restoreWindow: false)
         let window = try XCTUnwrap(controller.window); defer { window.close() }
         let root = try XCTUnwrap(window.contentView as? WorkbenchView)
-        XCTAssertFalse(window.isOpaque, "An opaque window prevents the workspace from compositing with content behind it")
-        XCTAssertEqual(window.backgroundColor.alphaComponent, 0, accuracy: 0.001,
-                       "The default solid window background must not cover the behind-window material")
-        XCTAssertEqual(root.workspace.effect.blendingMode, .behindWindow)
-        XCTAssertEqual(root.workspace.effect.state, .followsWindowActiveState)
-        XCTAssertEqual(window.alphaValue, 1, "Only the workspace material is translucent; artwork and controls must retain full opacity")
+        XCTAssertTrue(window.isOpaque, "The system sidebar needs a standard window background when inactive")
+        XCTAssertEqual(window.alphaValue, 1, "Only the stage material is translucent; artwork and controls must retain full opacity")
+        XCTAssertEqual(root.stage.effect.blendingMode, .behindWindow)
+        XCTAssertEqual(root.stage.effect.state, .followsWindowActiveState)
+        XCTAssertNotEqual(root.stage.material, .sidebar, "The stage must not reuse the sidebar material, or the two columns merge")
         var reduced = DesignPreferences(); reduced.reduceTransparency = true
-        root.workspace.preferences = reduced
-        XCTAssertTrue(root.workspace.isUsingOpaqueFallback, "System reduced-transparency behavior must remain available")
+        root.stage.preferences = reduced
+        XCTAssertTrue(root.stage.isUsingOpaqueFallback, "System reduced-transparency behavior must remain available")
     }
 
     @MainActor func testRealBatchUsesSharedPanelsAndKeepsArtworkWhenCollapsed() async throws {

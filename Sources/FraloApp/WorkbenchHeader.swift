@@ -7,9 +7,9 @@ private final class HeaderDocument: NSView {
     override var intrinsicContentSize: NSSize { NSSize(width: 220, height: 34) }
     init() {
         super.init(frame: NSRect(x: 0, y: 0, width: 220, height: 34))
-        name.font = .systemFont(ofSize: 13, weight: .semibold)
+        name.font = .systemFont(ofSize: 14, weight: .semibold)
         name.lineBreakMode = .byTruncatingMiddle; name.maximumNumberOfLines = 1
-        count.font = .systemFont(ofSize: 11); count.textColor = .secondaryLabelColor
+        count.font = .monospacedDigitSystemFont(ofSize: 11.5, weight: .regular); count.textColor = .secondaryLabelColor
         let stack = NSStackView(views: [name, count]); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 1
         stack.translatesAutoresizingMaskIntoConstraints = false; addSubview(stack)
         NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16), stack.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -38,11 +38,12 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
         toolbar.delegate = self; toolbar.displayMode = .iconOnly; toolbar.allowsUserCustomization = false
     }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, .init("add"), .space, .init("sidebar"), .init("sidebarBoundary"), .init("document"), .flexibleSpace, .init("copyCurrent"), .init("exportCurrent"), .space, .init("inspector"), .space, .init("more")]
+        [.flexibleSpace, .init("add"), .init("sidebar"), .init("sidebarBoundary"), .init("document"), .flexibleSpace, .init("copyCurrent"), .init("exportCurrent"), .space, .init("inspector"), .space, .init("more")]
     }
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         toolbarAllowedItemIdentifiers(toolbar).enumerated().compactMap { index, id in
-            sidebarHidden && (index == 0 || id.rawValue == "sidebarBoundary") ? nil : id
+            // The list header owns “+” while the sidebar is visible; the toolbar takes it over when hidden.
+            sidebarHidden ? (index == 0 || id.rawValue == "sidebarBoundary" ? nil : id) : (id.rawValue == "add" ? nil : id)
         }
     }
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
@@ -69,7 +70,7 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
             item.label = "图片列表"; item.toolTip = "显示或隐藏图片列表（⌃⌘S）"; item.target = owner; item.action = #selector(MainWindowController.toggleSidebar(_:))
             item.isBordered = true; item.visibilityPriority = .user
         case "inspector":
-            item.image = NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: "出图设置")
+            item.image = NSImage(systemSymbolName: "sidebar.right", accessibilityDescription: "出图设置")
             item.label = "出图设置"; item.toolTip = "隐藏出图设置"
             item.target = owner; item.action = #selector(MainWindowController.toggleInspector(_:)); item.isBordered = true
         case "document": item.view = document; item.label = "当前图片"; item.isBordered = false
@@ -91,15 +92,18 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
         item.isBordered = true; item.autovalidates = false
         return item
     }
-    func update(name: String, count: Int, sidebarHidden: Bool, inspectorVisible: Bool, canAdd: Bool, canCopy: Bool, canExport: Bool) {
+    func update(name: String, subtitle: String, sidebarHidden: Bool, inspectorVisible: Bool, canAdd: Bool, canCopy: Bool, canExport: Bool) {
         self.sidebarHidden = sidebarHidden
         document.name.stringValue = name; document.name.toolTip = name
-        document.count.stringValue = count == 0 ? "添加图片，开始套框" : "\(count) 张图片"
+        document.count.stringValue = subtitle
         let boundary = toolbar.items.firstIndex { $0.itemIdentifier.rawValue == "sidebarBoundary" }
+        let add = toolbar.items.firstIndex { $0.itemIdentifier.rawValue == "add" }
         if sidebarHidden {
             if let boundary { toolbar.removeItem(at: boundary) }
             if toolbar.items.first?.itemIdentifier == .flexibleSpace { toolbar.removeItem(at: 0) }
+            if add == nil { toolbar.insertItem(withItemIdentifier: .init("add"), at: 0) }
         } else {
+            if let add { toolbar.removeItem(at: add) }
             if toolbar.items.first?.itemIdentifier != .flexibleSpace { toolbar.insertItem(withItemIdentifier: .flexibleSpace, at: 0) }
             if boundary == nil, let sidebar = toolbar.items.firstIndex(where: { $0.itemIdentifier.rawValue == "sidebar" }) {
                 toolbar.insertItem(withItemIdentifier: .init("sidebarBoundary"), at: sidebar + 1)
