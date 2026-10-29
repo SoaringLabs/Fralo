@@ -36,6 +36,103 @@ public final class IconButton: ActionButton {
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
 }
 
+/// Circular symbol button for canvas and sidebar chrome. Every state reads at a glance: a soft circle
+/// on hover (key window only), a deeper inset circle while pressed, and the accent tint when a toggle
+/// is on. The owner sets a toggle's state; a click never leaves a stale “on” behind.
+@MainActor
+public final class SymbolButton: NSButton {
+    public var onPress: (() -> Void)?
+    public var preferences = DesignPreferences() { didSet { needsDisplay = true } }
+    private let toggles: Bool
+    private let symbol: NSImage?
+    private var assignedState: NSControl.StateValue = .off
+    private var tracking: NSTrackingArea?
+    private var windowObservers: [NSObjectProtocol] = []
+    var isHovered = false { didSet { if isHovered != oldValue { needsDisplay = true } } }
+    public init(_ symbol: String, label: String, toggles: Bool = false, onPress: (() -> Void)? = nil) {
+        self.toggles = toggles; self.onPress = onPress
+        self.symbol = NSImage(systemSymbolName: symbol, accessibilityDescription: label)?
+            .withSymbolConfiguration(.init(pointSize: 14, weight: .medium))
+        super.init(frame: .zero)
+        title = ""; image = nil; isBordered = false; focusRingType = .exterior
+        setButtonType(toggles ? .pushOnPushOff : .momentaryPushIn)
+        target = self; action = #selector(activate(_:))
+        toolTip = label; setAccessibilityLabel(label)
+        setAccessibilityElement(true); setAccessibilityRole(toggles ? .checkBox : .button)
+        if toggles { setAccessibilityValue(false) }
+        let side = FraloStyle.Button.compactHeight
+        NSLayoutConstraint.activate([widthAnchor.constraint(equalToConstant: side), heightAnchor.constraint(equalToConstant: side)])
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+    deinit { windowObservers.forEach(NotificationCenter.default.removeObserver) }
+    public override var alignmentRectInsets: NSEdgeInsets { .init(top: 0, left: 0, bottom: 0, right: 0) }
+    public override var intrinsicContentSize: NSSize { NSSize(width: FraloStyle.Button.compactHeight, height: FraloStyle.Button.compactHeight) }
+    public override var isEnabled: Bool { didSet { if !isEnabled { isHovered = false }; needsDisplay = true } }
+    public override var state: NSControl.StateValue {
+        didSet {
+            assignedState = state; needsDisplay = true
+            if toggles { setAccessibilityValue(state == .on) }
+        }
+    }
+    @objc private func activate(_ sender: Any?) {
+        if super.state != assignedState { super.state = assignedState; needsDisplay = true }
+        if isEnabled { onPress?() }
+    }
+    /// Like native buttons, a mouse click acts without pulling keyboard focus off the canvas or a field.
+    public override func becomeFirstResponder() -> Bool {
+        if NSApp.currentEvent?.type == .leftMouseDown && !NSApp.isFullKeyboardAccessEnabled { return false }
+        return super.becomeFirstResponder()
+    }
+    public override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
+        addTrackingArea(area); tracking = area
+    }
+    public override func mouseEntered(with event: NSEvent) { isHovered = isEnabled }
+    public override func mouseExited(with event: NSEvent) { isHovered = false }
+    public override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        windowObservers.forEach(NotificationCenter.default.removeObserver); windowObservers.removeAll()
+        guard let window else { return }
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
+            windowObservers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.isHovered = false }
+            })
+        }
+    }
+    public override func highlight(_ flag: Bool) { super.highlight(flag); needsDisplay = true }
+    public override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); needsDisplay = true }
+    private var circle: NSRect {
+        let side = min(bounds.width, bounds.height)
+        return NSRect(x: bounds.midX - side / 2, y: bounds.midY - side / 2, width: side, height: side)
+    }
+    public override var focusRingMaskBounds: NSRect { circle }
+    public override func drawFocusRingMask() { NSBezierPath(ovalIn: circle).fill() }
+    public override func draw(_ dirtyRect: NSRect) {
+        let pressed = cell?.isHighlighted == true && isEnabled
+        let on = toggles && state == .on, contrast = preferences.effectiveIncreaseContrast
+        let accent = NSColor.controlAccentColor
+        var fill: NSColor? = nil, edge: NSColor? = nil
+        if isEnabled {
+            if on { fill = accent.withAlphaComponent(pressed ? 0.30 : isHovered ? 0.22 : 0.15); edge = contrast ? accent : nil }
+            else if pressed { fill = NSColor.labelColor.withAlphaComponent(0.16) }
+            else if isHovered { fill = NSColor.labelColor.withAlphaComponent(0.08); edge = contrast ? NSColor.labelColor.withAlphaComponent(0.5) : nil }
+        }
+        // Pressing tucks the circle in by a point, so the click lands as a physical press.
+        let surface = NSBezierPath(ovalIn: circle.insetBy(dx: pressed ? 1.5 : 0.5, dy: pressed ? 1.5 : 0.5))
+        if let fill { fill.setFill(); surface.fill() }
+        if let edge { edge.setStroke(); surface.lineWidth = 1; surface.stroke() }
+        guard let symbol else { return }
+        let ink: NSColor = !isEnabled ? .tertiaryLabelColor : on ? accent : pressed ? .labelColor : NSColor.labelColor.withAlphaComponent(0.82)
+        let size = symbol.size, rect = NSRect(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2, width: size.width, height: size.height)
+        let tinted = NSImage(size: size, flipped: false) { target in
+            symbol.draw(in: target); ink.setFill(); target.fill(using: .sourceIn); return true
+        }
+        tinted.draw(in: rect.integral)
+    }
+}
+
 @MainActor
 public final class ChoiceMenu: NSPopUpButton {
     public var onChange: ((Int) -> Void)?
@@ -80,9 +177,16 @@ public final class ChoiceMenu: NSPopUpButton {
             tinted.draw(in: target); leading = 36
         }
         let text = displayTitle ?? titleOfSelectedItem ?? ""
+        let attributes: [NSAttributedString.Key: Any] = [.font: font ?? FraloStyle.TextRole.body.font, .foregroundColor: ink]
+        var arrowX = bounds.maxX - 17
+        if !showsSurface && leading == 11 {
+            // A bare readout keeps its value and chevron together as one centered label.
+            let width = min(ceil((text as NSString).size(withAttributes: attributes).width), bounds.width - 38)
+            leading = max(11, (bounds.width - width - 16) / 2); arrowX = leading + width + 6
+        }
         let paragraph = NSMutableParagraphStyle(); paragraph.lineBreakMode = .byTruncatingTail
-        (text as NSString).draw(in: NSRect(x: leading, y: bounds.midY - 8, width: max(0, bounds.width - leading - 24), height: 19),
-                               withAttributes: [.font: font ?? FraloStyle.TextRole.body.font, .foregroundColor: ink, .paragraphStyle: paragraph])
+        var textAttributes = attributes; textAttributes[.paragraphStyle] = paragraph
+        (text as NSString).draw(in: NSRect(x: leading, y: bounds.midY - 8, width: max(0, arrowX - leading - 4), height: 19), withAttributes: textAttributes)
         if let arrow = NSImage(systemSymbolName: showsSurface ? "chevron.up.chevron.down" : "chevron.down", accessibilityDescription: nil) {
             let tinted = NSImage(size: NSSize(width: 10, height: 12), flipped: false) { target in
                 let scale = min(target.width / max(1, arrow.size.width), target.height / max(1, arrow.size.height))
@@ -90,7 +194,7 @@ public final class ChoiceMenu: NSPopUpButton {
                 arrow.draw(in: NSRect(x: (target.width - size.width) / 2, y: (target.height - size.height) / 2, width: size.width, height: size.height))
                 (self.showsSurface ? NSColor.controlAccentColor : ink).setFill(); target.fill(using: .sourceIn); return true
             }
-            tinted.draw(in: NSRect(x: bounds.maxX - 17, y: bounds.midY - 6, width: 10, height: 12))
+            tinted.draw(in: NSRect(x: arrowX, y: bounds.midY - 6, width: 10, height: 12))
         }
     }
     public override var focusRingMaskBounds: NSRect { bounds.insetBy(dx: 1, dy: 1) }
