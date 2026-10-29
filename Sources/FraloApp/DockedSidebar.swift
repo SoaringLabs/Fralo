@@ -38,8 +38,9 @@ final class DockedSidebar: NSView {
         }
         if let scroll = body as? NSScrollView {
             scroll.hasVerticalScroller = true
-            // The base panel hides indicators. This column opts into the system
-            // preference, including legacy bars when the user chooses Always.
+            scroll.verticalScroller = SidebarScroller()
+            // Keep native visibility preferences, but draw the same thin, trackless
+            // knob in both legacy/Always and overlay presentation.
             scroll.scrollerStyle = NSScroller.preferredScrollerStyle
             scroll.scrollerKnobStyle = .default
             // Keep selection cards inset while the native scroller owns the edge.

@@ -345,3 +345,37 @@ hardware was not tested. Full VoiceOver speech, system-wide live preference
 switching, and Reduce Transparency / Increase Contrast UI checks remain pending.
 System soft edges still have a subtle lower boundary; no pixel-identical Find My
 reproduction or complete HIG/accessibility certification is claimed.
+
+
+### Trackless scrollbar correction — 2026-10-30
+
+User comparison with Find My rejected the first scrollbar appearance: the native
+legacy style showed a broad knob and a background slot. This supersedes the
+previous assumption that choosing the preferred native style was sufficient to
+match the reference. The new target is a six-point rounded knob with no track in
+resting, scrolling, hover and drag states, including Always mode.
+
+`SidebarScroller` keeps native scrolling/tracking and customizes only supported
+NSScroller part drawing and the knob's horizontal hit rectangle. The track part
+paints nothing, the knob is six points wide with a three-point trailing inset,
+and the native hit area remains broader. Both native styles are supported;
+no global setting is changed to obtain the appearance. This follows Apple's
+[NSScroller parts customization contract](https://developer.apple.com/documentation/appkit/nsscroller/iscompatiblewithoverlayscrollers).
+No Find My private implementation is assumed.
+
+A rendering regression test failed on the old implementation (nontransparent
+slot, oversized knob) and passed after the change in light/dark and legacy/overlay
+modes. All 44 affected sidebar/design-system/HIG tests and the Release build pass.
+The fixed heading, content underlap, row insets and inspector policy are retained.
+
+
+Native validation of the correction confirms a roughly six-point, trackless knob
+in light/default and dark/minimum windows, including resting, hover and scroll
+states. Legacy/Always thumb dragging was exercised in both appearances and moved
+the actual list to both ends. Overlay/WhenScrolling wheel scrolling and appearance
+were observed; visible-overlay thumb dragging remains unverified because the
+indicator faded during automated attempts. Do not infer a passed drag check from
+AX value assignment. The pixel test also checks that painted knob pixels map to
+the native knob hit part in both modes. The final preview restores the user's
+selection and scroll position, with only one instance retained. Temporary app
+preference overrides were removed; global settings were not changed.

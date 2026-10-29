@@ -120,11 +120,18 @@ action remain native and independent for each button.
 
 ### Sidebar scrolling
 
-The production batch sidebar opts into native vertical scrollbars, with the current
-`NSScroller.preferredScrollerStyle`; the inspector and lab panels retain their
-existing hidden indicators. The scroll viewport fills the sidebar, while 10 pt
-horizontal row insets keep thumbnails, selection and keyboard focus aligned
-independently of overlay or legacy scrollbar gutters.
+The production batch sidebar uses a native `NSScroller` with a six-point rounded
+knob and no painted track. `SidebarScroller` overrides only native part drawing
+and the knob's horizontal hit rectangle, keeping AppKit dragging, paging,
+overlay fading and accessibility behavior. The larger native hit target remains
+independent of the thin artwork. Both legacy/Always and overlay modes retain the
+same narrow, transparent-track appearance; visibility still follows the native
+preference, without changing the user's global settings. Increased contrast
+strengthens the knob color rather than adding a track.
+
+The inspector and lab panels retain their existing hidden indicators. The scroll
+viewport fills the sidebar, while 10 pt horizontal row insets keep thumbnails,
+selection and keyboard focus aligned independently of scrollbar metrics.
 
 On macOS 26 the fixed image heading is a split-item top accessory, which supplies
 safe-area insets and the system scroll edge effect. macOS 26.1 and later use the

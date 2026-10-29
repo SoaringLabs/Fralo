@@ -82,4 +82,47 @@ final class SidebarScrollingTests: XCTestCase {
         list.update([BatchEntry(id: "short", title: "short.png")]); list.select(0); sidebar.layoutSubtreeIfNeeded()
         XCTAssertGreaterThanOrEqual(table.convert(table.rect(ofRow: 0), to: sidebar).minY, header.convert(header.bounds, to: sidebar).maxY)
     }
+
+    @MainActor func testSidebarScrollerPaintsASixPointKnobWithoutATrack() async throws {
+        _ = NSApplication.shared
+        let list = BatchList(entries: (0..<30).map { BatchEntry(id: String($0), title: "image-\($0).png") })
+        let sidebar = DockedSidebar(header: NSTextField(labelWithString: "图片 30"), body: list, footer: NSView(), usesNativeHeader: false)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 280, height: 640), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; defer { window.close() }
+        window.contentView = sidebar; sidebar.layoutSubtreeIfNeeded()
+        for style in [NSScroller.Style.legacy, .overlay] {
+            list.scrollerStyle = style; list.tile(); sidebar.layoutSubtreeIfNeeded()
+            let scroller = try XCTUnwrap(list.verticalScroller)
+            scroller.knobProportion = 0.3; scroller.doubleValue = 0.4
+            for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+                scroller.appearance = NSAppearance(named: appearance)
+                func paintedColumns(_ draw: () -> Void) throws -> Set<Int> {
+                    let width = max(1, Int(scroller.bounds.width.rounded(.up)))
+                    let height = max(1, Int(scroller.bounds.height.rounded(.up)))
+                    let bitmap = try XCTUnwrap(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
+                        bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+                    memset(bitmap.bitmapData!, 0, bitmap.bytesPerRow * bitmap.pixelsHigh)
+                    NSGraphicsContext.saveGraphicsState(); defer { NSGraphicsContext.restoreGraphicsState() }
+                    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
+                    scroller.effectiveAppearance.performAsCurrentDrawingAppearance { draw() }
+                    var columns = Set<Int>()
+                    for x in 0..<width { for y in 0..<height {
+                        if (bitmap.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.01 { columns.insert(x); break }
+                    } }
+                    return columns
+                }
+                XCTAssertTrue(try paintedColumns { scroller.drawKnobSlot(in: scroller.bounds, highlight: false) }.isEmpty,
+                              "The background slot must stay transparent, including Always/legacy mode")
+                let knobColumns = try paintedColumns { scroller.drawKnob() }
+                XCTAssertFalse(knobColumns.isEmpty)
+                XCTAssertLessThanOrEqual(knobColumns.count, 6, "Visible knob width must match the thin reference, independent of the larger hit target")
+                XCTAssertGreaterThan(scroller.rect(for: .knob).width, 6, "Keep the native drag target wider than the artwork")
+                let minX = try XCTUnwrap(knobColumns.min()), maxX = try XCTUnwrap(knobColumns.max())
+                let point = NSPoint(x: CGFloat(minX + maxX + 1) / 2, y: scroller.rect(for: .knob).midY)
+                XCTAssertEqual(scroller.testPart(scroller.convert(point, to: nil)), .knob,
+                               "The pixels we draw must map to the native draggable knob in both modes")
+            }
+        }
+    }
+
 }
