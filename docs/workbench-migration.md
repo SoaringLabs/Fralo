@@ -420,3 +420,25 @@ cannot generate a standalone unpressed mouse move, so pure hover is covered by
 tracking-event rendering tests but still needs direct human confirmation; the
 native screenshots verify press/stay/away transitions. Older OS hardware,
 VoiceOver and live accessibility-preference tests remain unperformed.
+
+
+### Smooth scrollbar feedback — 2026-10-30
+
+The user confirmed ordinary unpressed hover entry/exit on the previous build and
+requested a gradual color transition. A custom animatable scalar now interpolates
+the knob opacity through AppKit's animator proxy, reusing FraloMotion's180ms
+selection duration and ease-in/out timing. Reversals continue from the current
+value per the native animator contract. Reduce Motion uses a zero-duration proxy
+to cancel any in-flight transition and applies the endpoint immediately. No shape,
+track, hit geometry, row margin or scroll handling changes are included.
+
+A rendered-frame regression test reproduced the old immediate jump, missing
+intermediate values and discontinuous reversal, then passed with the animation.
+The explicit Reduce Motion test confirms immediate endpoints and unchanged hit
+geometry. All48 affected sidebar/design-system/HIG tests and the Release build
+pass. Native preview checks retain6pt/no-track artwork,7pt gap, correct endpoint
+colors and real dragging without selection changes. The screenshot pipeline took
+longer than the180ms transition and did not independently capture intermediate
+frames; smooth interpolation is established by the native rendered-frame test,
+not those endpoint screenshots. The latest preview restores the user's most
+recent04-sample.png selection and scroll0.013215859.

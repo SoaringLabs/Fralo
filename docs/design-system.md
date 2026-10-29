@@ -128,7 +128,10 @@ independent of the thin artwork. Both legacy/Always and overlay modes retain the
 same narrow, transparent-track appearance; visibility still follows the native
 preference, without changing the user's global settings. The knob rests at low
 contrast, darkens when the pointer enters its native hit area or during native
-knob tracking, and returns to its idle color on exit/release. A passive local pointer-event
+knob tracking, and returns to its idle color on exit/release. Color emphasis uses the native
+AppKit animator with the design system's 180 ms selection timing and an ease-in/out
+curve. Rapid reversals retarget the current value. Reduce Motion cancels the fade
+and applies its endpoint immediately. A passive local pointer-event
 observer also updates the state when a click or scroll relocates the pointer
 without an intermediate tracking-area boundary event; it returns native events
 unchanged. Increased contrast strengthens both states rather than adding a track

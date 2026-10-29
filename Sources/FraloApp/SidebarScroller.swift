@@ -1,4 +1,6 @@
 import AppKit
+import QuartzCore
+import FraloDesignSystem
 
 /// Native scrolling and hit testing with the reference's narrow, trackless artwork.
 /// Customize individual parts so AppKit retains overlay fading and drag tracking.
@@ -7,8 +9,31 @@ final class SidebarScroller: NSScroller {
     override class var isCompatibleWithOverlayScrollers: Bool { true }
     override var isOpaque: Bool { false }
     private var hoverArea: NSTrackingArea?
-    private var isHovered = false
-    private var isDragging = false
+    private var isHovered = false { didSet { updateEmphasis() } }
+    private var isDragging = false { didSet { updateEmphasis() } }
+    var preferences = DesignPreferences() { didSet { updateEmphasis(force: true) } }
+    @objc dynamic var hoverAmount: CGFloat = 0 { didSet { needsDisplay = true } }
+    private var targetAmount: CGFloat = 0
+
+    override class func defaultAnimation(forKey key: NSAnimatablePropertyKey) -> Any? {
+        key == "hoverAmount" ? CABasicAnimation() : super.defaultAnimation(forKey: key)
+    }
+
+    private func updateEmphasis(force: Bool = false) {
+        let target: CGFloat = isHovered || isDragging ? 1 : 0
+        guard force || target != targetAmount else { return }
+        targetAmount = target
+        let duration = window == nil ? 0 : FraloMotion.duration(.selection, preferences: preferences)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            // AppKit retargets from the in-flight value instead of restarting.
+            animator().hoverAmount = target
+        }
+        // Zero-duration proxies can defer their setter to the next run-loop turn.
+        // Cancel through the proxy, then apply the accessible endpoint now.
+        if duration == 0 { hoverAmount = target }
+    }
     private var pointerMonitor: Any?
 
     override func viewDidMoveToWindow() {
@@ -70,9 +95,10 @@ final class SidebarScroller: NSScroller {
         let native = rect(for: .knob)
         guard !native.isEmpty else { return }
         let knob = NSRect(x: floor(bounds.maxX - 9), y: native.minY, width: 6, height: native.height).intersection(bounds)
-        let contrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
-        let active = isHovered || isDragging
-        let opacity: CGFloat = contrast ? (active ? 0.72 : 0.48) : (active ? 0.42 : 0.20)
+        let contrast = preferences.effectiveIncreaseContrast
+        let idle: CGFloat = contrast ? 0.48 : 0.20
+        let active: CGFloat = contrast ? 0.72 : 0.42
+        let opacity = idle + (active - idle) * hoverAmount
         NSColor.labelColor.withAlphaComponent(opacity).setFill()
         NSBezierPath(roundedRect: knob, xRadius: 3, yRadius: 3).fill()
     }

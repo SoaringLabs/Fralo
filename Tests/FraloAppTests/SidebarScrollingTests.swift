@@ -177,4 +177,63 @@ final class SidebarScrollingTests: XCTestCase {
         }
     }
 
+    @MainActor func testSidebarHoverRendersIntermediateColorsAndReversesWithoutJumping() async throws {
+        _ = NSApplication.shared
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion { throw XCTSkip("System Reduce Motion disables fades") }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 100, height: 240), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; defer { window.close() }
+        let scroller = SidebarScroller(frame: NSRect(x: 0, y: 0, width: 17, height: 240))
+        window.contentView?.addSubview(scroller)
+        scroller.scrollerStyle = .legacy; scroller.knobProportion = 0.3; scroller.doubleValue = 0.4
+        func alpha() throws -> CGFloat {
+            let bitmap = try XCTUnwrap(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 17, pixelsHigh: 240,
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+            memset(bitmap.bitmapData!, 0, bitmap.bytesPerRow * bitmap.pixelsHigh)
+            NSGraphicsContext.saveGraphicsState(); defer { NSGraphicsContext.restoreGraphicsState() }
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
+            scroller.drawKnob()
+            return (0..<17).flatMap { x in (0..<240).map { bitmap.colorAt(x: x, y: $0)?.alphaComponent ?? 0 } }.max() ?? 0
+        }
+        let idle = try alpha()
+        let enter = try XCTUnwrap(NSEvent.enterExitEvent(with: .mouseEntered, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, eventNumber: 1, trackingNumber: 1, userData: nil))
+        let exit = try XCTUnwrap(NSEvent.enterExitEvent(with: .mouseExited, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, eventNumber: 2, trackingNumber: 1, userData: nil))
+        scroller.mouseEntered(with: enter)
+        XCTAssertEqual(try alpha(), idle, accuracy: 0.015, "The first frame must not jump to the dark endpoint")
+        var samples: [CGFloat] = []
+        for _ in 0..<30 { try await Task.sleep(nanoseconds: 10_000_000); samples.append(try alpha()) }
+        let active = try XCTUnwrap(samples.last)
+        XCTAssertGreaterThan(active, idle + 0.1)
+        XCTAssertTrue(samples.contains { $0 > idle + 0.01 && $0 < active - 0.01 }, "The fade must actually render intermediate opacity values")
+        scroller.mouseExited(with: exit)
+        try await Task.sleep(nanoseconds: 60_000_000)
+        let reversing = try alpha()
+        scroller.mouseEntered(with: enter)
+        XCTAssertEqual(try alpha(), reversing, accuracy: 0.015, "Rapid reversal starts at the current displayed color")
+        scroller.mouseExited(with: exit)
+        try await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertEqual(try alpha(), idle, accuracy: 0.01)
+    }
+
+    @MainActor func testSidebarFadeRespectsReduceMotionWithoutChangingGeometry() async throws {
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 100, height: 240), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; defer { window.close() }
+        let scroller = SidebarScroller(frame: NSRect(x: 0, y: 0, width: 17, height: 240))
+        window.contentView?.addSubview(scroller)
+        scroller.preferences.reduceMotion = true
+        scroller.scrollerStyle = .legacy; scroller.knobProportion = 0.3
+        let hit = scroller.rect(for: .knob)
+        let enter = try XCTUnwrap(NSEvent.enterExitEvent(with: .mouseEntered, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, eventNumber: 1, trackingNumber: 1, userData: nil))
+        scroller.mouseEntered(with: enter)
+        XCTAssertEqual(scroller.hoverAmount, 1, accuracy: 0.001)
+        let exit = try XCTUnwrap(NSEvent.enterExitEvent(with: .mouseExited, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, eventNumber: 2, trackingNumber: 1, userData: nil))
+        scroller.mouseExited(with: exit)
+        XCTAssertEqual(scroller.hoverAmount, 0, accuracy: 0.001)
+        XCTAssertEqual(scroller.rect(for: .knob), hit)
+    }
+
 }
