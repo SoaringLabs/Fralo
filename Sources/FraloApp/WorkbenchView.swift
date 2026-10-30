@@ -8,6 +8,15 @@ private final class WorkspaceRegion: NSView {
     override func layout() { super.layout(); onLayout?() }
 }
 
+/// AppKit drives one eased progress value for the panel and all viewing geometry.
+@MainActor
+private final class InspectorAnimation: NSAnimation {
+    var onProgress: ((CGFloat) -> Void)?
+    override var currentProgress: NSAnimation.Progress {
+        didSet { onProgress?(CGFloat(currentValue)) }
+    }
+}
+
 /// Native column ownership lets the toolbar and sidebar share the same boundary.
 @MainActor
 final class WorkbenchView: NSView {
@@ -32,7 +41,7 @@ final class WorkbenchView: NSView {
     /// the inspector floats above the same scrolling canvas as the toolbar.
     var viewingInsets: NSEdgeInsets {
         NSEdgeInsets(top: headerHeight + 12, left: 24, bottom: 76,
-                     right: inspectorHidden || previewing ? 24 : Self.inspectorWidth + Self.inspectorInset + 24)
+                     right: 24 + (Self.inspectorWidth + Self.inspectorInset) * inspectorReveal)
     }
     private let region = WorkspaceRegion()
     private(set) var sidebarItem: NSSplitViewItem!
@@ -44,11 +53,20 @@ final class WorkbenchView: NSView {
         get { storedCollapsed }
         set { setCollapsed(newValue, animated: false) }
     }
-    var inspectorHidden = false { didSet { if !animatingInspector { updateVisibility() } } }
-    var previewing = false { didSet { applySidebar(animated: false); updateVisibility() } }
+    private var requestedInspectorHidden = false
+    var inspectorHidden: Bool {
+        get { requestedInspectorHidden }
+        set { requestedInspectorHidden = newValue; settleInspector(); updateVisibility() }
+    }
+    var previewing = false { didSet { settleInspector(); applySidebar(animated: false); updateVisibility() } }
+    var motionPreferences = DesignPreferences() {
+        didSet { if motionPreferences.effectiveReduceMotion { settleInspector(); updateVisibility() } }
+    }
+    private var inspectorReveal: CGFloat = 1
+    private var inspectorAnimation: InspectorAnimation?
+    private var motionObservation: NSObjectProtocol?
     var onGeometryChange: (() -> Void)?
     var onPanelVisibilityChange: (() -> Void)?
-    private var animatingInspector = false
     private var transition = 0
     override var isFlipped: Bool { true }
     static let inspectorWidth: CGFloat = 312
@@ -73,10 +91,21 @@ final class WorkbenchView: NSView {
         toolbarBehavior.onVisibilityChange = { [weak self] visible in self?.headerEngaged = visible; self?.updateHeaderBackdrop() }
         region.onLayout = { [weak self] in
             guard let self else { return }
-            if !self.animatingInspector { self.arrangeWorkspace() }
+            self.arrangeWorkspace()
             self.onGeometryChange?()
         }
+        motionObservation = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.motionPreferences.effectiveReduceMotion else { return }
+                self.settleInspector(); self.updateVisibility()
+            }
+        }
         arrangeWorkspace()
+    }
+    deinit {
+        if let motionObservation { NSWorkspace.shared.notificationCenter.removeObserver(motionObservation) }
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
 
@@ -109,7 +138,7 @@ final class WorkbenchView: NSView {
 
     override func layout() {
         super.layout()
-        if !animatingInspector { arrangeWorkspace() }
+        arrangeWorkspace()
         onGeometryChange?()
     }
     func setCollapsed(_ value: Bool, animated: Bool) {
@@ -138,22 +167,38 @@ final class WorkbenchView: NSView {
         })
     }
     func setInspectorHidden(_ value: Bool, animated: Bool) {
-        guard inspectorHidden != value else { return }
-        let duration = animated && window != nil && !previewing ? FraloMotion.duration(.structure, preferences: DesignPreferences()) : 0
+        guard inspectorHidden != value else {
+            if !animated { settleInspector(); updateVisibility() }
+            return
+        }
+        let duration = animated && window != nil && !previewing ? FraloMotion.duration(.structure, preferences: motionPreferences) : 0
         transition += 1; let currentTransition = transition
-        guard duration > 0 else { animatingInspector = false; inspectorHidden = value; arrangeWorkspace(); onGeometryChange?(); return }
-        let wasVisible = !right.isHidden
-        animatingInspector = true; inspectorHidden = value
-        right.isHidden = previewing || (value && !wasVisible)
+        inspectorAnimation?.stop(); inspectorAnimation = nil
+        guard duration > 0 else { inspectorHidden = value; return }
+        let start = inspectorReveal, target: CGFloat = value ? 0 : 1
+        requestedInspectorHidden = value
+        // Keep the panel visible until its slide finishes, including when reversing halfway.
+        right.isHidden = false
         onPanelVisibilityChange?()
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = duration; self.arrangeWorkspace(animated: true)
-        }, completionHandler: { [weak self] in
-            MainActor.assumeIsolated {
-                guard let self, self.transition == currentTransition else { return }
-                self.animatingInspector = false; self.updateVisibility(); self.arrangeWorkspace(); self.onGeometryChange?()
+        let animation = InspectorAnimation(duration: duration, animationCurve: .easeInOut)
+        animation.animationBlockingMode = .nonblocking
+        animation.frameRate = 60
+        animation.onProgress = { [weak self] progress in
+            guard let self, self.transition == currentTransition else { return }
+            self.inspectorReveal = start + (target - start) * progress
+            self.arrangeWorkspace(); self.onGeometryChange?()
+            if progress >= 1 {
+                self.inspectorAnimation = nil
+                self.updateVisibility()
             }
-        })
+        }
+        inspectorAnimation = animation; animation.start()
+    }
+    private func settleInspector() {
+        transition += 1
+        inspectorAnimation?.stop(); inspectorAnimation = nil
+        inspectorReveal = inspectorHidden || previewing ? 0 : 1
+        arrangeWorkspace(); onGeometryChange?()
     }
     private func updateVisibility() {
         right.isHidden = inspectorHidden || previewing
@@ -162,18 +207,17 @@ final class WorkbenchView: NSView {
     private func updateHeaderBackdrop() {
         headerBackdrop.setShown(headerEngaged || contentUnderHeader)
     }
-    private func arrangeWorkspace(animated: Bool = false) {
+    private func arrangeWorkspace() {
         let area = region.bounds
         // The floating inspector stays clear of the full-height scroller at the window edge.
         let edge = Self.inspectorInset, width = Self.inspectorWidth
         let chrome = headerHeight
         let top: CGFloat = chrome + 8
         let height = max(0, area.height - top - edge)
-        let rightRect = NSRect(x: inspectorHidden || previewing ? area.width + edge : area.width - edge - width, y: top, width: width, height: height)
+        let rightRect = NSRect(x: area.width + edge - (width + 2 * edge) * inspectorReveal, y: top, width: width, height: height)
         toolbarBehavior.frame = NSRect(x: 0, y: 0, width: area.width, height: chrome)
         headerBackdrop.frame = toolbarBehavior.frame
-        for (view, frame) in [(right as NSView, rightRect), (content, area)] {
-            if animated { view.animator().frame = frame } else { view.frame = frame }
-        }
+        right.frame = rightRect
+        content.frame = area
     }
 }

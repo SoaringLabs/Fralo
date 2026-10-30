@@ -465,3 +465,44 @@ unchanged copy test passed in isolation and in the related-suite recheck. No
 renderer or copy assertion was changed, and the intermittent cause remains
 unconfirmed. Tests exercised the compatibility path on the current OS; macOS
 14/15 hardware and full VoiceOver remain unverified.
+
+### Synchronized inspector transitions (FRALO-12) — 2026-10-31
+
+Hiding the inspector previously animated the panel frame while the central
+viewing margins switched straight to their final values. The artwork, empty
+stage and viewing capsule could therefore jump independently of the panel.
+One nonblocking AppKit animation now supplies an eased reveal fraction to both
+the inspector frame and the shared viewing margins, using the existing 220 ms
+structural duration. Each frame updates viewing geometry without requesting a
+new composition render. The scrolling viewport remains full width.
+
+Reversing a transition starts at the current reveal fraction. Generation guards
+reject callbacks from an interrupted animation; direct visibility restoration,
+preview mode and Reduce Motion settle immediately. Window resizing uses the
+current reveal fraction rather than a stale panel rectangle. A change to the
+system's Reduce Motion preference also settles a running transition; the local
+preview's Reduce Motion override now reaches the workbench itself.
+
+This follows Apple's [Motion](https://developer.apple.com/design/human-interface-guidelines/motion)
+guidance for brief, interruptible feedback, [Layout](https://developer.apple.com/design/human-interface-guidelines/layout)
+guidance for consistent adaptation, and [Accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility)
+guidance for reducing spatial motion. Existing materials, controls, final
+geometry, selection and composition/export settings are retained.
+
+Verification: all 133 Debug and 125 Release tests passed, with one opt-in visible
+drag-performance probe skipped in each configuration. Two new production-window
+regressions sample intermediate panel/artwork/capsule geometry, reversal without
+an initial jump, resize, explicit zoom, source/settings preservation, empty
+stage, preview-mode interruption and immediate Reduce Motion/restoration.
+Public-source and whitespace checks also passed. Builds retain existing SDK
+warnings; offscreen window tests also emit private Auto Layout diagnostics while
+passing their geometry assertions.
+
+Native checks on macOS 27 cover light/dark appearance at 1400×850 and 1030×640,
+empty/populated batches, repeated settings toggles, retained 100% zoom and focus
+return from an inspector radio control to the canvas. Preview launches use the
+task worktree's run script, replacing its prior instances only after building.
+Static captures verify endpoints; frame continuity is established by the sampled
+window regression, not screenshots. Subjective motion acceptance, full VoiceOver,
+older macOS hardware and live OS accessibility-preference toggling remain
+unverified. No PR, merge or completion acceptance is implied by these checks.

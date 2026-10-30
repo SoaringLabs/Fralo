@@ -21,6 +21,7 @@ final class DevelopmentEntry: NSObject {
         preferences.reduceMotion = CommandLine.arguments.contains("--preview-reduce-motion")
         preferences.increaseContrast = CommandLine.arguments.contains("--preview-increase-contrast")
         func apply(_ view: NSView) {
+            (view as? WorkbenchView)?.motionPreferences = preferences
             (view as? CanvasToolbarBehavior)?.preferences = preferences
             (view as? HeaderBackdrop)?.preferences = preferences
             (view as? ThinScroller)?.preferences = preferences
