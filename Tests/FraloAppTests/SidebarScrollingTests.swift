@@ -155,7 +155,7 @@ final class SidebarScrollingTests: XCTestCase {
 
     @MainActor func testSidebarKnobHoverDarkensAndExitRestoresItsIdleColor() async throws {
         _ = NSApplication.shared
-        let scroller = SidebarScroller(frame: NSRect(x: 0, y: 0, width: 17, height: 240))
+        let scroller = ThinScroller(frame: NSRect(x: 0, y: 0, width: 17, height: 240))
         scroller.scrollerStyle = .legacy; scroller.knobProportion = 0.3; scroller.doubleValue = 0.4
         func maxAlpha() throws -> CGFloat {
             let bitmap = try XCTUnwrap(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 17, pixelsHigh: 240,
@@ -210,7 +210,7 @@ final class SidebarScrollingTests: XCTestCase {
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion { throw XCTSkip("System Reduce Motion disables fades") }
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 100, height: 240), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false; defer { window.close() }
-        let scroller = SidebarScroller(frame: NSRect(x: 0, y: 0, width: 17, height: 240))
+        let scroller = ThinScroller(frame: NSRect(x: 0, y: 0, width: 17, height: 240))
         window.contentView?.addSubview(scroller)
         scroller.scrollerStyle = .legacy; scroller.knobProportion = 0.3; scroller.doubleValue = 0.4
         func alpha() throws -> CGFloat {
@@ -248,7 +248,7 @@ final class SidebarScrollingTests: XCTestCase {
         _ = NSApplication.shared
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 100, height: 240), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false; defer { window.close() }
-        let scroller = SidebarScroller(frame: NSRect(x: 0, y: 0, width: 17, height: 240))
+        let scroller = ThinScroller(frame: NSRect(x: 0, y: 0, width: 17, height: 240))
         window.contentView?.addSubview(scroller)
         scroller.preferences.reduceMotion = true
         scroller.scrollerStyle = .legacy; scroller.knobProportion = 0.3

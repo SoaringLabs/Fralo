@@ -57,6 +57,7 @@ final class PanelPolishTests: XCTestCase {
         XCTAssertTrue(viewing.isCompact)
         XCTAssertGreaterThanOrEqual(viewing.zoom.bounds.width, viewing.zoom.intrinsicContentSize.width - 1, "The fixed inspector must not truncate the zoom action at minimum width")
         let previousWidth = root.content.bounds.width
+        let previousViewingWidth = previousWidth - root.viewingInsets.left - root.viewingInsets.right
         let field = inspector.devicePicker
         XCTAssertTrue(window.makeFirstResponder(field))
         toggleInspector()
@@ -64,7 +65,9 @@ final class PanelPolishTests: XCTestCase {
         XCTAssertTrue(root.inspectorHidden); XCTAssertTrue(root.right.isHidden)
         XCTAssertEqual(inspectorAction.toolTip, "显示出图设置")
         XCTAssertTrue(window.firstResponder === canvas)
-        XCTAssertGreaterThan(root.content.bounds.width, previousWidth + WorkbenchView.inspectorWidth - 20)
+        XCTAssertEqual(root.content.bounds.width, previousWidth, "Floating inspector never changes the viewport width")
+        let viewingWidth = root.content.bounds.width - root.viewingInsets.left - root.viewingInsets.right
+        XCTAssertGreaterThan(viewingWidth, previousViewingWidth + WorkbenchView.inspectorWidth - 20)
         XCTAssertTrue(canvas.image === rendered); XCTAssertEqual(list.selectedIndex, 0)
         XCTAssertEqual(try encoder.encode(CompositionStore(legacy: store).load()), stored)
         copyCurrent()

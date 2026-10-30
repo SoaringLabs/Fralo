@@ -30,6 +30,8 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
     private let menu: NSMenu
     private let document = HeaderDocument()
     private var sidebarHidden = false
+    var controlViews: [NSView] { toolbar.items.compactMap(\.view) }
+    var controlMenus: [NSMenu] { [menu] }
 
     init(owner: MainWindowController, splitView: NSSplitView, menu: NSMenu, sidebarHidden: Bool) {
         self.owner = owner; self.splitView = splitView; self.menu = menu

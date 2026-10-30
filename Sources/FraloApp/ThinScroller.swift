@@ -4,8 +4,9 @@ import FraloDesignSystem
 
 /// Native scrolling and hit testing with the reference's narrow, trackless artwork.
 /// Customize individual parts so AppKit retains overlay fading and drag tracking.
+/// Shared by the sidebar list and both canvas axes so the app has one scroller style.
 @MainActor
-final class SidebarScroller: NSScroller {
+final class ThinScroller: NSScroller {
     override class var isCompatibleWithOverlayScrollers: Bool { true }
     override var isOpaque: Bool { false }
     private var hoverArea: NSTrackingArea?
@@ -82,11 +83,14 @@ final class SidebarScroller: NSScroller {
         // No slot, including legacy/Always mode and overlay hover/drag states.
     }
 
+    private var isHorizontal: Bool { bounds.width > bounds.height }
+
     override func rect(for part: NSScroller.Part) -> NSRect {
         var rect = super.rect(for: part)
         if part == .knob, !rect.isEmpty {
-            // Drawing six points wide must not make dragging six points precise.
-            rect.origin.x = bounds.minX; rect.size.width = bounds.width
+            // Drawing six points thick must not make dragging six points precise.
+            if isHorizontal { rect.origin.y = bounds.minY; rect.size.height = bounds.height }
+            else { rect.origin.x = bounds.minX; rect.size.width = bounds.width }
         }
         return rect
     }
@@ -94,7 +98,10 @@ final class SidebarScroller: NSScroller {
     override func drawKnob() {
         let native = rect(for: .knob)
         guard !native.isEmpty else { return }
-        let knob = NSRect(x: floor(bounds.maxX - 9), y: native.minY, width: 6, height: native.height).intersection(bounds)
+        // Three points from the window-facing edge, matching across both axes.
+        let knob = isHorizontal
+            ? NSRect(x: native.minX, y: isFlipped ? floor(bounds.maxY - 9) : ceil(bounds.minY + 3), width: native.width, height: 6).intersection(bounds)
+            : NSRect(x: floor(bounds.maxX - 9), y: native.minY, width: 6, height: native.height).intersection(bounds)
         let contrast = preferences.effectiveIncreaseContrast
         let idle: CGFloat = contrast ? 0.48 : 0.20
         let active: CGFloat = contrast ? 0.72 : 0.42

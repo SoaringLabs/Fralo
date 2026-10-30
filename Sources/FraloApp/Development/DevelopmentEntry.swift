@@ -1,5 +1,6 @@
 #if FRALO_DEV
 import AppKit
+import FraloDesignSystem
 
 /// This entire type and its entry points are absent from a Release compilation.
 @MainActor
@@ -14,6 +15,20 @@ final class DevelopmentEntry: NSObject {
         window.setContentSize(NSSize(width: min(parts[0], visible.width), height: min(parts[1], visible.height - 52)))
         if CommandLine.arguments.contains("--preview-collapsed"), let workbench = window.contentView as? WorkbenchView { workbench.collapsed = true }
         window.center()
+        // Strengthen accessibility only in this preview; never change the user's OS settings.
+        var preferences = DesignPreferences()
+        preferences.reduceTransparency = CommandLine.arguments.contains("--preview-reduce-transparency")
+        preferences.reduceMotion = CommandLine.arguments.contains("--preview-reduce-motion")
+        preferences.increaseContrast = CommandLine.arguments.contains("--preview-increase-contrast")
+        func apply(_ view: NSView) {
+            (view as? CanvasToolbarBehavior)?.preferences = preferences
+            (view as? HeaderBackdrop)?.preferences = preferences
+            (view as? ThinScroller)?.preferences = preferences
+            (view as? MaterialSurface)?.preferences = preferences
+            (view as? SymbolButton)?.preferences = preferences
+            view.subviews.forEach(apply)
+        }
+        if let content = window.contentView { apply(content) }
     }
     static var labOnly: Bool { CommandLine.arguments.contains("--design-lab-only") }
     private(set) var controller: DesignLabController?
@@ -21,6 +36,7 @@ final class DevelopmentEntry: NSObject {
     private var labMenu: NSMenu?
     private weak var mainWindow: NSWindow?
     private var panelProbe: PanelRenderingProbe?
+    private var capsuleMatrix: CapsuleLegibilityMatrix?
     private var observer: NSObjectProtocol?
     func install(in menu: NSMenu, mainWindow: NSWindow? = nil) {
         self.mainWindow = mainWindow; productMenu = menu
@@ -65,6 +81,12 @@ final class DevelopmentEntry: NSObject {
         NSApp.activate(ignoringOtherApps: true)
     }
     func showRenderingProbesIfRequested(behind window: NSWindow?) {
+        if let argument = CommandLine.arguments.first(where: { $0.hasPrefix("--capsule-matrix=") }) {
+            let matrix = CapsuleLegibilityMatrix(); capsuleMatrix = matrix; matrix.show()
+            let url = URL(fileURLWithPath: String(argument.dropFirst("--capsule-matrix=".count)))
+            // Glass settles over a few frames after the window appears.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { matrix.writeReport(to: url) }
+        }
         if CommandLine.arguments.contains("--panel-render-check"), let window {
             let report = CommandLine.arguments.first(where: { $0.hasPrefix("--panel-render-report=") }).map {
                 URL(fileURLWithPath: String($0.dropFirst("--panel-render-report=".count)))

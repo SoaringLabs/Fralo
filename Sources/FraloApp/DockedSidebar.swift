@@ -38,7 +38,7 @@ final class DockedSidebar: NSView {
         }
         if let scroll = body as? NSScrollView {
             scroll.hasVerticalScroller = true
-            scroll.verticalScroller = SidebarScroller()
+            scroll.verticalScroller = ThinScroller()
             scroll.verticalScroller?.controlSize = .small
             // Keep native visibility preferences, but draw the same thin, trackless
             // knob in both legacy/Always and overlay presentation.

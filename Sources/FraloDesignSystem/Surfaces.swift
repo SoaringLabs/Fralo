@@ -13,7 +13,17 @@ public final class MaterialSurface: NSView {
     let panelTint = NSView()
     private var observer: NSObjectProtocol?
     public var preferences = DesignPreferences() { didSet { refresh() } }
+    /// Opt in only for glass containing controls, not large decorative panels.
+    public var isInteractive = false { didSet { refresh() } }
     public var cornerRadius: CGFloat = 0 { didSet { refresh() } }
+    /// How much window background frosts a panel, per appearance. Zero leaves the native glass bare.
+    public var tintOpacity: CGFloat = 0.55 { didSet { refresh() } }
+    public var darkTintOpacity: CGFloat = 0.55 { didSet { refresh() } }
+    /// A one-pixel outline in the label colour, so the surface keeps an edge over backdrops of its
+    /// own tone. It resolves in the surface's effective appearance: dark on light glass, light on dark.
+    /// Increase Contrast always shows it, at full point width.
+    public var showsOutline = true { didSet { refresh() } }
+    public var outlineOpacity: CGFloat = 0.14 { didSet { refresh() } }
     public var material: NSVisualEffectView.Material { get { effect.material } set { effect.material = newValue } }
     public var isUsingOpaqueFallback: Bool { !fallbackView.isHidden }
     public var isUsingNativeGlass: Bool { nativeGlass != nil && !isUsingOpaqueFallback }
@@ -59,22 +69,36 @@ public final class MaterialSurface: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     deinit { if let observer { NSWorkspace.shared.notificationCenter.removeObserver(observer) } }
     public override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); refresh() }
+    public override func viewDidChangeBackingProperties() { super.viewDidChangeBackingProperties(); refresh() }
     public func refresh() {
         // The glass radius shapes the effect, but does not fence every descendant render layer.
         clipsToBounds = true
+        let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        let tint = dark ? darkTintOpacity : tintOpacity
+        let contrast = preferences.effectiveIncreaseContrast, opaque = preferences.effectiveReduceTransparency
+        let outlined = showsOutline || contrast
+        // Without glass the outline is the only edge left against a same-coloured backdrop.
+        let outlineAlpha = opaque ? max(outlineOpacity, 0.24) : outlineOpacity
+        let pixel = 1 / (window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2)
         effectiveAppearance.performAsCurrentDrawingAppearance {
             layer?.cornerRadius = cornerRadius; layer?.masksToBounds = true
-            layer?.borderColor = (preferences.effectiveIncreaseContrast ? NSColor.separatorColor : NSColor.labelColor.withAlphaComponent(0.14)).cgColor
-            layer?.borderWidth = role == .panel ? (preferences.effectiveIncreaseContrast ? 1 : 0.5) : 0
+            // Increase Contrast must be the strongest edge; the system separator is too pale over light art.
+            layer?.borderColor = NSColor.labelColor.withAlphaComponent(contrast ? 0.5 : outlineAlpha).cgColor
+            layer?.borderWidth = role == .panel && outlined ? (contrast ? 1 : pixel) : 0
             fallbackView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
             fallbackView.layer?.cornerRadius = cornerRadius
             // Translucent enough for the blurred desktop behind the stage to read through, opaque enough to separate layers.
-            panelTint.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.55).cgColor
+            panelTint.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(tint).cgColor
         }
         if #available(macOS 26.0, *), let glass = nativeGlass as? NSGlassEffectView {
             glass.cornerRadius = cornerRadius
+            #if compiler(>=6.4) // effectIsInteractive ships in the macOS 27 SDK (Xcode 27); CI still builds with Xcode 26.
+            if #available(macOS 27.0, *) {
+                glass.effectIsInteractive = isInteractive && !preferences.effectiveReduceMotion && !preferences.effectiveReduceTransparency
+            }
+            #endif
         }
-        panelTint.isHidden = role != .panel
+        panelTint.isHidden = role != .panel || tint == 0
         fallbackView.isHidden = !preferences.effectiveReduceTransparency
         effect.isHidden = !fallbackView.isHidden || nativeGlass != nil
     }
@@ -377,11 +401,13 @@ public final class CanvasSurface: NSView {
     public var showsStageShadow = false { didSet { needsDisplay = true } }
     public var image: NSImage? {
         didSet {
-            needsDisplay = true
+            needsDisplay = true; luminanceMap = nil
             setAccessibilityValue(image.map { "\(Int($0.size.width)) × \(Int($0.size.height))" } ?? "暂无成品")
         }
     }
     public var zoom: CGFloat? { didSet { needsDisplay = true } }
+    /// Viewing-only gutters keep Fit artwork and scroll limits clear of floating controls.
+    public var viewingInsets = NSEdgeInsetsZero { didSet { needsDisplay = true } }
     public override var isFlipped: Bool { true }
     public override var acceptsFirstResponder: Bool { true }
     public var allowsPositioning = false {
@@ -497,10 +523,59 @@ public final class CanvasSurface: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     public var imageRect: NSRect {
         guard let image, image.size.width > 0, image.size.height > 0 else { return .zero }
-        let fit = max(0, min((bounds.width - 32) / image.size.width, (bounds.height - 32) / image.size.height))
+        let width = max(0, bounds.width - viewingInsets.left - viewingInsets.right)
+        let height = max(0, bounds.height - viewingInsets.top - viewingInsets.bottom)
+        let fit = max(0, min((width - 32) / image.size.width, (height - 32) / image.size.height))
         let factor = zoom ?? fit
         let size = NSSize(width: image.size.width * factor, height: image.size.height * factor)
-        return NSRect(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2, width: size.width, height: size.height)
+        return NSRect(x: viewingInsets.left + (width - size.width) / 2, y: viewingInsets.top + (height - size.height) / 2, width: size.width, height: size.height)
+    }
+    /// Mean luminance (0–1) of the opaque artwork beneath `rect`, in this view's coordinates.
+    /// Nil when the rect mostly covers the stage or transparent areas, which follow the window appearance.
+    public func artworkLuminance(under rect: NSRect) -> CGFloat? {
+        let art = imageRect
+        guard rect.width > 0, rect.height > 0, art.width > 0, art.height > 0, let map = luminanceMap ?? makeLuminanceMap() else { return nil }
+        let overlap = rect.intersection(art)
+        guard !overlap.isNull, overlap.width > 0, overlap.height > 0 else { return nil }
+        let cellWidth = art.width / CGFloat(map.width), cellHeight = art.height / CGFloat(map.height)
+        func column(_ x: CGFloat) -> Int { min(map.width - 1, max(0, Int((x - art.minX) / cellWidth))) }
+        func row(_ y: CGFloat) -> Int { min(map.height - 1, max(0, Int((y - art.minY) / cellHeight))) }
+        var total: CGFloat = 0, opaque = 0, samples = 0
+        // Flipped view and bitmap rows both run top to bottom.
+        for y in row(overlap.minY)...row(overlap.maxY - 0.01) {
+            for x in column(overlap.minX)...column(overlap.maxX - 0.01) {
+                samples += 1
+                let value = map.values[y * map.width + x]
+                if value >= 0 { total += CGFloat(value); opaque += 1 }
+            }
+        }
+        // Coverage of the whole rect, so a capsule hanging mostly over the stage defers to it.
+        let coverage = overlap.width * overlap.height / (rect.width * rect.height) * CGFloat(opaque) / CGFloat(max(1, samples))
+        return coverage >= 0.5 && opaque > 0 ? total / CGFloat(opaque) : nil
+    }
+    private struct LuminanceMap { let width: Int, height: Int; let values: [Float] }
+    private var luminanceMap: LuminanceMap?
+    private func makeLuminanceMap() -> LuminanceMap? {
+        guard let image, let source = image.cgImage(forProposedRect: nil, context: nil, hints: nil), source.width > 0, source.height > 0 else { return nil }
+        // A coarse map is plenty for a control-sized backdrop and keeps scrolling free of image work.
+        let width = 64, height = max(1, min(512, Int((CGFloat(64) * CGFloat(source.height) / CGFloat(source.width)).rounded())))
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let drawn = pixels.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            context.interpolationQuality = .medium
+            context.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
+            return true
+        }
+        guard drawn else { return nil }
+        let values = (0..<(width * height)).map { index -> Float in
+            let alpha = Float(pixels[index * 4 + 3])
+            guard alpha >= 128 else { return -1 }
+            let r = Float(pixels[index * 4]), g = Float(pixels[index * 4 + 1]), b = Float(pixels[index * 4 + 2])
+            return (0.2126 * r + 0.7152 * g + 0.0722 * b) / alpha
+        }
+        let map = LuminanceMap(width: width, height: height, values: values); luminanceMap = map
+        return map
     }
     public override func draw(_ dirtyRect: NSRect) {
         guard let image else { return }
@@ -570,6 +645,11 @@ public final class CanvasSurface: NSView {
 @MainActor
 public final class ViewToolbar: NSView {
     public static let height: CGFloat = 36
+    /// Bare Liquid Glass in both appearances; legibility comes from `backdropLuminance`.
+    public static let tintOpacity: CGFloat = 0, darkTintOpacity: CGFloat = 0
+    /// Hysteresis band for flipping the capsule's foreground, so mid-tone artwork never flickers.
+    /// Centred near 0.4 encoded luma, where dark symbols on the lightened glass start to out-contrast white.
+    public static let lightBackdropThreshold: CGFloat = 0.45, darkBackdropThreshold: CGFloat = 0.35
     public let surface = MaterialSurface(.panel, radius: ViewToolbar.height / 2)
     public let zoom = ChoiceMenu(["适应窗口", "100%", "50%"], label: "缩放比例")
     public let zoomOut = SymbolButton("minus", label: "缩小")
@@ -587,6 +667,13 @@ public final class ViewToolbar: NSView {
     public let preview = SymbolButton("checkerboard.rectangle", label: "显示透明区域", toggles: true)
     public init() {
         super.init(frame: .zero)
+        surface.isInteractive = true
+        surface.tintOpacity = Self.tintOpacity; surface.darkTintOpacity = Self.darkTintOpacity
+        // The surface must clip (see the child-outline contract), which also clips the glass's own
+        // shadow; this host layer restores a soft lift outside that clip.
+        wantsLayer = true
+        layer?.shadowColor = NSColor.black.cgColor; layer?.shadowOpacity = 0.14
+        layer?.shadowRadius = 8; layer?.shadowOffset = CGSize(width: 0, height: -2)
         surface.translatesAutoresizingMaskIntoConstraints = false; addSubview(surface)
         zoom.showsSurface = false; composition.showsSurface = false; composition.isHidden = true
         zoom.font = .monospacedDigitSystemFont(ofSize: 13, weight: .regular)
@@ -612,6 +699,32 @@ public final class ViewToolbar: NSView {
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     deinit { pendingActivity?.cancel() }
+    public override func layout() {
+        super.layout()
+        layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: Self.height / 2, cornerHeight: Self.height / 2, transform: nil)
+    }
+    /// Luminance of the artwork behind the capsule, or nil over the stage. Like system Liquid Glass,
+    /// the capsule's foreground flips to stay legible: dark symbols over bright art, light over dark.
+    public var backdropLuminance: CGFloat? { didSet { updateBackdropAppearance() } }
+    /// Whether the backdrop chose the light appearance; nil inherits the window's.
+    public private(set) var usesLightAppearance: Bool?
+    private func updateBackdropAppearance() {
+        guard let luminance = backdropLuminance else {
+            guard usesLightAppearance != nil else { return }
+            usesLightAppearance = nil; appearance = nil; return
+        }
+        let light: Bool
+        switch usesLightAppearance {
+        case true?: light = luminance > Self.darkBackdropThreshold
+        case false?: light = luminance >= Self.lightBackdropThreshold
+        case nil: light = luminance >= (Self.lightBackdropThreshold + Self.darkBackdropThreshold) / 2
+        }
+        guard light != usesLightAppearance else { return }
+        usesLightAppearance = light
+        let contrast = surface.preferences.effectiveIncreaseContrast
+        appearance = NSAppearance(named: light ? (contrast ? .accessibilityHighContrastAqua : .aqua)
+                                               : (contrast ? .accessibilityHighContrastDarkAqua : .darkAqua))
+    }
     /// Shows `text` in the zoom readout; `detail` becomes its tooltip (e.g. the output pixel size).
     public func showStatus(_ text: String, detail: String? = nil) {
         dimensions.stringValue = text
