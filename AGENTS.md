@@ -1,5 +1,11 @@
 # Fralo project rules
 
+## 调试进程交接
+
+- 每次完成需求改动并启动新版调试程序时，先构建成功，再结束本工作区同一种预览的所有旧进程，确认退出后启动新版；无响应时升级为强制终止。不要为了保留旧调试会话而留下旧进程。
+- Workbench Preview 和 Design Lab 分别最多保留一个新版实例；通过各自的 `scripts/run-*.sh` 启动，它们自动按完整可执行路径清理旧进程。`--build-only` 只构建，不清理进程。
+- 使用其他启动方式或临时调试程序时，也执行上述交接，逐个核对完整可执行路径和 PID；清理范围仅限本次工作区的调试程序，保留正式安装版及其他工作区的进程。交付前核对旧进程已退出、新进程版本和窗口正常。
+
 ## Apple HIG
 
 - 所有后续改动都检查其用户体验影响；涉及界面、交互、状态反馈或辅助功能时，尽量以 [Apple Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/) 为默认依据。

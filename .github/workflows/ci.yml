@@ -36,6 +36,8 @@ jobs:
           if-no-files-found: ignore
       - name: Update feed validation tests
         run: python3 scripts/test_prepare_update.py
+      - name: Preview process handoff tests
+        run: python3 -B scripts/test_stop_preview_processes.py
       - name: Build App and CLI
         run: swift build -c release
       - name: CLI integration checks

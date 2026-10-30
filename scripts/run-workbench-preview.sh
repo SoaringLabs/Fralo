@@ -36,6 +36,16 @@ info = {
     'CFBundleVersion': '1', 'CFBundleShortVersionString': '0.1',
     'CFBundleDevelopmentRegion': 'zh_CN',
 }
+# Match the production layered icon and older-macOS .icns fallback.
+icon_info = session / 'icon-info.plist'
+subprocess.run([
+    'xcrun', 'actool', str(root / 'Resources/Fralo.icon'),
+    '--compile', str(resources), '--platform', 'macosx',
+    '--minimum-deployment-target', '14.0', '--app-icon', 'Fralo',
+    '--output-partial-info-plist', str(icon_info),
+    '--output-format', 'human-readable-text',
+], check=True, stdout=subprocess.DEVNULL)
+info.update(plistlib.loads(icon_info.read_bytes()))
 with (app / 'Contents/Info.plist').open('wb') as file:
     plistlib.dump(info, file)
 subprocess.run(['codesign', '--force', '--deep', '--sign', '-', str(app)], check=True, stdout=subprocess.DEVNULL)
@@ -45,5 +55,6 @@ PY
 printf '%s\n' "$preview_bundle"
 if $build_only; then exit 0; fi
 settings_directory="$(mktemp -d "${TMPDIR:-/tmp}/fralo-workbench.XXXXXX")"
+python3 "$project_root/scripts/stop-preview-processes.py" workbench
 exec env FRALO_SETTINGS_PATH="$settings_directory/settings.json" \
   "$preview_bundle/Contents/MacOS/FraloApp" --workbench-preview "$@"

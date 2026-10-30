@@ -88,13 +88,12 @@ final class CompositionInspector: NSView {
 
     init(settings: CompositionSettings) {
         self.settings = settings
-        mode = ValuePicker(["透明套壳", "背景成图"], label: "出图模式", selected: settings.mode == .transparent ? 0 : 1)
-        devicePicker = ValuePicker(["手机", "平板", "浏览器"], label: "展示类型", selected: DisplayKind.allCases.firstIndex(of: settings.display)!)
+        mode = ValuePicker(["透明套壳", "背景成图"], label: "出图模式", selected: settings.mode == .transparent ? 0 : 1, purpose: .tabs, size: .large)
+        devicePicker = ValuePicker(["手机", "平板", "浏览器"], label: "展示类型", selected: DisplayKind.allCases.firstIndex(of: settings.display)!, purpose: .tabs, size: .large)
         formatPicker = ValuePicker(["PNG", "JPEG"], label: "文件格式", selected: settings.format == .png ? 0 : 1)
         backgroundType = ValuePicker(["纯色", "渐变", "图片"], label: "背景类型")
         pngCompression = ValuePicker(["无损", "均衡", "最小"], label: "PNG 体积", selected: Self.pngPreset(settings))
-        mode.controlHeight = 34; devicePicker.controlHeight = 28; backgroundType.controlHeight = 28
-        for picker in [formatPicker, pngCompression] { picker.controlHeight = 24 }
+        for picker in [backgroundType, formatPicker, pngCompression] { picker.controlSize = .small }
         super.init(frame: NSRect(x: 0, y: 0, width: 276, height: 500))
         mode.onChange = { [weak self] index in
             self?.edit { $0.mode = index == 0 ? .transparent : .background }
@@ -287,7 +286,7 @@ final class CompositionInspector: NSView {
         let shadow = ValuePicker(["无", "柔和", "明显"], label: "阴影", selected: ShadowStyle.allCases.firstIndex(of: settings.shadow)!) { [weak self] index in
             self?.editDevice { if $0.mode == .transparent { $0.transparentShadow = ShadowStyle.allCases[index] } else { $0.backgroundShadow = ShadowStyle.allCases[index] } }
         }
-        shadow.controlHeight = 24
+        shadow.controlSize = .small
         views.append(field("阴影", shadow, width: 172))
         views.append(slider("不透明度", range: 0...100, value: settings.deviceOpacity * 100) { [weak self] v in self?.editDevice { $0.deviceOpacity = v / 100 } })
         if settings.mode == .background {

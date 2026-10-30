@@ -153,10 +153,10 @@ final class ScenarioWorkbench: NSView {
     }
     func refreshInspector() {
         rightPanel?.removeFromSuperview()
-        let mode = ValuePicker(["透明套壳", "背景成图"], label: "样例出图模式", selected: state.scenario.transparent ? 0 : 1) { [weak self] index in
+        let mode = ValuePicker(["透明套壳", "背景成图"], label: "样例出图模式", selected: state.scenario.transparent ? 0 : 1, purpose: .tabs, size: .large) { [weak self] index in
             self?.state.scenario.transparent = index == 0; self?.refreshInspector(); self?.render()
         }
-        mode.preferences = state.preferences; modePicker = mode
+        modePicker = mode
         let heading = FraloStyle.stack([mode, FraloStyle.text("样式应用于全部 \(state.scenario.count) 张样例", role: .caption, secondary: true)], spacing: 10)
         let pages: [(String, NSView)] = [("设备", deviceControls()), ("背景", backgroundControls()), ("导出", exportControls())]
         let tabs = InspectorTabs(pages.map { ($0.0, ScrollContent.make($0.1, inset: 0)) }, style: .floating)
@@ -173,10 +173,10 @@ final class ScenarioWorkbench: NSView {
         needsLayout = true
     }
     private func deviceControls() -> NSView {
-        let type = ValuePicker(["手机", "平板", "浏览器"], label: "样例展示类型", selected: state.scenario.device) { [weak self] index in
+        let type = ValuePicker(["手机", "平板", "浏览器"], label: "样例展示类型", selected: state.scenario.device, purpose: .tabs, size: .large) { [weak self] index in
             self?.state.scenario.device = index; self?.refreshInspector(); self?.render()
         }
-        type.preferences = state.preferences; devicePicker = type
+        devicePicker = type
         let titles = state.scenario.device == 0 ? ["iPhone · 现有渲染"] : state.scenario.device == 1 ? ["iPad · 布局夹具"] : ["Safari · 布局夹具", "Chrome · 控件样例"]
         var rows: [NSView] = [type, ChoiceMenu(titles, label: "样例外框")]
         if !state.scenario.transparent {
@@ -202,10 +202,9 @@ final class ScenarioWorkbench: NSView {
         ], spacing: 20, fillWidth: true))
     }
     private func exportControls() -> NSView {
-        let format = ValuePicker(["PNG", "JPEG"], label: "样例导出格式", selected: state.scenario.format) { [weak self] value in
+        let format = ValuePicker(["PNG", "JPEG"], label: "样例导出格式", selected: state.scenario.format, size: .small) { [weak self] value in
             self?.state.scenario.format = value; self?.refreshInspector()
         }
-        format.preferences = state.preferences
         var rows: [NSView] = [format]
         if state.scenario.format == 1 {
             rows += [SliderRow("图片质量", range: 1...100, value: state.scenario.quality) { [weak self] in self?.state.scenario.quality = $0 },

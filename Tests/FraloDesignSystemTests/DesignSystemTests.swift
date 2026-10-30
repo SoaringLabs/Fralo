@@ -173,7 +173,7 @@ final class DesignSystemTests: XCTestCase {
         picker.isEnabled = false; picker.choose(1)
         XCTAssertEqual(picker.selectedIndex, 0)
         XCTAssertEqual(edits, [0])
-        XCTAssertEqual(picker.accessibilityRole(), .radioGroup)
+        XCTAssertEqual(picker.selectedSegment, 0)
     }
 
     @MainActor func testSliderClampsRejectsNonfiniteAndRestoresWithoutEdits() async {
@@ -246,20 +246,23 @@ final class DesignSystemTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(second.valueLabel.frame.width, 48)
     }
 
-    @MainActor func testClickingAParameterTakesFocusAwayFromTheCanvas() async {
+    @MainActor func testParameterFocusKeepsKeyboardSelectionAwayFromTheCanvas() async {
         _ = NSApplication.shared
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 300), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         let canvas = CanvasSurface(frame: NSRect(x: 0, y: 0, width: 300, height: 200))
+        var canvasMoves = 0
+        canvas.onPrevious = { canvasMoves += 1 }; canvas.onNext = { canvasMoves += 1 }
         let picker = ValuePicker(["A", "B"], label: "参数")
         picker.frame = NSRect(x: 0, y: 200, width: 200, height: 30)
         window.contentView?.addSubview(canvas); window.contentView?.addSubview(picker)
         window.makeFirstResponder(canvas)
-        let button = picker.accessibilityChildren()?.last as? NSButton
-        button?.performClick(nil)
+        XCTAssertTrue(window.makeFirstResponder(picker))
+        picker.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: 124)!)
         XCTAssertTrue(window.firstResponder === picker)
         XCTAssertEqual(picker.selectedIndex, 1)
-        XCTAssertEqual(picker.focusRingType, .none, "Pointer selection should not add a second large selection outline")
+        XCTAssertEqual(canvasMoves, 0)
         picker.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
             windowNumber: window.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: 123)!)
         XCTAssertEqual(picker.focusRingType, .exterior, "Keyboard use must expose a visible focus ring")
