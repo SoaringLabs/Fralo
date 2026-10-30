@@ -136,7 +136,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         previewScroll.automaticallyAdjustsContentInsets = false; previewScroll.contentInsets = NSEdgeInsetsZero
         previewScroll.translatesAutoresizingMaskIntoConstraints = false
         previewScroll.onResize = { [weak self] in self?.layoutPreview() }
-        previewScroll.onScroll = { [weak self] in self?.updateHeaderOverlap() }
+        previewScroll.onScroll = { [weak self] in self?.updateCanvasOverlays() }
         center.view.addSubview(previewScroll)
         footer.translatesAutoresizingMaskIntoConstraints = false; center.view.addSubview(footer)
         fitMenu.removeAllItems(); fitMenu.addItems(withTitles: ["适应窗口", "25%", "50%", "100%", "200%"])
@@ -560,7 +560,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private func layoutPreview() {
         guard !layingOutPreview else { return }
         layingOutPreview = true; defer { layingOutPreview = false }
-        defer { updateHeaderOverlap() }
+        defer { updateCanvasOverlays() }
         let insets = workbench.viewingInsets
         footerTrailing?.constant = -insets.right
         emptyTrailing?.constant = -insets.right
@@ -602,6 +602,12 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         viewing.showsComposition = false
         viewing.composition.selectItem(at: CanvasRatio.allCases.firstIndex(of: settings.canvas) ?? 1)
         viewing.composition.displayTitle = "\(settings.canvas.rawValue) · \(Int(pixels.width)) × \(Int(pixels.height))"
+    }
+    /// Floating chrome reacts to the artwork actually beneath it.
+    private func updateCanvasOverlays() { updateHeaderOverlap(); updateCapsuleBackdrop() }
+    private func updateCapsuleBackdrop() {
+        guard canvas.image != nil, !previewScroll.isHidden, !footer.isHidden, viewing.window != nil else { viewing.backdropLuminance = nil; return }
+        viewing.backdropLuminance = canvas.artworkLuminance(under: canvas.convert(viewing.bounds, from: viewing))
     }
     /// The header backdrop also appears whenever artwork actually sits beneath it.
     private func updateHeaderOverlap() {
@@ -751,7 +757,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         exportAction.count = items.count; exportAction.isEnabled = !isExporting
         updatePanelControls()
         if items.isEmpty { empty.isHidden = false; footer.isHidden = true; previewScroll.isHidden = true }
-        updateHeaderOverlap()
+        updateCanvasOverlays()
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         let editingText = (window?.firstResponder as? NSTextView)?.isEditable == true

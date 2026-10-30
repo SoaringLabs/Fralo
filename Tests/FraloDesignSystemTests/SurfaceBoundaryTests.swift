@@ -23,6 +23,90 @@ final class SurfaceBoundaryTests: XCTestCase {
         panel.preferences = preferences; XCTAssertTrue(panel.isUsingOpaqueFallback)
     }
 
+    @MainActor func testViewingCapsuleIsBareGlassInBothAppearances() throws {
+        _ = NSApplication.shared
+        let controls = ViewToolbar(); controls.frame = NSRect(x: 0, y: 0, width: 300, height: ViewToolbar.height)
+        let surface = controls.surface
+        for name: NSAppearance.Name in [.aqua, .darkAqua] {
+            surface.appearance = NSAppearance(named: name); surface.refresh()
+            XCTAssertTrue(surface.panelTint.isHidden, "\(name.rawValue): no overlay hides the glass rim or refraction")
+            XCTAssertGreaterThan(surface.layer?.borderWidth ?? 0, 0, "\(name.rawValue): a hairline keeps the edge over same-tone art")
+        }
+        XCTAssertFalse(MaterialSurface(.panel).panelTint.isHidden, "Large panels keep their backing")
+        XCTAssertTrue(surface.clipsToBounds, "The child-outline clipping contract still holds")
+        controls.layout()
+        XCTAssertGreaterThan(controls.layer?.shadowOpacity ?? 0, 0, "The host restores the lift the clip removes")
+        XCTAssertNotNil(controls.layer?.shadowPath)
+
+        var contrast = DesignPreferences(); contrast.increaseContrast = true
+        surface.preferences = contrast
+        XCTAssertEqual(surface.layer?.borderWidth, 1, "Increase Contrast widens the outline")
+        var opaque = DesignPreferences(); opaque.reduceTransparency = true
+        surface.preferences = opaque
+        XCTAssertTrue(surface.isUsingOpaqueFallback)
+    }
+
+    @MainActor func testOutlineFollowsTheSurfaceAppearanceAndStrengthensWithoutGlass() throws {
+        _ = NSApplication.shared
+        let surface = MaterialSurface(.panel, radius: 18)
+        func outline() throws -> (luma: CGFloat, alpha: CGFloat) {
+            let color = try XCTUnwrap(surface.layer?.borderColor.flatMap { NSColor(cgColor: $0)?.usingColorSpace(.sRGB) })
+            return (0.2126 * color.redComponent + 0.7152 * color.greenComponent + 0.0722 * color.blueComponent, color.alphaComponent)
+        }
+        surface.appearance = NSAppearance(named: .aqua); surface.refresh()
+        let light = try outline()
+        XCTAssertLessThan(light.luma, 0.3, "Dark hairline on light glass")
+        surface.appearance = NSAppearance(named: .darkAqua); surface.refresh()
+        let dark = try outline()
+        XCTAssertGreaterThan(dark.luma, 0.7, "Light hairline on dark glass")
+        var opaque = DesignPreferences(); opaque.reduceTransparency = true
+        surface.preferences = opaque
+        XCTAssertGreaterThan(try outline().alpha, dark.alpha, "With no glass rim, the outline carries the edge alone")
+        var contrast = DesignPreferences(); contrast.increaseContrast = true
+        surface.preferences = contrast
+        XCTAssertGreaterThan(try outline().alpha, dark.alpha, "Increase Contrast is the strongest edge")
+    }
+
+    @MainActor func testCapsuleForegroundFlipsWithBackdropUsingHysteresis() throws {
+        _ = NSApplication.shared
+        let controls = ViewToolbar()
+        func isLight() -> Bool { controls.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .aqua }
+        XCTAssertNil(controls.appearance, "Over the stage the capsule follows the window")
+        controls.backdropLuminance = 0.92
+        XCTAssertEqual(controls.usesLightAppearance, true); XCTAssertTrue(isLight(), "Bright art gets dark symbols")
+        controls.backdropLuminance = 0.4
+        XCTAssertEqual(controls.usesLightAppearance, true, "Mid tones keep the current choice")
+        controls.backdropLuminance = 0.3
+        XCTAssertEqual(controls.usesLightAppearance, false); XCTAssertFalse(isLight(), "Dark art gets light symbols")
+        controls.backdropLuminance = 0.4
+        XCTAssertEqual(controls.usesLightAppearance, false, "Mid tones keep the current choice")
+        controls.backdropLuminance = ViewToolbar.lightBackdropThreshold
+        XCTAssertEqual(controls.usesLightAppearance, true)
+        controls.backdropLuminance = nil
+        XCTAssertNil(controls.usesLightAppearance); XCTAssertNil(controls.appearance)
+    }
+
+    @MainActor func testCanvasReportsOpaqueArtworkLuminanceAndDefersToTheStage() throws {
+        _ = NSApplication.shared
+        // Top half white, bottom half black, right quarter transparent.
+        let image = NSImage(size: NSSize(width: 400, height: 400), flipped: true) { _ in
+            NSColor.white.setFill(); NSRect(x: 0, y: 0, width: 300, height: 200).fill()
+            NSColor.black.setFill(); NSRect(x: 0, y: 200, width: 300, height: 200).fill()
+            return true
+        }
+        let canvas = CanvasSurface(frame: NSRect(x: 0, y: 0, width: 432, height: 432))
+        canvas.image = image; canvas.zoom = 1
+        let art = canvas.imageRect
+        let top = try XCTUnwrap(canvas.artworkLuminance(under: NSRect(x: art.minX + 20, y: art.minY + 40, width: 200, height: 36)))
+        XCTAssertGreaterThan(top, 0.9)
+        let bottom = try XCTUnwrap(canvas.artworkLuminance(under: NSRect(x: art.minX + 20, y: art.minY + 320, width: 200, height: 36)))
+        XCTAssertLessThan(bottom, 0.1)
+        XCTAssertNil(canvas.artworkLuminance(under: NSRect(x: art.minX + 310, y: art.minY + 40, width: 80, height: 36)), "Transparent art shows the stage")
+        XCTAssertNil(canvas.artworkLuminance(under: NSRect(x: art.minX - 180, y: art.minY + 40, width: 200, height: 36)), "Mostly over the stage")
+        canvas.image = nil
+        XCTAssertNil(canvas.artworkLuminance(under: NSRect(x: 0, y: 0, width: 100, height: 36)))
+    }
+
     @MainActor func testNativeGlassCannotPaintAnUnroundedChildOutlineOutsideItsSurface() async throws {
         guard #available(macOS 26.0, *) else { throw XCTSkip("Native glass is unavailable") }
         _ = NSApplication.shared

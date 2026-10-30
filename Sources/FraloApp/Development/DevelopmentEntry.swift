@@ -36,6 +36,7 @@ final class DevelopmentEntry: NSObject {
     private var labMenu: NSMenu?
     private weak var mainWindow: NSWindow?
     private var panelProbe: PanelRenderingProbe?
+    private var capsuleMatrix: CapsuleLegibilityMatrix?
     private var observer: NSObjectProtocol?
     func install(in menu: NSMenu, mainWindow: NSWindow? = nil) {
         self.mainWindow = mainWindow; productMenu = menu
@@ -80,6 +81,12 @@ final class DevelopmentEntry: NSObject {
         NSApp.activate(ignoringOtherApps: true)
     }
     func showRenderingProbesIfRequested(behind window: NSWindow?) {
+        if let argument = CommandLine.arguments.first(where: { $0.hasPrefix("--capsule-matrix=") }) {
+            let matrix = CapsuleLegibilityMatrix(); capsuleMatrix = matrix; matrix.show()
+            let url = URL(fileURLWithPath: String(argument.dropFirst("--capsule-matrix=".count)))
+            // Glass settles over a few frames after the window appears.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { matrix.writeReport(to: url) }
+        }
         if CommandLine.arguments.contains("--panel-render-check"), let window {
             let report = CommandLine.arguments.first(where: { $0.hasPrefix("--panel-render-report=") }).map {
                 URL(fileURLWithPath: String($0.dropFirst("--panel-render-report=".count)))

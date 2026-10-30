@@ -134,6 +134,8 @@ final class CanvasChromeTests: XCTestCase {
             XCTAssertTrue(scroll.verticalScroller is ThinScroller); XCTAssertTrue(scroll.horizontalScroller is ThinScroller)
             XCTAssertEqual(scroll.scrollerInsets.top, root.headerHeight, accuracy: 0.1, "Scrollers start below the header")
             XCTAssertFalse(root.contentUnderHeader, "Fitted artwork stays clear of the header")
+            let capsule = try XCTUnwrap(descendants(root).compactMap { $0 as? ViewToolbar }.first)
+            XCTAssertNil(capsule.backdropLuminance, "Fitted artwork leaves the capsule over the stage")
             let rect = canvas.imageRect
             XCTAssertGreaterThanOrEqual(rect.minY, canvas.viewingInsets.top)
             XCTAssertLessThanOrEqual(rect.maxY, scroll.contentView.bounds.height - canvas.viewingInsets.bottom + 0.1)
@@ -164,6 +166,7 @@ final class CanvasChromeTests: XCTestCase {
             XCTAssertFalse(root.contentUnderHeader)
             scroll.contentView.scroll(to: NSPoint(x: 0, y: 300)); scroll.reflectScrolledClipView(scroll.contentView)
             XCTAssertTrue(root.contentUnderHeader, "Artwork scrolled beneath the header raises the backdrop")
+            XCTAssertNotNil(capsule.backdropLuminance, "Zoomed artwork behind the capsule drives its foreground")
             XCTAssertTrue(root.headerBackdrop.isShown)
             scroll.contentView.scroll(to: .zero); scroll.reflectScrolledClipView(scroll.contentView)
             XCTAssertFalse(root.contentUnderHeader)
