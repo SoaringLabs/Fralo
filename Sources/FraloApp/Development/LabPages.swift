@@ -96,7 +96,7 @@ enum LabPages {
         let sections: [NSView] = [
             SoftButtonGallery.make(state: state),
             FormSection("按钮与反馈", detail: "可直接点击，并用 Tab / Shift-Tab 检查焦点；这是共享组件的真实行为。", views: [FraloStyle.stack([primary, secondary, quiet, destructive, icon], axis: .horizontal), FraloStyle.stack([disabled, busy, export], axis: .horizontal), feedback]),
-            FormSection("参数选择与内容导航", detail: "原生胶囊：大号内容切换、紧凑参数选择；按住拖动后松手提交。动效与辅助功能效果由系统管理。", views: [sample(picker, width: 320), sample(orientation, width: 240), sample(disabledPicker, width: 300), sample(navigation)]),
+            FormSection("参数选择与内容导航", detail: "原生胶囊：统一中性胶囊：大号内容切换、紧凑参数单选；按住拖动后松手提交。参数保留单选语义。", views: [sample(picker, width: 320), sample(orientation, width: 240), sample(disabledPicker, width: 300), sample(navigation)]),
             FormSection("图卡选择", detail: "正式工作台使用真实外框缩略图。此处验证图卡的选择、方向键、焦点与不可用状态。", views: [sample(cards, width: 340), sample(disabledCards, width: 340)]),
             FormSection("表单、颜色与数值", views: [sample(FormRow("窗口样式", content: popup)), sample(FormRow("透明填底", content: color)), sample(FormRow("质量数值", content: number)), sample(slider), sample(opacity), sample(unavailable), sample(InfoRow("实际尺寸", value: "2400 × 1800 px"))]),
             FormSection("背景缩略图", views: [swatches, ToggleControl("布尔选项", value: true) { feedback.stringValue = "布尔选项：\($0)" }]),
@@ -202,7 +202,7 @@ final class MotionExperiment: NSView {
         let preview = ActionButton("切换成品预览") { [weak workbench] in workbench?.togglePreview() }
         let status = FraloStyle.text("原生选择动效由系统管理 · 结构 \(Int(FraloMotion.duration(.structure, preferences: state.preferences) * 1000)) ms", role: .detail, secondary: true)
         let heading = FraloStyle.stack([FraloStyle.text("交互与动效实验", role: .title),
-            FraloStyle.paragraph("结构变化不能修改成品构图；原生控件保留自己的反馈。开启上方减少动态效果后重播，过渡应直接完成。"),
+            FraloStyle.paragraph("结构变化不能修改成品构图。上方减少动态效果影响结构过渡；原生选择动效遵循系统设置。"),
             FraloStyle.stack([picker, replay, collapse, preview], axis: .horizontal, spacing: 12), status], spacing: 10)
         for view in [heading, workbench] { view.translatesAutoresizingMaskIntoConstraints = false; addSubview(view) }
         NSLayoutConstraint.activate([
