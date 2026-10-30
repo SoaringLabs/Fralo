@@ -22,15 +22,15 @@ func separator() -> NSBox { let box = NSBox(); box.boxType = .separator; return 
 
 @MainActor
 final class DropContainer: NSView {
-    var onDrop: (([URL]) -> Void)?
+    var router: FileDropRouter?
     override init(frame: NSRect) { super.init(frame: frame); registerForDraggedTypes([.fileURL]) }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { .copy }
-    override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool { true }
-    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        guard let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty else { return false }
-        onDrop?(urls); return true
-    }
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { router?.entered(sender) ?? [] }
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { router?.updated(sender) ?? [] }
+    override func draggingExited(_ sender: NSDraggingInfo?) { router?.exited() }
+    override func draggingEnded(_ sender: NSDraggingInfo) { router?.ended() }
+    override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool { router?.updated(sender) == .copy }
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool { router?.perform(sender) ?? false }
 }
 
 @MainActor

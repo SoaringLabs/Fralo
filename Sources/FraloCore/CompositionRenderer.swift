@@ -185,10 +185,36 @@ public enum CompositionRenderer {
     private static func fill(_ rect: CGRect, radius: CGFloat, color: CGColor, context: CGContext) {
         context.addPath(CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)); context.setFillColor(color); context.fillPath()
     }
-    private static func shell(_ input: ImageInput, settings: CompositionSettings, maxDimension: Int?) throws -> RenderedComposition {
+    /// The screen's rectangle and corner radius as fractions of the framed device image (top-left origin),
+    /// so viewing-only overlays can align with the screen without re-deriving each frame's layout.
+    public static func screenLayout(_ settings: CompositionSettings) throws -> (rect: CGRect, cornerRadius: CGFloat) {
+        let settings = try settings.validated()
+        let native = settings.deviceCanvasSize
+        let rect: CGRect, radius: CGFloat
+        switch settings.display {
+        case .phone:
+            let plan = try RenderPlan(sourceSize: CGSize(width: 1, height: 1), settings: RenderSettings(model: settings.phoneModel, orientation: settings.orientation),
+                                      containSource: true, canvasSize: native)
+            rect = plan.screen; radius = plan.geometry.model.screenRadius * plan.scale
+        case .tablet, .browser:
+            let layout = shellLayout(settings)
+            let fit = min(native.width / layout.size.width, native.height / layout.size.height)
+            let offset = CGPoint(x: (native.width - layout.size.width * fit) / 2, y: (native.height - layout.size.height * fit) / 2)
+            rect = CGRect(x: offset.x + layout.screen.minX * fit, y: offset.y + layout.screen.minY * fit, width: layout.screen.width * fit, height: layout.screen.height * fit)
+            radius = layout.radius * fit
+        }
+        return (CGRect(x: rect.minX / native.width, y: rect.minY / native.height, width: rect.width / native.width, height: rect.height / native.height),
+                radius / native.width)
+    }
+    private static func shellLayout(_ settings: CompositionSettings) -> (size: CGSize, screen: CGRect, radius: CGFloat) {
         let tablet = settings.display == .tablet
         let size = tablet ? (settings.orientation == .portrait ? CGSize(width: 1100, height: 1442) : CGSize(width: 1442, height: 1100)) : CGSize(width: 1500, height: 1500 / settings.windowRatio.ratio)
         let screen = tablet ? CGRect(origin: .zero, size: size).insetBy(dx: 38, dy: 38) : CGRect(x: 2, y: settings.browser == .chrome ? 86 : 64, width: size.width - 4, height: size.height - (settings.browser == .chrome ? 88 : 66))
+        return (size, screen, tablet ? 30 : 4)
+    }
+    private static func shell(_ input: ImageInput, settings: CompositionSettings, maxDimension: Int?) throws -> RenderedComposition {
+        let tablet = settings.display == .tablet
+        let (size, screen, screenRadius) = shellLayout(settings)
         let nativeSize = settings.deviceCanvasSize
         let reduction = maxDimension.map { min(1, CGFloat($0) / max(nativeSize.width, nativeSize.height)) } ?? 1
         let output = CGSize(width: ceil(nativeSize.width * reduction), height: ceil(nativeSize.height * reduction))
@@ -216,7 +242,7 @@ public enum CompositionRenderer {
                 context.move(to: CGPoint(x: x + edge, y: barY + 11)); context.addLine(to: CGPoint(x: x, y: barY + 18)); context.addLine(to: CGPoint(x: x + edge, y: barY + 25)); context.strokePath()
             }
         }
-        context.saveGState(); context.addPath(CGPath(roundedRect: screen, cornerWidth: tablet ? 30 : 4, cornerHeight: tablet ? 30 : 4, transform: nil)); context.clip()
+        context.saveGState(); context.addPath(CGPath(roundedRect: screen, cornerWidth: screenRadius, cornerHeight: screenRadius, transform: nil)); context.clip()
         context.setFillColor(CGColor(gray: 0.04, alpha: 1)); context.fill(screen)
         let image = try input.decode(maxDimension: max(1, Int(ceil(max(screen.width, screen.height) * fit * reduction))))
         let sourceFit = min(screen.width / CGFloat(image.width), screen.height / CGFloat(image.height))

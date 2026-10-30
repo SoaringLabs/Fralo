@@ -390,7 +390,9 @@ public final class ExportAction: NSStackView {
     public let disclosure = ActionButton("", role: .primary, symbol: "chevron.down", label: "更多导出操作")
     public var onExportAll: (() -> Void)?
     public var onExportCurrent: (() -> Void)?
-    public var count = 0 { didSet { primary.title = "导出全部 · \(count) 张"; refresh() } }
+    public var count = 0 { didSet { primary.title = Self.title(count); refresh() } }
+    /// An empty batch has nothing to count; the disabled action keeps only its name.
+    private static func title(_ count: Int) -> String { count > 0 ? "导出全部 · \(count) 张" : "导出全部" }
     public var isEnabled = true { didSet { refresh() } }
     private let divider = NSView()
     public init(count: Int) {
@@ -410,7 +412,7 @@ public final class ExportAction: NSStackView {
         primary.setContentHuggingPriority(.defaultLow, for: .horizontal)
         primary.onPress = { [weak self] in self?.onExportAll?() }
         disclosure.onPress = { [weak self] in self?.showMenu() }
-        self.count = count; primary.title = "导出全部 · \(count) 张"; refresh()
+        self.count = count; primary.title = Self.title(count); refresh()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     private func refresh() {

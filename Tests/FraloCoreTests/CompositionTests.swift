@@ -290,4 +290,31 @@ final class CompositionTests: XCTestCase {
         XCTAssertEqual(try store.load(), s); XCTAssertEqual(try Data(contentsOf: legacy.url), bytes); XCTAssertEqual(try legacy.load(), old)
         s.deviceOpacity = .nan; XCTAssertThrowsError(try store.save(s))
     }
+
+    func testScreenLayoutMatchesWhereEachFrameDrawsTheScreenshot() throws {
+        for display in DisplayKind.allCases {
+            for orientation in [Orientation.portrait, .landscape] where display != .browser || orientation == .portrait {
+                var settings = CompositionSettings(); settings.mode = .transparent; settings.transparentShadow = .none
+                settings.display = display; settings.orientation = orientation
+                let layout = try CompositionRenderer.screenLayout(settings), native = settings.deviceCanvasSize
+                let screen = CGRect(x: layout.rect.minX * native.width, y: layout.rect.minY * native.height,
+                                    width: layout.rect.width * native.width, height: layout.rect.height * native.height)
+                let frame = try CompositionRenderer.render(solidInput(CGSize(width: screen.width.rounded(), height: screen.height.rounded())), settings: settings)
+                XCTAssertEqual(frame.pixelSize, native, "\(display) \(orientation)")
+                let bytes = try pixels(frame.image), width = frame.image.width
+                func isSource(_ x: CGFloat, _ y: CGFloat) -> Bool {
+                    let i = (Int(y) * width + Int(x)) * 4
+                    return abs(Int(bytes[i]) - 77) < 6 && abs(Int(bytes[i + 1]) - 128) < 6 && abs(Int(bytes[i + 2]) - 204) < 6
+                }
+                let name = "\(display) \(orientation)"
+                XCTAssertTrue(isSource(screen.midX, screen.midY), name)
+                for (inside, outside) in [((screen.minX + 3, screen.midY), (screen.minX - 4, screen.midY)), ((screen.maxX - 3, screen.midY), (screen.maxX + 3, screen.midY)),
+                                          ((screen.midX, screen.maxY - 3), (screen.midX, screen.maxY + 3))] {
+                    XCTAssertTrue(isSource(inside.0, inside.1), name)
+                    if outside.0 >= 0, outside.0 < native.width, outside.1 < native.height { XCTAssertFalse(isSource(outside.0, outside.1), name) }
+                }
+                XCTAssertGreaterThan(layout.cornerRadius, 0, name)
+            }
+        }
+    }
 }

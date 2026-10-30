@@ -17,7 +17,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private(set) var settingsController: AppearanceSettingsWindowController?
     private var workbench: WorkbenchView!
     private var batchHadImages: Bool?
-    private var inspectorHiddenForEmptyBatch = false
+    private var sidebarCollapsedForEmptyBatch = false
     private let center = NSViewController()
     private let list = BatchList()
     private let viewing = ViewToolbar()
@@ -28,18 +28,19 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private let filename = FraloStyle.text("", role: .heading), position = FraloStyle.text("", role: .caption, secondary: true)
     private let previewScroll = PreviewScrollView()
     private let canvas = CanvasSurface(frame: .zero)
-    private let empty = NSView()
-    private let emptyIcon = NSImageView()
+    private lazy var emptyStage = EmptyStageView(action: emptyAction)
+    private let appendOverlay = AppendDropOverlay(frame: .zero)
+    private let sidebarPlaceholder = SidebarEmptyPlaceholder(frame: .zero)
+    private let dropRouter = FileDropRouter()
+    private var emptyFrameKey: [String]?
+    private var emptyFrameRequest = 0
     private let history = UndoManager()
     private var continuousSettingsStart: CompositionSettings?
     private var dragSettingsStart: CompositionSettings?
     private var copyFeedback: DispatchWorkItem?
     private let emptyAction = ActionButton("添加图片", role: .primary, symbol: "plus")
-    private let emptyMessage = label("拖入截图，开始套框", size: 22, weight: .semibold)
-    private let emptyDetail = label("PNG / JPEG · 支持批量导入", secondary: true)
     private let footer = CanvasControlsOverlay()
     private var footerTrailing: NSLayoutConstraint?
-    private var emptyTrailing: NSLayoutConstraint?
     private var fitMenu: NSPopUpButton { viewing.zoom }
     private let dimensions = FraloStyle.text("尚无成品", role: .detail, secondary: true)
     private let splitController = NSSplitViewController()
@@ -92,12 +93,20 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
 
     private func buildInterface() {
         center.view = DropContainer()
-        (center.view as? DropContainer)?.onDrop = { [weak self] in self?.importURLs($0) }
+        dropRouter.evaluate = { [weak self] urls in
+            guard let self, !self.isExporting else { return DropSummary(urls: []) }
+            return DropSummary(urls: urls, existing: Set(self.items.map(\.input.id)))
+        }
+        dropRouter.onChange = { [weak self] summary in self?.showDragFeedback(summary) }
+        dropRouter.onDrop = { [weak self] in self?.importURLs($0) }
+        (center.view as? DropContainer)?.router = dropRouter
         let title = FraloStyle.text("图片"); title.font = .systemFont(ofSize: 13, weight: .semibold)
         batchCount.font = .monospacedDigitSystemFont(ofSize: 13, weight: .medium); batchCount.textColor = .labelColor
         addButton.onPress = { [weak self] in self?.addImages(nil) }
         let heading = FraloStyle.stack([title, batchCount, NSView(), addButton], axis: .horizontal, spacing: 6)
         let left = DockedSidebar(header: heading, body: list, footer: NSView())
+        left.installPlaceholder(sidebarPlaceholder); left.dropRouter = dropRouter
+        sidebarPlaceholder.addButton.onPress = { [weak self] in self?.addImages(nil) }
         list.onSelection = { [weak self] _ in self?.selectionChanged() }
         list.onDelete = { [weak self] in self?.removeSelected(nil) }
         let menu = NSMenu(); menu.addItem(actionItem("移除当前图片", #selector(removeSelected(_:))))
@@ -124,6 +133,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         workbench.toolbarBehavior.menus = { [weak self] in self?.header.controlMenus ?? [] }
         window?.acceptsMouseMovedEvents = true
         updatePanelControls()
+        requestPreview()
         updateActions(); window?.recalculateKeyViewLoop()
     }
 
@@ -156,24 +166,14 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             footer.leadingAnchor.constraint(equalTo: center.view.leadingAnchor, constant: 24), footerTrailing!, footer.bottomAnchor.constraint(equalTo: center.view.bottomAnchor), footer.heightAnchor.constraint(equalToConstant: 76),
             viewing.centerXAnchor.constraint(equalTo: footer.centerXAnchor), viewing.centerYAnchor.constraint(equalTo: footer.centerYAnchor), viewing.widthAnchor.constraint(lessThanOrEqualTo: footer.widthAnchor), viewing.heightAnchor.constraint(equalToConstant: ViewToolbar.height)
         ])
-        empty.translatesAutoresizingMaskIntoConstraints = false; center.view.addSubview(empty)
-        let icon = emptyIcon
-        icon.image = NSImage(systemSymbolName: "photo.badge.plus", accessibilityDescription: nil)
-        icon.imageScaling = .scaleProportionallyUpOrDown
-        icon.contentTintColor = .tertiaryLabelColor
-        icon.widthAnchor.constraint(equalToConstant: 52).isActive = true; icon.heightAnchor.constraint(equalToConstant: 52).isActive = true
-        let add = emptyAction; add.onPress = { [weak self] in self?.addImages(nil) }
-        emptyDetail.lineBreakMode = .byWordWrapping; emptyDetail.maximumNumberOfLines = 3
-        emptyDetail.alignment = .center
-        emptyDetail.widthAnchor.constraint(lessThanOrEqualToConstant: 340).isActive = true
-        let emptyContent = stack([icon, emptyMessage, emptyDetail, add, label("或按 ⌘V 粘贴图片", size: 12, secondary: true)], spacing: 16)
-        emptyContent.alignment = .centerX; emptyContent.translatesAutoresizingMaskIntoConstraints = false; empty.addSubview(emptyContent)
-        emptyTrailing = empty.trailingAnchor.constraint(equalTo: center.view.trailingAnchor)
-        NSLayoutConstraint.activate([
-            empty.leadingAnchor.constraint(equalTo: center.view.leadingAnchor, constant: 24), emptyTrailing!, empty.topAnchor.constraint(equalTo: center.view.topAnchor), empty.bottomAnchor.constraint(equalTo: center.view.bottomAnchor),
-            emptyContent.centerXAnchor.constraint(equalTo: empty.centerXAnchor), emptyContent.centerYAnchor.constraint(equalTo: empty.centerYAnchor)
-        ])
-
+        emptyAction.onPress = { [weak self] in self?.addImages(nil) }
+        for view in [emptyStage, appendOverlay] {
+            view.translatesAutoresizingMaskIntoConstraints = false; center.view.addSubview(view)
+            NSLayoutConstraint.activate([
+                view.leadingAnchor.constraint(equalTo: center.view.leadingAnchor), view.trailingAnchor.constraint(equalTo: center.view.trailingAnchor),
+                view.topAnchor.constraint(equalTo: center.view.topAnchor), view.bottomAnchor.constraint(equalTo: center.view.bottomAnchor)
+            ])
+        }
     }
 
     private func buildInspector() -> NSView {
@@ -305,7 +305,9 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         if workbench.collapsed, let focus = window?.firstResponder as? NSView, workbench.left.containsSidebarView(focus) {
             window?.makeFirstResponder(canvas)
         }
-        preferences.set(workbench.collapsed, forKey: "sidebarCollapsed")
+        // Opening the list by any route while it is collapsed for an empty batch is the user's choice.
+        if sidebarCollapsedForEmptyBatch && !workbench.collapsed { sidebarCollapsedForEmptyBatch = false }
+        if !sidebarCollapsedForEmptyBatch { preferences.set(workbench.collapsed, forKey: "sidebarCollapsed") }
         window?.recalculateKeyViewLoop()
     }
 
@@ -342,6 +344,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             preferences.set(false, forKey: "sidebarCollapsed"); window?.makeFirstResponder(list.documentView); return
         }
         let focusWasInList = (window?.firstResponder as? NSView).map { workbench.left.containsSidebarView($0) } ?? false
+        sidebarCollapsedForEmptyBatch = false
         workbench.setCollapsed(!workbench.collapsed, animated: true)
         preferences.set(workbench.collapsed, forKey: "sidebarCollapsed")
         if !workbench.previewing && (!workbench.collapsed || focusWasInList) {
@@ -349,7 +352,6 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         }
     }
     @objc func toggleInspector(_ sender: Any?) {
-        inspectorHiddenForEmptyBatch = false
         if workbench.previewing {
             togglePreview()
             workbench.setInspectorHidden(false, animated: true)
@@ -476,16 +478,13 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         previewToken.cancel(); let token = CancellationToken(); previewToken = token
         inspectorUI.showOutputSize(nil)
         guard let index = selectedIndex else {
-            canvas.image = nil; empty.isHidden = false; emptyMessage.stringValue = "拖入截图，开始套框"
-            configureEmptyState(isError: false)
-            emptyAction.title = "添加图片"; emptyAction.onPress = { [weak self] in self?.addImages(nil) }
-            emptyDetail.stringValue = "PNG / JPEG · 支持批量导入"
+            canvas.image = nil; showEmptyGuidance(); emptyStage.isHidden = false
             previewScroll.isHidden = true; footer.isHidden = true; filename.stringValue = ""; position.stringValue = ""
-            window?.title = "Fralo"; dimensions.stringValue = "尚无成品"; inspectorUI.outputInfo.stringValue = "—"; viewing.finishPreviewUpdate(); updateActions(); return
+            window?.title = "Fralo"; dimensions.stringValue = "尚无成品"; inspectorUI.outputInfo.stringValue = "尺寸随截图确定"; viewing.finishPreviewUpdate(); updateActions(); return
         }
         let input = items[index].input, snapshot = settings, generation = previewRequest
         window?.title = input.name; filename.stringValue = input.name; position.stringValue = "\(index + 1) / \(items.count)"
-        empty.isHidden = true; previewScroll.isHidden = false; footer.isHidden = false
+        emptyStage.isHidden = true; previewScroll.isHidden = false; footer.isHidden = false
         viewing.beginPreviewUpdate(); updateActions()
         let work = DispatchWorkItem { [weak self] in
             guard !token.isCancelled else { return }
@@ -521,14 +520,15 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
                         self.canvas.showsElevation = snapshot.mode == .background
                         self.applyCanvasBacking()
                         self.dimensions.stringValue = "\(snapshot.format == .png ? "PNG" : "JPEG") · \(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height))"
-                        self.empty.isHidden = true; self.layoutPreview()
+                        self.emptyStage.isHidden = true; self.layoutPreview()
                         if byteCount == nil { self.calculateCurrentSize() }
                     case .failure(let error):
                         self.positioningLayers = nil; self.canvas.finishPositioningArtwork(discard: true)
-                        self.canvas.image = nil; self.empty.isHidden = false; self.emptyMessage.stringValue = "无法生成成品"
-                        self.configureEmptyState(isError: true)
-                        self.emptyAction.title = "重试预览"; self.emptyAction.onPress = { [weak self] in self?.scheduleThumbnails(); self?.requestPreview() }
-                        self.emptyDetail.stringValue = error.localizedDescription
+                        self.canvas.image = nil; self.emptyStage.isHidden = false
+                        self.emptyAction.title = "重试预览"; self.emptyAction.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: nil)
+                        self.emptyAction.setAccessibilityLabel("重试预览")
+                        self.emptyAction.onPress = { [weak self] in self?.scheduleThumbnails(); self?.requestPreview() }
+                        self.emptyStage.showError(error.localizedDescription)
                         self.previewScroll.isHidden = true; self.footer.isHidden = true; self.dimensions.stringValue = "无法确定"
                         if let i = self.items.firstIndex(where: { $0.input.id == input.id }) { self.items[i].error = error.localizedDescription; self.refreshList() }
                     }
@@ -563,7 +563,10 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         defer { updateCanvasOverlays() }
         let insets = workbench.viewingInsets
         footerTrailing?.constant = -insets.right
-        emptyTrailing?.constant = -insets.right
+        // The empty frame and append outline share the canvas' viewing margins; no floating bar while empty.
+        emptyStage.viewingInsets = NSEdgeInsets(top: insets.top, left: insets.left, bottom: 24, right: insets.right)
+        appendOverlay.viewingInsets = NSEdgeInsets(top: workbench.headerHeight + 8, left: 14, bottom: 14,
+                                                   right: insets.right - 24 + (workbench.inspectorHidden || workbench.previewing ? 14 : 8))
         // Overlay scrollers start below the header instead of running under the toolbar.
         let scrollerInsets = NSEdgeInsets(top: workbench.headerHeight, left: 0, bottom: 0, right: 0)
         if previewScroll.scrollerInsets.top != scrollerInsets.top { previewScroll.scrollerInsets = scrollerInsets }
@@ -732,23 +735,27 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         }
         alert.beginSheetModal(for: window!) { response in if response == .alertSecondButtonReturn { NSWorkspace.shared.open(directory) } }
     }
-    /// Empty-batch transitions affect presentation, never the user's visibility preference.
-    private func synchronizeInspectorWithBatch() {
+    /// Empty-batch transitions affect presentation, never the user's visibility preference:
+    /// the list collapses while there is nothing to list, and the inspector stays available for presets.
+    private func synchronizePanelsWithBatch() {
         let hasImages = !items.isEmpty
+        sidebarPlaceholder.isHidden = hasImages; list.isHidden = !hasImages
+        batchCount.isHidden = !hasImages
         guard batchHadImages != hasImages else { return }
         batchHadImages = hasImages
         if !hasImages {
-            inspectorHiddenForEmptyBatch = !workbench.inspectorHidden
-            let focusWasInInspector = (window?.firstResponder as? NSView).map { $0.isDescendant(of: workbench.right) } ?? false
-            workbench.setInspectorHidden(true, animated: window?.isVisible == true)
-            if focusWasInInspector { window?.makeFirstResponder(emptyAction) }
-        } else if inspectorHiddenForEmptyBatch {
-            inspectorHiddenForEmptyBatch = false
-            workbench.setInspectorHidden(false, animated: window?.isVisible == true)
+            guard !workbench.collapsed, !workbench.previewing else { return }
+            let focusWasInList = (window?.firstResponder as? NSView).map { workbench.left.containsSidebarView($0) } ?? false
+            sidebarCollapsedForEmptyBatch = true
+            workbench.setCollapsed(true, animated: window?.isVisible == true)
+            if focusWasInList { window?.makeFirstResponder(emptyAction) }
+        } else if sidebarCollapsedForEmptyBatch {
+            sidebarCollapsedForEmptyBatch = false
+            workbench.setCollapsed(false, animated: window?.isVisible == true)
         }
     }
     private func updateActions() {
-        synchronizeInspectorWithBatch()
+        synchronizePanelsWithBatch()
         updateCanvasInteraction()
         inspectorUI?.setEditingEnabled(!isExporting)
         batchCount.stringValue = "\(items.count)"; inspectorUI?.batchCount = items.count
@@ -756,7 +763,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         window?.subtitle = headerSubtitle
         exportAction.count = items.count; exportAction.isEnabled = !isExporting
         updatePanelControls()
-        if items.isEmpty { empty.isHidden = false; footer.isHidden = true; previewScroll.isHidden = true }
+        if items.isEmpty { emptyStage.isHidden = false; footer.isHidden = true; previewScroll.isHidden = true }
         updateCanvasOverlays()
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
@@ -797,14 +804,21 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     }
     /// “1 / 4 · iPhone 18 Pro · 竖屏”: position in the batch, then the device being framed.
     private var headerSubtitle: String {
-        guard let index = selectedIndex else { return items.isEmpty ? "添加图片，开始套框" : "\(items.count) 张图片" }
-        let device: String
-        switch settings.display {
-        case .phone: device = settings.phoneModel.title + " · " + settings.orientation.title
-        case .tablet: device = "iPad · " + settings.orientation.title
-        case .browser: device = (settings.browser == .safari ? "Safari" : "Chrome") + " · " + settings.windowRatio.rawValue
+        guard let index = selectedIndex else {
+            // Empty: what the first import will be framed as, instead of repeating the stage's prompt.
+            guard items.isEmpty else { return "\(items.count) 张图片" }
+            let format = settings.format == .png ? "PNG" : "JPEG"
+            let output = settings.mode == .transparent ? (settings.format == .png ? "透明 PNG" : format) : "背景成图 · " + format
+            return deviceDescription + " · " + output
         }
-        return "\(index + 1) / \(items.count) · " + device
+        return "\(index + 1) / \(items.count) · " + deviceDescription
+    }
+    private var deviceDescription: String {
+        switch settings.display {
+        case .phone: return settings.phoneModel.title + " · " + settings.orientation.title
+        case .tablet: return "iPad · " + settings.orientation.title
+        case .browser: return (settings.browser == .safari ? "Safari" : "Chrome") + " · " + settings.windowRatio.rawValue
+        }
     }
     @objc func toggleTransparencyGrid(_ sender: Any? = nil) {
         transparencyGrid.toggle(); viewing.preview.state = transparencyGrid ? .on : .off
@@ -817,10 +831,56 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         canvas.showsTransparencyGrid = background || transparencyGrid
         canvas.showsStageShadow = !background && !transparencyGrid && settings.shadow == .none
     }
-    private func configureEmptyState(isError: Bool) {
-        emptyIcon.image = NSImage(systemSymbolName: isError ? "exclamationmark.triangle" : "photo.badge.plus", accessibilityDescription: nil)
-        emptyAction.image = NSImage(systemSymbolName: isError ? "arrow.clockwise" : "plus", accessibilityDescription: nil)
-        emptyAction.setAccessibilityLabel(isError ? "重试预览" : "添加图片")
+    private func showEmptyGuidance() {
+        emptyAction.title = "添加图片…"; emptyAction.image = NSImage(systemSymbolName: "plus", accessibilityDescription: nil)
+        emptyAction.setAccessibilityLabel("添加图片"); emptyAction.onPress = { [weak self] in self?.addImages(nil) }
+        emptyStage.showEmpty(title: "拖入截图", detail: "PNG / JPEG · 可多选或拖入文件夹")
+        refreshEmptyFrame()
+    }
+    /// Renders the selected device without a screenshot. Viewing only; cached per frame silhouette.
+    private func refreshEmptyFrame() {
+        let key = Self.framing(settings)
+        guard key != emptyFrameKey else { return }
+        emptyFrameKey = key; emptyFrameRequest += 1
+        let generation = emptyFrameRequest
+        var framing = settings; framing.mode = .transparent; framing.transparentShadow = .none; framing.deviceOpacity = 1
+        renderQueue.async { [weak self, framing] in
+            let result = autoreleasepool { Result { () -> (CGImage, CGRect, CGFloat) in
+                let frame = try CompositionRenderer.render(ImageInput(data: Self.blankScreen, name: "empty.png"), settings: framing, maxDimension: 1600)
+                let layout = try CompositionRenderer.screenLayout(framing)
+                return (frame.image, layout.rect, layout.cornerRadius)
+            } }
+            DispatchQueue.main.async {
+                guard let self, self.emptyFrameRequest == generation else { return }
+                switch result {
+                case .success(let (image, screen, radius)):
+                    self.emptyStage.device = .init(image: NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height)),
+                                                   screen: screen, cornerRadius: radius, display: framing.display, orientation: framing.orientation)
+                case .failure: self.emptyStage.device = nil; self.emptyFrameKey = nil
+                }
+            }
+        }
+    }
+    /// A transparent pixel: the frame keeps its own dark screen fill.
+    private static let blankScreen: Data = {
+        let context = CGContext(data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        return (try? FrameRenderer.pngData(context.makeImage()!)) ?? Data()
+    }()
+    /// Drag feedback: the empty frame lights up or declines; a filled batch is outlined for appending.
+    func showDragFeedback(_ summary: DropSummary?) {
+        let appending = !items.isEmpty
+        guard let summary, !isExporting else {
+            appendOverlay.show(nil, title: "")
+            if items.isEmpty && !emptyStage.isShowingError { showEmptyGuidance() }
+            return
+        }
+        let message = summary.message(appending: appending, device: deviceDescription)
+        if appending {
+            appendOverlay.show(summary, title: summary.canDrop ? message.title : message.title + " · " + message.detail)
+        } else {
+            emptyStage.showDrag(summary.canDrop ? .accepting : .rejecting, title: message.title, detail: message.detail)
+        }
     }
     private func showError(_ message: String, title: String = "无法完成操作") {
         let alert = NSAlert(); alert.alertStyle = .warning; alert.messageText = title; alert.informativeText = message

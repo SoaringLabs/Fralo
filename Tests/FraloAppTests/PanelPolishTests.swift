@@ -24,7 +24,8 @@ final class PanelPolishTests: XCTestCase {
         let inspectorAction = try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "inspector" })
         func toggleInspector() { NSApp.sendAction(try! XCTUnwrap(inspectorAction.action), to: inspectorAction.target, from: inspectorAction) }
         func copyCurrent() { let item = actions[0]; NSApp.sendAction(try! XCTUnwrap(item.action), to: item.target, from: item) }
-        XCTAssertEqual(Array(toolbar.items.prefix(4).map { $0.itemIdentifier }), [.flexibleSpace, .init("sidebar"), .init("sidebarBoundary"), .init("document")])
+        // An empty batch collapses the list for presentation, so the toolbar offers “+”.
+        XCTAssertEqual(Array(toolbar.items.prefix(4).map { $0.itemIdentifier }), [.init("add"), .init("sidebar"), .init("document"), .flexibleSpace])
         XCTAssertEqual(actions.map(\.action), [#selector(MainWindowController.copyCurrent(_:)), #selector(MainWindowController.exportCurrent(_:))])
         XCTAssertTrue(actions.allSatisfy { $0.target === controller && $0.isBordered })
         XCTAssertEqual(actions.map(\.label), ["复制当前图片", "导出当前图片"])
@@ -38,7 +39,7 @@ final class PanelPolishTests: XCTestCase {
             XCTAssertEqual(root.right.bounds.width, WorkbenchView.inspectorWidth, accuracy: 0.1)
             XCTAssertGreaterThan(root.content.bounds.width, 300)
         }
-        XCTAssertEqual(inspectorAction.toolTip, "显示出图设置"); XCTAssertTrue(root.inspectorHidden); XCTAssertFalse(actions[0].isEnabled)
+        XCTAssertEqual(inspectorAction.toolTip, "隐藏出图设置"); XCTAssertFalse(root.inspectorHidden); XCTAssertFalse(actions[0].isEnabled)
         let context = try XCTUnwrap(CGContext(data: nil, width: 300, height: 600, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.setFillColor(CGColor(srgbRed: 0.1, green: 0.6, blue: 0.3, alpha: 1)); context.fill(CGRect(x: 0, y: 0, width: 300, height: 600))
         let input = directory.appendingPathComponent("input.png"); try FrameRenderer.pngData(XCTUnwrap(context.makeImage())).write(to: input)
@@ -123,6 +124,10 @@ final class PanelPolishTests: XCTestCase {
         let window = try XCTUnwrap(controller.window); defer { window.close() }
         let root = try XCTUnwrap(window.contentView as? WorkbenchView)
         let toggle = try XCTUnwrap(window.toolbar?.items.first { $0.itemIdentifier.rawValue == "sidebar" })
+        XCTAssertTrue(root.collapsed, "An empty batch starts with the list collapsed")
+        XCTAssertFalse(defaults.bool(forKey: "sidebarCollapsed"), "Automatic collapse must not overwrite the user's preference")
+        controller.toggleSidebar(nil); try await Task.sleep(nanoseconds: 350_000_000); root.layoutSubtreeIfNeeded()
+        XCTAssertFalse(root.collapsed); XCTAssertFalse(defaults.bool(forKey: "sidebarCollapsed"))
         let boundary = try XCTUnwrap(window.toolbar?.items.first { $0 is NSTrackingSeparatorToolbarItem } as? NSTrackingSeparatorToolbarItem)
         XCTAssertTrue(boundary.splitView === root.splitView)
         XCTAssertEqual(boundary.dividerIndex, 0)
@@ -141,7 +146,6 @@ final class PanelPolishTests: XCTestCase {
             let header = root.left.heading
             XCTAssertGreaterThanOrEqual(header.convert(header.bounds, to: root).minY, root.safeAreaInsets.top)
         }
-        controller.toggleInspector(nil) // Explicitly open settings for this focus-preservation test.
         let inspector = try XCTUnwrap(root.right.body as? CompositionInspector)
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
         let field = inspector.devicePicker

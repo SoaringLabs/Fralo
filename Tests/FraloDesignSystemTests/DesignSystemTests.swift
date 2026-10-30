@@ -324,8 +324,8 @@ final class DesignSystemTests: XCTestCase {
         action.exportCurrent(); action.primary.performClick(nil)
         XCTAssertEqual(current, 1); XCTAssertEqual(all, 1)
         action.count = 0; action.exportCurrent(); action.primary.performClick(nil)
-        XCTAssertEqual(action.primary.accessibilityLabel(), "导出全部 · 0 张")
-        XCTAssertEqual(action.primary.toolTip, "导出全部 · 0 张")
+        XCTAssertEqual(action.primary.accessibilityLabel(), "导出全部")
+        XCTAssertEqual(action.primary.toolTip, "导出全部")
         XCTAssertEqual(current, 1); XCTAssertEqual(all, 1)
         XCTAssertFalse(action.disclosure.isEnabled)
     }
