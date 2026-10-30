@@ -61,7 +61,8 @@ final class SurfaceBoundaryTests: XCTestCase {
         XCTAssertGreaterThan(dark.luma, 0.7, "Light hairline on dark glass")
         var opaque = DesignPreferences(); opaque.reduceTransparency = true
         surface.preferences = opaque
-        XCTAssertGreaterThan(try outline().alpha, dark.alpha, "With no glass rim, the outline carries the edge alone")
+        // An absolute floor: with system Reduce Transparency on, the baseline is already this strong.
+        XCTAssertGreaterThanOrEqual(try outline().alpha, 0.24, "With no glass rim, the outline carries the edge alone")
         var contrast = DesignPreferences(); contrast.increaseContrast = true
         surface.preferences = contrast
         XCTAssertGreaterThan(try outline().alpha, dark.alpha, "Increase Contrast is the strongest edge")

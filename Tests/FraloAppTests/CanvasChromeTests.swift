@@ -16,10 +16,13 @@ final class CanvasChromeTests: XCTestCase {
         let window = KeyWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false; defer { window.close() }
         let host = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 400)); window.contentView = host
-        let behavior = CanvasToolbarBehavior(frame: NSRect(x: 0, y: 340, width: 600, height: 60)); host.addSubview(behavior)
+        let behavior = CanvasToolbarBehavior(frame: NSRect(x: 0, y: 340, width: 600, height: 60))
+        // Observe before attaching: with system Reduce Transparency on (as on CI runners) the
+        // backdrop is already visible from the first refresh, so no later change would be reported.
+        var requests: [Bool] = []; behavior.onVisibilityChange = { requests.append($0) }
+        host.addSubview(behavior)
         XCTAssertTrue(behavior.subviews.isEmpty, "The tracking region must never paint a custom backdrop")
         XCTAssertNil(behavior.layer); XCTAssertNil(behavior.hitTest(NSPoint(x: 300, y: 370)))
-        var requests: [Bool] = []; behavior.onVisibilityChange = { requests.append($0) }
         behavior.updatePointer(locationInWindow: NSPoint(x: 300, y: 370)); behavior.refresh()
         XCTAssertTrue(behavior.isEngaged); XCTAssertEqual(requests.last, true)
         behavior.updatePointer(locationInWindow: NSPoint(x: 300, y: 200)); behavior.refresh()
@@ -55,13 +58,18 @@ final class CanvasChromeTests: XCTestCase {
         window.isReleasedWhenClosed = false; defer { window.close() }
         window.contentView?.addSubview(backdrop)
         backdrop.setShown(true); backdrop.setShown(false)
-        XCTAssertTrue(backdrop.isShown, "Hiding waits so pointer travel between items does not flicker")
-        backdrop.setShown(true)
-        try await Task.sleep(nanoseconds: UInt64((HeaderBackdrop.hideDelay + 0.1) * 1_000_000_000))
-        XCTAssertTrue(backdrop.isShown, "Showing again cancels the pending hide")
-        backdrop.setShown(false)
-        try await Task.sleep(nanoseconds: UInt64((HeaderBackdrop.hideDelay + 0.1) * 1_000_000_000))
-        XCTAssertFalse(backdrop.isShown)
+        if backdrop.preferences.effectiveReduceMotion {
+            // System Reduce Motion (as on CI runners) hides at once by design.
+            XCTAssertFalse(backdrop.isShown); XCTAssertEqual(backdrop.alphaValue, 0)
+        } else {
+            XCTAssertTrue(backdrop.isShown, "Hiding waits so pointer travel between items does not flicker")
+            backdrop.setShown(true)
+            try await Task.sleep(nanoseconds: UInt64((HeaderBackdrop.hideDelay + 0.1) * 1_000_000_000))
+            XCTAssertTrue(backdrop.isShown, "Showing again cancels the pending hide")
+            backdrop.setShown(false)
+            try await Task.sleep(nanoseconds: UInt64((HeaderBackdrop.hideDelay + 0.1) * 1_000_000_000))
+            XCTAssertFalse(backdrop.isShown)
+        }
 
         var reduced = DesignPreferences(); reduced.reduceTransparency = true; reduced.reduceMotion = true
         backdrop.preferences = reduced
