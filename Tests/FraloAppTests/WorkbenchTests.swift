@@ -32,6 +32,10 @@ final class WorkbenchTests: XCTestCase {
             inspector.formatPicker.choose(format)
             for size in [NSSize(width: 1030, height: 640), NSSize(width: 1400, height: 838), NSSize(width: 1586, height: 945)] {
                 window.setContentSize(size); root.layoutSubtreeIfNeeded()
+                let modeAlignment = inspector.mode.alignmentRect(forFrame: inspector.mode.frame)
+                print("[DEBUG-fralo16-alignment] mode frame=\(inspector.mode.frame) alignment=\(modeAlignment) insets=\(inspector.mode.alignmentRectInsets) panel=\(root.right.bounds.width) export=\(export.bounds.width)")
+                XCTAssertEqual(modeAlignment.width, root.right.bounds.width - FraloStyle.Workbench.panelInset * 2, accuracy: 1)
+                XCTAssertEqual(export.bounds.width, modeAlignment.width, accuracy: 1)
                 XCTAssertEqual(inspector.mode.bounds.width, root.right.bounds.width - FraloStyle.Workbench.panelInset * 2, accuracy: 1)
                 XCTAssertEqual(export.bounds.width, inspector.mode.bounds.width, accuracy: 1)
                 XCTAssertGreaterThan(inspector.bounds.height, 80, "Settings must retain a usable scroll viewport even with JPEG options")
