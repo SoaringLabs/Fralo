@@ -224,6 +224,9 @@ public final class ThumbnailRow: NSTableCellView {
         image.image = entry.image ?? NSImage(systemSymbolName: entry.failed ? "exclamationmark.triangle" : "photo", accessibilityDescription: nil)
         image.imageScaling = .scaleProportionallyUpOrDown
         image.contentTintColor = entry.failed ? .systemRed : .secondaryLabelColor
+        // Rows are not drop targets; NSImageView's default image-drag registration would
+        // steal drags meant for the list's container.
+        image.unregisterDraggedTypes()
         image.translatesAutoresizingMaskIntoConstraints = false
         addSubview(image)
         let inset: CGFloat = 7

@@ -16,7 +16,8 @@ final class WorkbenchTests: XCTestCase {
         let window = try XCTUnwrap(controller.window); window.isReleasedWhenClosed = false
         defer { window.close() }
         let root = try XCTUnwrap(window.contentView as? WorkbenchView)
-        controller.toggleInspector(nil) // Exercise inspector controls independently of automatic empty-state collapse.
+        XCTAssertFalse(root.inspectorHidden, "An empty batch keeps the inspector available for presets")
+        controller.toggleSidebar(nil) // Open the list the empty batch collapsed, to exercise the full workbench.
         let inspector = try XCTUnwrap(root.right.body as? CompositionInspector)
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
         let export = try XCTUnwrap(descendants(root.right).compactMap { $0 as? ExportAction }.first)

@@ -60,6 +60,26 @@ final class DockedSidebar: NSView {
         view.isDescendant(of: self) || view.isDescendant(of: headerContainer)
     }
 
+    /// Files dropped anywhere in the sidebar join the batch, as on the stage.
+    var dropRouter: FileDropRouter? {
+        didSet { if dropRouter != nil { registerForDraggedTypes([.fileURL]) } else { unregisterDraggedTypes() } }
+    }
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { dropRouter?.entered(sender) ?? [] }
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { dropRouter?.updated(sender) ?? [] }
+    override func draggingExited(_ sender: NSDraggingInfo?) { dropRouter?.exited() }
+    override func draggingEnded(_ sender: NSDraggingInfo) { dropRouter?.ended() }
+    override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool { dropRouter?.updated(sender) == .copy }
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool { dropRouter?.perform(sender) ?? false }
+
+    /// Shown in place of the rows while the batch is empty, below the fixed heading.
+    func installPlaceholder(_ placeholder: NSView) {
+        placeholder.translatesAutoresizingMaskIntoConstraints = false; addSubview(placeholder)
+        let top = usesNativeHeader ? placeholder.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 4)
+            : placeholder.topAnchor.constraint(equalTo: headerContainer.bottomAnchor, constant: 4)
+        NSLayoutConstraint.activate([top, placeholder.leadingAnchor.constraint(equalTo: leadingAnchor), placeholder.trailingAnchor.constraint(equalTo: trailingAnchor),
+                                     placeholder.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -10)])
+    }
+
     func configureHeader(for item: NSSplitViewItem) {
         if #available(macOS 26.0, *), usesNativeHeader {
             let accessory = NSSplitViewItemAccessoryViewController()
