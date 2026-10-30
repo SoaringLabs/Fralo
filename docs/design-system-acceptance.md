@@ -60,3 +60,17 @@ Run `scripts/run-design-lab.sh`, or use **开发 → 设计实验室…** in a D
 4. In Scenarios, inspect empty/loading/failure states, 100 entries, long names and the export page's PNG/JPEG conditional controls.
 
 Phone examples use the existing core renderer. iPad/browser are labelled layout fixtures. Export actions demonstrate interaction only and write no product files; new production renderers and JPEG export belong to the next task.
+
+## Native capsule segments — FRALO-10 (2026-10-30)
+
+The user selected the native `automatic / tabs / capsule / large` reference and authorized implementation. Production output-mode/device-category switches now use large native capsule tabs; background type, format, compression and shadow use small native capsule value selection. The development lab consumes the same implementation. Apple HIG references and compatibility/toolchain behavior are recorded in [the design system](design-system.md#native-capsule-segments-fralo-10).
+
+Local verification used macOS 27.0.1 / Xcode 27. Debug tests reported 122 executed, one opt-in desktop-performance probe skipped and zero failures. A final targeted run covers native commit/restore/disable behavior, target/action delivery, focus, undo/redo and development consumers after removing the obsolete custom-motion preview settings. Debug preview packaging and Release build passed. Both executable load commands retain a macOS 14.0 minimum; this is deployment metadata, not proof of running on every supported OS.
+
+The real packaged workbench was inspected with a repository fixture at 1200 × 800 and 1030 × 640, in light and dark. The 312 pt inspector keeps all segment labels readable. Its content scrolls to format/compression at minimum size while the export footer stays visible. Empty-state behavior is unchanged: an explicitly opened inspector permits preconfiguration, while export/copy remain disabled.
+
+Actual pointer input verified horizontal mode-drag submission and upward/downward/diagonal drag-out cancellation, followed by one-step undo and redo. After pointer selection, arrows changed device or shadow within the focused control; Tab/Shift-Tab left it. PNG/JPEG changed the corresponding settings and summary. The accessibility tree exposed mode/category choices as tabs and parameter choices as radio buttons. This does not establish full VoiceOver speech coverage.
+
+Local captures are outside the checkout at `/tmp/fralo-10-preview/`: `final-light-1200.png`, `sample-dark-1200.png`, `sample-light-1030.png`, `sample-dark-1030-top.png`, `sample-dark-1030-export.png`, and `empty-light-1200.png`. The kept preview bundle is under this task worktree's `.build/workbench-preview/session-qkocpcvd/`; its executable UUID matches the final Debug build. Its settings file is isolated from the installed product.
+
+Not verified: physical macOS 14–26 behavior, a real Xcode 26 CI run, full VoiceOver traversal/speech, global accessibility-setting changes, or the transient Find My glass-lens effect. The lab was compiled/tested but not manually inspected in this pass. No export was performed during UI verification; renderer/export source was unchanged. No merge or release is included.
