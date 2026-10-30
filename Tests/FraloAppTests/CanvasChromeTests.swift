@@ -55,6 +55,12 @@ final class CanvasChromeTests: XCTestCase {
         if #available(macOS 26.0, *) {
             let glass = try XCTUnwrap(descendants(controls).compactMap { $0 as? NSGlassEffectView }.first)
             XCTAssertNil(glass.tintColor)
+            if #available(macOS 27.0, *) {
+                XCTAssertEqual(glass.effectIsInteractive, !controls.surface.preferences.effectiveReduceMotion && !controls.surface.preferences.effectiveReduceTransparency)
+                var reduced = DesignPreferences(); reduced.reduceMotion = true
+                controls.surface.preferences = reduced
+                XCTAssertFalse(glass.effectIsInteractive)
+            }
         }
         var preferences = DesignPreferences(); preferences.reduceTransparency = true
         controls.surface.preferences = preferences
@@ -88,7 +94,10 @@ final class CanvasChromeTests: XCTestCase {
             let rect = canvas.imageRect
             XCTAssertGreaterThanOrEqual(rect.minY, canvas.viewingInsets.top)
             XCTAssertLessThanOrEqual(rect.maxY, scroll.contentView.bounds.height - canvas.viewingInsets.bottom + 0.1)
-            XCTAssertLessThanOrEqual(rect.maxX, scroll.contentView.bounds.width + 0.1)
+            XCTAssertEqual(root.content.frame, root.content.superview!.bounds, "Floating inspector must not shrink the scrolling viewport")
+            XCTAssertEqual(scroll.frame.width, root.content.bounds.width, accuracy: 0.1)
+            XCTAssertGreaterThanOrEqual(rect.minX, canvas.viewingInsets.left)
+            XCTAssertLessThanOrEqual(rect.maxX, scroll.contentView.bounds.width - canvas.viewingInsets.right + 0.1)
             let fittedZoom = canvas.zoom
             let fittedOrigin = scroll.contentView.bounds.origin
             window.makeFirstResponder(canvas)
@@ -103,7 +112,7 @@ final class CanvasChromeTests: XCTestCase {
                 XCTAssertTrue(root.toolbarBehavior.subviews.isEmpty)
                 XCTAssertEqual(document.frame, documentFrame, "Informational text must not move native toolbar actions")
                 let title = try XCTUnwrap(descendants(document).compactMap { $0 as? NSTextField }.first)
-                XCTAssertEqual(title.isHidden, window.titlebarAppearsTransparent, "Information appears only over the system background")
+                XCTAssertFalse(title.isHidden, "Filename remains visible independently of background interaction")
             }
             controller.actualPixels(nil); root.layoutSubtreeIfNeeded()
             XCTAssertGreaterThanOrEqual(canvas.imageRect.minY, canvas.viewingInsets.top)
@@ -112,6 +121,16 @@ final class CanvasChromeTests: XCTestCase {
         }
         let document = try XCTUnwrap(window.toolbar?.items.first { $0.itemIdentifier.rawValue == "document" }?.view)
         XCTAssertTrue(descendants(document).compactMap { $0 as? MaterialSurface }.isEmpty, "Filename has no custom white backing")
+        for collapsed in [false, true] {
+            root.collapsed = collapsed
+            for hidden in [false, true] {
+                root.inspectorHidden = hidden; root.layoutSubtreeIfNeeded(); controller.fitPreview(nil)
+                XCTAssertEqual(root.content.frame, root.content.superview!.bounds)
+                XCTAssertEqual(root.toolbarBehavior.frame.width, root.content.frame.width, accuracy: 0.1)
+                XCTAssertEqual(canvas.viewingInsets.right, hidden ? 24 : WorkbenchView.inspectorWidth + 34)
+                XCTAssertEqual(canvas.imageRect.midX, canvas.viewingInsets.left + (scroll.contentView.bounds.width - canvas.viewingInsets.left - canvas.viewingInsets.right) / 2, accuracy: 0.1)
+            }
+        }
         controller.newBatch(nil)
         let footer = try XCTUnwrap(descendants(root).compactMap { $0 as? CanvasControlsOverlay }.first)
         XCTAssertTrue(footer.isHidden)

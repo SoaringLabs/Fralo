@@ -13,6 +13,8 @@ public final class MaterialSurface: NSView {
     let panelTint = NSView()
     private var observer: NSObjectProtocol?
     public var preferences = DesignPreferences() { didSet { refresh() } }
+    /// Opt in only for glass containing controls, not large decorative panels.
+    public var isInteractive = false { didSet { refresh() } }
     public var cornerRadius: CGFloat = 0 { didSet { refresh() } }
     public var material: NSVisualEffectView.Material { get { effect.material } set { effect.material = newValue } }
     public var isUsingOpaqueFallback: Bool { !fallbackView.isHidden }
@@ -73,6 +75,9 @@ public final class MaterialSurface: NSView {
         }
         if #available(macOS 26.0, *), let glass = nativeGlass as? NSGlassEffectView {
             glass.cornerRadius = cornerRadius
+            if #available(macOS 27.0, *) {
+                glass.effectIsInteractive = isInteractive && !preferences.effectiveReduceMotion && !preferences.effectiveReduceTransparency
+            }
         }
         panelTint.isHidden = role != .panel
         fallbackView.isHidden = !preferences.effectiveReduceTransparency
@@ -591,6 +596,7 @@ public final class ViewToolbar: NSView {
     public let preview = SymbolButton("checkerboard.rectangle", label: "显示透明区域", toggles: true)
     public init() {
         super.init(frame: .zero)
+        surface.isInteractive = true
         surface.translatesAutoresizingMaskIntoConstraints = false; addSubview(surface)
         zoom.showsSurface = false; composition.showsSurface = false; composition.isHidden = true
         zoom.font = .monospacedDigitSystemFont(ofSize: 13, weight: .regular)

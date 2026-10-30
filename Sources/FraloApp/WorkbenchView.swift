@@ -19,12 +19,17 @@ final class WorkbenchView: NSView {
     let right: FloatingPanel
     let content: NSView
     let toolbarBehavior = CanvasToolbarBehavior(frame: .zero)
-    var onToolbarBackgroundVisibilityChange: ((Bool) -> Void)?
     private var workspaceItem: NSSplitViewItem?
     var headerHeight: CGFloat {
-        // Full-height split items can report a zero safe-area inset. The public window
-        // layout rect still describes the actual unified titlebar/toolbar obstruction.
-        max(region.safeAreaInsets.top, window.map { $0.frame.height - $0.contentLayoutRect.height } ?? 0)
+        // Accessories animate their safe-area contribution. Only the window toolbar
+        // obstruction belongs in our fixed viewing budget; hover must not re-fit art.
+        window.map { $0.frame.height - $0.contentLayoutRect.height } ?? region.safeAreaInsets.top
+    }
+    /// The viewport remains full width. These are document/viewing margins only;
+    /// the inspector floats above the same scrolling canvas as the toolbar.
+    var viewingInsets: NSEdgeInsets {
+        NSEdgeInsets(top: headerHeight + 12, left: 24, bottom: 76,
+                     right: inspectorHidden || previewing ? 24 : Self.inspectorWidth + 10 + 24)
     }
     private let region = WorkspaceRegion()
     private(set) var sidebarItem: NSSplitViewItem!
@@ -70,7 +75,7 @@ final class WorkbenchView: NSView {
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
 
-    func configure(in controller: NSSplitViewController) {
+    func configure(in controller: NSSplitViewController, contentController: NSViewController? = nil) {
         controller.splitView = splitView
         controller.view = self
         let sidebarController = NSViewController(); sidebarController.view = left
@@ -81,6 +86,7 @@ final class WorkbenchView: NSView {
         sidebarItem.canCollapse = true; sidebarItem.canCollapseFromWindowResize = false
         sidebarItem.allowsFullHeightLayout = true; sidebarItem.titlebarSeparatorStyle = .none
         let workspaceController = NSViewController(); workspaceController.view = region
+        if let contentController { workspaceController.addChild(contentController) }
         let main = NSSplitViewItem(viewController: workspaceController)
         main.allowsFullHeightLayout = true
         main.minimumThickness = 740; main.titlebarSeparatorStyle = .none
@@ -157,20 +163,17 @@ final class WorkbenchView: NSView {
         if window.titlebarAppearsTransparent == visible { window.titlebarAppearsTransparent = !visible }
         if window.titlebarSeparatorStyle != style { window.titlebarSeparatorStyle = style }
         if workspaceItem?.titlebarSeparatorStyle != style { workspaceItem?.titlebarSeparatorStyle = style }
-        onToolbarBackgroundVisibilityChange?(visible)
     }
     private func arrangeWorkspace(animated: Bool = false) {
         let area = region.bounds
         // The floating inspector keeps a 10 pt inset from the window edge.
-        let edge: CGFloat = 10, gap: CGFloat = 24, width = Self.inspectorWidth
+        let edge: CGFloat = 10, width = Self.inspectorWidth
         let chrome = headerHeight
         let top: CGFloat = chrome + 8
         let height = max(0, area.height - top - edge)
         let rightRect = NSRect(x: inspectorHidden || previewing ? area.width + edge : area.width - edge - width, y: top, width: width, height: height)
-        let end = inspectorHidden || previewing ? area.width - gap : rightRect.minX - gap
-        let centerRect = NSRect(x: gap, y: 0, width: max(0, end - gap), height: area.height)
         toolbarBehavior.frame = NSRect(x: 0, y: 0, width: area.width, height: chrome)
-        for (view, frame) in [(right as NSView, rightRect), (content, centerRect)] {
+        for (view, frame) in [(right as NSView, rightRect), (content, area)] {
             if animated { view.animator().frame = frame } else { view.frame = frame }
         }
     }

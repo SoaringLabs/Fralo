@@ -4,13 +4,9 @@ import AppKit
 private final class HeaderDocument: NSView {
     let name = NSTextField(labelWithString: "Fralo")
     let count = NSTextField(labelWithString: "")
-    var informationVisible = false {
-        didSet { name.isHidden = !informationVisible; count.isHidden = !informationVisible }
-    }
     override var intrinsicContentSize: NSSize { NSSize(width: 220, height: 34) }
     init() {
         super.init(frame: NSRect(x: 0, y: 0, width: 220, height: 34))
-        name.isHidden = true; count.isHidden = true
         name.font = .systemFont(ofSize: 14, weight: .semibold)
         name.lineBreakMode = .byTruncatingMiddle; name.maximumNumberOfLines = 1
         count.font = .monospacedDigitSystemFont(ofSize: 11.5, weight: .regular); count.textColor = .secondaryLabelColor
@@ -36,10 +32,6 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
     private var sidebarHidden = false
     var controlViews: [NSView] { toolbar.items.compactMap(\.view) }
     var controlMenus: [NSMenu] { [menu] }
-    var documentInformationVisible: Bool {
-        get { document.informationVisible }
-        set { document.informationVisible = newValue }
-    }
 
     init(owner: MainWindowController, splitView: NSSplitView, menu: NSMenu, sidebarHidden: Bool) {
         self.owner = owner; self.splitView = splitView; self.menu = menu
