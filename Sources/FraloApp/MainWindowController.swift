@@ -27,7 +27,6 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private var transparencyGrid = false
     private let filename = FraloStyle.text("", role: .heading), position = FraloStyle.text("", role: .caption, secondary: true)
     private let previewScroll = PreviewScrollView()
-    private var previewViewportObservation: NSObjectProtocol?
     private let canvas = CanvasSurface(frame: .zero)
     private let empty = NSView()
     private let emptyIcon = NSImageView()
@@ -38,7 +37,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private let emptyAction = ActionButton("添加图片", role: .primary, symbol: "plus")
     private let emptyMessage = label("拖入截图，开始套框", size: 22, weight: .semibold)
     private let emptyDetail = label("PNG / JPEG · 支持批量导入", secondary: true)
-    private let footer = CanvasChrome(.floating)
+    private let footer = CanvasControlsOverlay()
     private var fitMenu: NSPopUpButton { viewing.zoom }
     private let dimensions = FraloStyle.text("尚无成品", role: .detail, secondary: true)
     private let splitController = NSSplitViewController()
@@ -88,7 +87,6 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         if let warning = initialWarning { DispatchQueue.main.async { [weak self] in self?.showError(warning) } }
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-    deinit { if let previewViewportObservation { NotificationCenter.default.removeObserver(previewViewportObservation) } }
 
     private func buildInterface() {
         center.view = DropContainer()
@@ -120,10 +118,10 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         buildPreview()
         header = WorkbenchHeader(owner: self, splitView: workbench.splitView, menu: moreMenu(), sidebarHidden: workbench.collapsed)
         window?.toolbar = header.toolbar
-        workbench.headerBackdrop.focusViews = { [weak self] in self?.header.controlViews ?? [] }
-        workbench.headerBackdrop.menus = { [weak self] in self?.header.controlMenus ?? [] }
-        footer.focusViews = { [weak self] in self.map { [$0.viewing] } ?? [] }
-        footer.menus = { [weak self] in self.map { [$0.fitMenu.menu, $0.viewing.composition.menu].compactMap { $0 } } ?? [] }
+        workbench.toolbarBehavior.focusViews = { [weak self] in self?.header.controlViews ?? [] }
+        workbench.toolbarBehavior.menus = { [weak self] in self?.header.controlMenus ?? [] }
+        workbench.onToolbarBackgroundVisibilityChange = { [weak self] visible in self?.header.documentInformationVisible = visible }
+        header.documentInformationVisible = !window!.titlebarAppearsTransparent
         window?.acceptsMouseMovedEvents = true
         updatePanelControls()
         updateActions(); window?.recalculateKeyViewLoop()
@@ -131,15 +129,10 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
 
     private func buildPreview() {
         previewScroll.documentView = canvas; previewScroll.hasVerticalScroller = true; previewScroll.hasHorizontalScroller = true
-        previewScroll.autohidesScrollers = true; previewScroll.scrollerStyle = .overlay; previewScroll.drawsBackground = false
+        previewScroll.autohidesScrollers = true; previewScroll.scrollerStyle = NSScroller.preferredScrollerStyle; previewScroll.drawsBackground = false
         previewScroll.automaticallyAdjustsContentInsets = false; previewScroll.contentInsets = NSEdgeInsetsZero
         previewScroll.translatesAutoresizingMaskIntoConstraints = false
         previewScroll.onResize = { [weak self] in self?.layoutPreview() }
-        previewScroll.contentView.postsBoundsChangedNotifications = true
-        previewViewportObservation = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification,
-            object: previewScroll.contentView, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.updateDocumentBackdrop() }
-            }
         center.view.addSubview(previewScroll)
         footer.translatesAutoresizingMaskIntoConstraints = false; center.view.addSubview(footer)
         fitMenu.removeAllItems(); fitMenu.addItems(withTitles: ["适应窗口", "25%", "50%", "100%", "200%"])
@@ -150,7 +143,6 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         viewing.zoomOut.onPress = { [weak self] in self?.zoomOut(nil) }
         viewing.zoomIn.onPress = { [weak self] in self?.zoomIn(nil) }
         viewing.translatesAutoresizingMaskIntoConstraints = false; footer.addSubview(viewing)
-        footer.controls = viewing
         canvas.onPrevious = { [weak self] in self?.moveSelection(-1) }
         canvas.onNext = { [weak self] in self?.moveSelection(1) }
         canvas.onEscape = { [weak self] in if self?.workbench.previewing == true { self?.togglePreview() } }
@@ -563,21 +555,28 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         guard !layingOutPreview, let rendered else { return }
         layingOutPreview = true; defer { layingOutPreview = false }
         viewing.fitControls(to: center.view.bounds.width)
-        let available = previewScroll.contentView.bounds.size
-        guard available.width > 0, available.height > 0 else { return }
         let pixels = rendered.pixelSize, backing = window?.backingScaleFactor ?? 2
         let reference = rendered.previewReferenceSize
-        // These are document gutters, not opaque bars. Zoomed artwork can scroll underneath
-        // the controls, while Fit and either scroll limit keep every image edge reachable.
+        // Document gutters keep all image edges reachable without painting toolbar bars.
         let top = workbench.headerHeight + 12, bottom: CGFloat = 76
         canvas.viewingInsets = NSEdgeInsets(top: top, left: 0, bottom: bottom, right: 0)
-        let factor = zoom.map { $0 / backing } ?? min(max(10, available.width - 8) / reference.width, max(10, available.height - top - bottom - 32) / reference.height)
-        let size = NSSize(width: pixels.width * factor, height: pixels.height * factor)
-        let document = NSSize(width: max(available.width, size.width + 8), height: max(available.height, size.height + top + bottom + 32))
-        canvas.setFrameSize(document); canvas.zoom = factor
-        if zoom == nil {
-            previewScroll.contentView.scroll(to: .zero)
-            previewScroll.reflectScrolledClipView(previewScroll.contentView)
+        var factor: CGFloat = 0
+        // Legacy scrollers consume viewport space; overlay scrollers do not. Settle native
+        // tiling synchronously before publishing a fit scale or retaining a scroll position.
+        for _ in 0..<4 {
+            previewScroll.tile()
+            let available = previewScroll.contentView.bounds.size
+            guard available.width > 0, available.height > 0 else { return }
+            factor = zoom.map { $0 / backing } ?? min(max(10, available.width - 8) / reference.width, max(10, available.height - top - bottom - 32) / reference.height)
+            let size = NSSize(width: pixels.width * factor, height: pixels.height * factor)
+            let document = NSSize(width: max(available.width, size.width + 8), height: max(available.height, size.height + top + bottom + 32))
+            canvas.setFrameSize(document); canvas.zoom = factor
+            previewScroll.tile()
+            if zoom == nil {
+                previewScroll.contentView.scroll(to: .zero)
+                previewScroll.reflectScrolledClipView(previewScroll.contentView)
+            }
+            if previewScroll.contentView.bounds.size == available { break }
         }
         let percent = viewing.dimensions.stringValue == "已复制" ? "已复制" : "\(Int((factor * backing * 100).rounded()))%"
         viewing.showStatus(percent, detail: "\(Int(pixels.width)) × \(Int(pixels.height)) px")
@@ -589,12 +588,6 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         viewing.showsComposition = false
         viewing.composition.selectItem(at: CanvasRatio.allCases.firstIndex(of: settings.canvas) ?? 1)
         viewing.composition.displayTitle = "\(settings.canvas.rawValue) · \(Int(pixels.width)) × \(Int(pixels.height))"
-        updateDocumentBackdrop()
-    }
-    private func updateDocumentBackdrop() {
-        guard let header else { return }
-        let top = workbench.headerBackdrop
-        header.protectsDocument = !previewScroll.isHidden && canvas.image != nil && canvas.convert(canvas.imageRect, to: top).intersects(top.bounds)
     }
     @objc func fitPreview(_ sender: Any?) { zoom = nil; layoutPreview() }
     @objc func actualPixels(_ sender: Any?) { zoom = 1; layoutPreview() }
@@ -737,7 +730,6 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         exportAction.count = items.count; exportAction.isEnabled = !isExporting
         updatePanelControls()
         if items.isEmpty { empty.isHidden = false; footer.isHidden = true; previewScroll.isHidden = true }
-        updateDocumentBackdrop()
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         let editingText = (window?.firstResponder as? NSTextView)?.isEditable == true

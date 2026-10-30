@@ -21,7 +21,7 @@ final class DevelopmentEntry: NSObject {
         preferences.reduceMotion = CommandLine.arguments.contains("--preview-reduce-motion")
         preferences.increaseContrast = CommandLine.arguments.contains("--preview-increase-contrast")
         func apply(_ view: NSView) {
-            (view as? CanvasChrome)?.preferences = preferences
+            (view as? CanvasToolbarBehavior)?.preferences = preferences
             (view as? MaterialSurface)?.preferences = preferences
             (view as? SymbolButton)?.preferences = preferences
             view.subviews.forEach(apply)

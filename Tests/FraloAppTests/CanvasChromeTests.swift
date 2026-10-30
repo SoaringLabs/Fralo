@@ -1,87 +1,64 @@
 import AppKit
 import XCTest
 import FraloCore
-import FraloDesignSystem
+@testable import FraloDesignSystem
 @testable import FraloApp
 
 final class CanvasChromeTests: XCTestCase {
-    @MainActor private final class KeyWindow: NSWindow { override var isKeyWindow: Bool { true } }
+    @MainActor private final class KeyWindow: NSWindow {
+        var simulatedKey = true
+        override var isKeyWindow: Bool { simulatedKey }
+    }
     @MainActor private func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
 
-    @MainActor func testBackdropNeverInterceptsCanvasButFloatingControlsRemainClickable() throws {
-        _ = NSApplication.shared
-        let host = NSView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
-        let chrome = CanvasChrome(.floating); chrome.frame = NSRect(x: 0, y: 0, width: 800, height: 76)
-        let button = NSButton(title: "Zoom", target: nil, action: nil)
-        button.frame = NSRect(x: 320, y: 20, width: 160, height: 36)
-        chrome.addSubview(button); chrome.controls = button; host.addSubview(chrome)
-        chrome.layoutSubtreeIfNeeded()
-        for engaged in [false, true] {
-            chrome.setEngaged(engaged)
-            XCTAssertNil(chrome.hitTest(NSPoint(x: 100, y: 38)))
-            XCTAssertNil(chrome.hitTest(NSPoint(x: 315, y: 38)), "Decorative halo must not steal drag/scroll input")
-            let hit = try XCTUnwrap(chrome.hitTest(NSPoint(x: 400, y: 38)))
-            XCTAssertTrue(hit === button || hit.isDescendant(of: button))
-        }
-        XCTAssertLessThan(chrome.effect.frame.width, host.bounds.width / 2, "Bottom material stays local to the capsule")
-        XCTAssertEqual(chrome.effect.blendingMode, .withinWindow)
-    }
-
-    @MainActor func testAccessibilityFallbackAndInteractionNeverChangeGeometry() {
-        _ = NSApplication.shared
-        let chrome = CanvasChrome(.top)
-        chrome.frame = NSRect(x: 0, y: 0, width: 600, height: 70)
-        var preferences = DesignPreferences(); preferences.reduceMotion = true
-        chrome.preferences = preferences
-        let original = chrome.frame
-        for engaged in [true, false, true, false] {
-            chrome.setEngaged(engaged, animated: true)
-            XCTAssertEqual(chrome.frame, original)
-            XCTAssertEqual(chrome.effect.alphaValue, engaged || preferences.effectiveReduceTransparency || preferences.effectiveIncreaseContrast ? 1 : 0)
-        }
-        preferences.reduceTransparency = true; chrome.preferences = preferences
-        chrome.setEngaged(false)
-        XCTAssertTrue(chrome.isUsingOpaqueFallback)
-        XCTAssertTrue(chrome.effect.isHidden)
-        preferences.increaseContrast = true; chrome.preferences = preferences
-        XCTAssertEqual(chrome.frame, original)
-    }
-
-    @MainActor func testToolbarHoverUsesEventCoordinatesInsteadOfAnUnrelatedGlobalCursor() {
-        _ = NSApplication.shared
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false; defer { window.close() }
-        let host = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
-        window.contentView = host
-        let chrome = CanvasChrome(.top); chrome.frame = NSRect(x: 0, y: 340, width: 600, height: 60); host.addSubview(chrome)
-        chrome.updatePointer(locationInWindow: chrome.convert(NSPoint(x: 300, y: 30), to: nil))
-        XCTAssertTrue(chrome.isPointerInside)
-        chrome.refresh(animated: false)
-        XCTAssertTrue(chrome.isPointerInside, "A window update must not overwrite an actual pointer event with the global cursor")
-        chrome.updatePointer(locationInWindow: chrome.convert(NSPoint(x: 300, y: -200), to: nil))
-        XCTAssertFalse(chrome.isPointerInside)
-    }
-
-    @MainActor func testFocusAndNestedMenuKeepMaterialUntilBothAreDismissed() throws {
+    @MainActor func testToolbarBehaviorOnlyRequestsNativeVisibilityAndKeepsMenuFocus() throws {
         _ = NSApplication.shared
         let window = KeyWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false; defer { window.close() }
         let host = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 400)); window.contentView = host
-        let chrome = CanvasChrome(.floating); chrome.frame = NSRect(x: 0, y: 0, width: 600, height: 76); host.addSubview(chrome)
-        let button = NSPopUpButton(frame: NSRect(x: 200, y: 20, width: 180, height: 30)); button.addItem(withTitle: "100%")
-        chrome.addSubview(button); chrome.controls = button; chrome.focusViews = { [button] }
-        var preferences = DesignPreferences(); preferences.reduceMotion = true; chrome.preferences = preferences
-        chrome.updatePointer(locationInWindow: NSPoint(x: -1000, y: -1000))
-        XCTAssertTrue(window.makeFirstResponder(button)); chrome.refresh(animated: false)
-        XCTAssertTrue(chrome.isEngaged, "Keyboard focus protects controls without hover")
-        let menu = NSMenu(), submenu = NSMenu()
-        let item = NSMenuItem(title: "Nested", action: nil, keyEquivalent: ""); item.submenu = submenu; menu.addItem(item)
-        chrome.menus = { [menu] }
+        let behavior = CanvasToolbarBehavior(frame: NSRect(x: 0, y: 340, width: 600, height: 60)); host.addSubview(behavior)
+        XCTAssertTrue(behavior.subviews.isEmpty, "The tracking region must never paint a custom backdrop")
+        XCTAssertNil(behavior.layer); XCTAssertNil(behavior.hitTest(NSPoint(x: 300, y: 370)))
+        var requests: [Bool] = []; behavior.onVisibilityChange = { requests.append($0) }
+        behavior.updatePointer(locationInWindow: NSPoint(x: 300, y: 370)); behavior.refresh()
+        XCTAssertTrue(behavior.isEngaged); XCTAssertEqual(requests.last, true)
+        behavior.updatePointer(locationInWindow: NSPoint(x: 300, y: 200)); behavior.refresh()
+        let fallback = behavior.preferences.effectiveReduceTransparency || behavior.preferences.effectiveIncreaseContrast
+        XCTAssertFalse(behavior.isEngaged); XCTAssertEqual(requests.last, fallback)
+        let button = NSPopUpButton(frame: NSRect(x: 200, y: 350, width: 100, height: 30)); button.addItem(withTitle: "Zoom")
+        host.addSubview(button); behavior.focusViews = { [button] }
+        XCTAssertTrue(window.makeFirstResponder(button)); behavior.refresh()
+        XCTAssertTrue(behavior.isEngaged, "Keyboard focus keeps the system background visible")
         window.makeFirstResponder(nil)
+        let menu = NSMenu(), submenu = NSMenu(); let item = NSMenuItem(title: "Nested", action: nil, keyEquivalent: "")
+        item.submenu = submenu; menu.addItem(item); behavior.menus = { [menu] }
         NotificationCenter.default.post(name: NSMenu.didBeginTrackingNotification, object: submenu)
-        XCTAssertTrue(chrome.isEngaged, "A nested menu belongs to its originating tool region")
+        XCTAssertTrue(behavior.isEngaged)
         NotificationCenter.default.post(name: NSMenu.didEndTrackingNotification, object: submenu)
-        XCTAssertFalse(chrome.isEngaged, "Dismissal restores transparency after focus and hover have left")
+        XCTAssertFalse(behavior.isEngaged)
+        behavior.updatePointer(locationInWindow: NSPoint(x: 300, y: 370)); behavior.refresh()
+        window.simulatedKey = false
+        NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: window)
+        XCTAssertFalse(behavior.isEngaged); XCTAssertFalse(behavior.isPointerInside)
+    }
+
+    @MainActor func testFooterKeepsExistingCapsuleAndPassesCanvasInput() throws {
+        _ = NSApplication.shared
+        let overlay = CanvasControlsOverlay(frame: NSRect(x: 0, y: 0, width: 800, height: 76))
+        let controls = ViewToolbar(); controls.frame = NSRect(x: 300, y: 20, width: 200, height: 36)
+        overlay.addSubview(controls); overlay.layoutSubtreeIfNeeded()
+        XCTAssertNil(overlay.hitTest(NSPoint(x: 100, y: 38)))
+        XCTAssertNotNil(overlay.hitTest(NSPoint(x: 400, y: 38)))
+        XCTAssertNil(overlay.layer?.mask, "No hand-made gradient or full-width backdrop")
+        XCTAssertEqual(controls.surface.role, .panel, "Keep the existing legible FRALO-7 capsule")
+        XCTAssertEqual(controls.surface.effect.blendingMode, .withinWindow)
+        if #available(macOS 26.0, *) {
+            let glass = try XCTUnwrap(descendants(controls).compactMap { $0 as? NSGlassEffectView }.first)
+            XCTAssertNil(glass.tintColor)
+        }
+        var preferences = DesignPreferences(); preferences.reduceTransparency = true
+        controls.surface.preferences = preferences
+        XCTAssertTrue(controls.surface.isUsingOpaqueFallback)
     }
 
     @MainActor func testDocumentGuttersKeepFitAndZoomedEdgesReachable() async throws {
@@ -118,9 +95,15 @@ final class CanvasChromeTests: XCTestCase {
             window.selectNextKeyView(nil)
             root.layoutSubtreeIfNeeded()
             XCTAssertEqual(scroll.contentView.bounds.origin, fittedOrigin, "Keyboard focus must not scroll a fitted image")
-            for engaged in [true, false, true] {
-                root.headerBackdrop.setEngaged(engaged)
+            for engaged in [false, true, false] {
+                let document = try XCTUnwrap(window.toolbar?.items.first { $0.itemIdentifier.rawValue == "document" }?.view)
+                let documentFrame = document.frame
+                root.toolbarBehavior.setEngaged(engaged); root.layoutSubtreeIfNeeded()
                 XCTAssertEqual(canvas.zoom, fittedZoom); XCTAssertEqual(canvas.imageRect, rect)
+                XCTAssertTrue(root.toolbarBehavior.subviews.isEmpty)
+                XCTAssertEqual(document.frame, documentFrame, "Informational text must not move native toolbar actions")
+                let title = try XCTUnwrap(descendants(document).compactMap { $0 as? NSTextField }.first)
+                XCTAssertEqual(title.isHidden, window.titlebarAppearsTransparent, "Information appears only over the system background")
             }
             controller.actualPixels(nil); root.layoutSubtreeIfNeeded()
             XCTAssertGreaterThanOrEqual(canvas.imageRect.minY, canvas.viewingInsets.top)
@@ -128,11 +111,10 @@ final class CanvasChromeTests: XCTestCase {
             XCTAssertEqual(scroll.frame.height, root.content.bounds.height, accuracy: 0.1)
         }
         let document = try XCTUnwrap(window.toolbar?.items.first { $0.itemIdentifier.rawValue == "document" }?.view)
-        let localProtection = try XCTUnwrap(descendants(document).compactMap { $0 as? MaterialSurface }.first)
-        scroll.contentView.scroll(to: NSPoint(x: 0, y: canvas.imageRect.minY + 100))
-        XCTAssertFalse(localProtection.isHidden, "Only overlapping artwork needs a local filename backing")
+        XCTAssertTrue(descendants(document).compactMap { $0 as? MaterialSurface }.isEmpty, "Filename has no custom white backing")
         controller.newBatch(nil)
-        XCTAssertTrue(localProtection.isHidden, "Empty state must discard the previous artwork's overlap protection")
+        let footer = try XCTUnwrap(descendants(root).compactMap { $0 as? CanvasControlsOverlay }.first)
+        XCTAssertTrue(footer.isHidden)
     }
 
     @MainActor func testGutterCoordinateTransformPreservesAllDragDirections() throws {
