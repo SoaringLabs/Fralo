@@ -92,9 +92,11 @@ public final class MaterialSurface: NSView {
         }
         if #available(macOS 26.0, *), let glass = nativeGlass as? NSGlassEffectView {
             glass.cornerRadius = cornerRadius
+            #if compiler(>=6.4) // effectIsInteractive ships in the macOS 27 SDK (Xcode 27); CI still builds with Xcode 26.
             if #available(macOS 27.0, *) {
                 glass.effectIsInteractive = isInteractive && !preferences.effectiveReduceMotion && !preferences.effectiveReduceTransparency
             }
+            #endif
         }
         panelTint.isHidden = role != .panel || tint == 0
         fallbackView.isHidden = !preferences.effectiveReduceTransparency

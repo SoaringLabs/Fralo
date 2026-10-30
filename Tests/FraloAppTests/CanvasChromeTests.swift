@@ -95,12 +95,14 @@ final class CanvasChromeTests: XCTestCase {
         if #available(macOS 26.0, *) {
             let glass = try XCTUnwrap(descendants(controls).compactMap { $0 as? NSGlassEffectView }.first)
             XCTAssertNil(glass.tintColor)
+            #if compiler(>=6.4)
             if #available(macOS 27.0, *) {
                 XCTAssertEqual(glass.effectIsInteractive, !controls.surface.preferences.effectiveReduceMotion && !controls.surface.preferences.effectiveReduceTransparency)
                 var reduced = DesignPreferences(); reduced.reduceMotion = true
                 controls.surface.preferences = reduced
                 XCTAssertFalse(glass.effectIsInteractive)
             }
+            #endif
         }
         var preferences = DesignPreferences(); preferences.reduceTransparency = true
         controls.surface.preferences = preferences
