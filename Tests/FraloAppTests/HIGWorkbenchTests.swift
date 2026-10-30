@@ -102,7 +102,7 @@ final class HIGWorkbenchTests: XCTestCase {
         let store = SettingsStore(url: root.appendingPathComponent("settings.json"))
         let controller = MainWindowController(store: store, preferences: defaults, restoreWindow: false)
         let window = try XCTUnwrap(controller.window); defer { window.close() }
-        controller.toggleInspector(nil)
+        XCTAssertFalse(try XCTUnwrap(window.contentView as? WorkbenchView).inspectorHidden, "An empty batch keeps the inspector available")
         let inspector = try XCTUnwrap(descendants(try XCTUnwrap(window.contentView)).compactMap { $0 as? CompositionInspector }.first)
         inspector.devicePicker.choose(1)
         // The inspector has no free-text values; exercise the routing with any native field in the window.
