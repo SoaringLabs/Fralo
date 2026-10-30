@@ -36,5 +36,7 @@ final class DropContainer: NSView {
 @MainActor
 final class PreviewScrollView: NSScrollView {
     var onResize: (() -> Void)?
+    var onScroll: (() -> Void)?
     override func layout() { super.layout(); onResize?() }
+    override func reflectScrolledClipView(_ clipView: NSClipView) { super.reflectScrolledClipView(clipView); onScroll?() }
 }

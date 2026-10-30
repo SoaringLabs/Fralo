@@ -1,7 +1,81 @@
 import AppKit
 import FraloDesignSystem
 
-/// Tracks interaction only. NSWindow and its toolbar draw the entire background;
+/// The workspace header's background. AppKit has no public hover reveal, and toggling
+/// `titlebarAppearsTransparent` swaps instantly, so a native material fades here instead,
+/// like Find My's own titlebar view. The window titlebar itself stays transparent.
+@MainActor
+final class HeaderBackdrop: NSView {
+    static let fadeIn: TimeInterval = 0.2, fadeOut: TimeInterval = 0.25, hideDelay: TimeInterval = 0.3
+    let effect = NSVisualEffectView()
+    private let fallback = NSView()
+    private let hairline = NSView()
+    private var hideWork: DispatchWorkItem?
+    private var observer: NSObjectProtocol?
+    /// The requested state; alpha may still be fading toward it.
+    private(set) var isShown = false
+    var preferences = DesignPreferences() { didSet { refreshMaterial() } }
+    var isUsingOpaqueFallback: Bool { !fallback.isHidden }
+    override var isFlipped: Bool { true }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true; alphaValue = 0
+        effect.material = .titlebar; effect.blendingMode = .withinWindow; effect.state = .followsWindowActiveState
+        fallback.wantsLayer = true; hairline.wantsLayer = true
+        for view in [effect, fallback] { view.frame = bounds; view.autoresizingMask = [.width, .height]; addSubview(view) }
+        // Flipped: a flexible top margin pins the separator to the bottom edge.
+        hairline.frame = NSRect(x: 0, y: bounds.height - 1, width: bounds.width, height: 1)
+        hairline.autoresizingMask = [.width, .minYMargin]; addSubview(hairline)
+        setAccessibilityElement(false)
+        observer = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: nil, queue: .main) { [weak self] _ in MainActor.assumeIsolated { self?.refreshMaterial() } }
+        refreshMaterial()
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+    deinit { if let observer { NSWorkspace.shared.notificationCenter.removeObserver(observer) } }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); refreshMaterial() }
+
+    /// Shows immediately; hides after a short delay so crossing between toolbar items never flickers.
+    func setShown(_ shown: Bool) {
+        if shown {
+            hideWork?.cancel(); hideWork = nil
+            guard !isShown else { return }
+            isShown = true; fade(to: 1, duration: Self.fadeIn)
+        } else {
+            guard isShown, hideWork == nil else { return }
+            guard window != nil, !preferences.effectiveReduceMotion else { isShown = false; fade(to: 0, duration: 0); return }
+            let work = DispatchWorkItem { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.hideWork = nil; self.isShown = false; self.fade(to: 0, duration: Self.fadeOut)
+                }
+            }
+            hideWork = work; DispatchQueue.main.asyncAfter(deadline: .now() + Self.hideDelay, execute: work)
+        }
+    }
+    private func fade(to value: CGFloat, duration: TimeInterval) {
+        let duration = window == nil || preferences.effectiveReduceMotion ? 0 : duration
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            animator().alphaValue = value
+        }
+        // Zero-duration proxies can defer their setter; apply the endpoint now.
+        if duration == 0 { alphaValue = value }
+    }
+    private func refreshMaterial() {
+        let opaque = preferences.effectiveReduceTransparency
+        effect.isHidden = opaque; fallback.isHidden = !opaque
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            fallback.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+            hairline.layer?.backgroundColor = NSColor.separatorColor.cgColor
+        }
+    }
+}
+
+/// Tracks interaction only. `HeaderBackdrop` paints the background;
 /// this view installs no material, tint, gradient, or opacity animation.
 @MainActor
 final class CanvasToolbarBehavior: NSView {

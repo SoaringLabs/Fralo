@@ -129,10 +129,14 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
 
     private func buildPreview() {
         previewScroll.documentView = canvas; previewScroll.hasVerticalScroller = true; previewScroll.hasHorizontalScroller = true
+        // The same thin, trackless knob as the sidebar list, on both axes.
+        previewScroll.verticalScroller = ThinScroller(); previewScroll.horizontalScroller = ThinScroller()
+        previewScroll.verticalScroller?.controlSize = .small; previewScroll.horizontalScroller?.controlSize = .small
         previewScroll.autohidesScrollers = true; previewScroll.scrollerStyle = NSScroller.preferredScrollerStyle; previewScroll.drawsBackground = false
         previewScroll.automaticallyAdjustsContentInsets = false; previewScroll.contentInsets = NSEdgeInsetsZero
         previewScroll.translatesAutoresizingMaskIntoConstraints = false
         previewScroll.onResize = { [weak self] in self?.layoutPreview() }
+        previewScroll.onScroll = { [weak self] in self?.updateHeaderOverlap() }
         center.view.addSubview(previewScroll)
         footer.translatesAutoresizingMaskIntoConstraints = false; center.view.addSubview(footer)
         fitMenu.removeAllItems(); fitMenu.addItems(withTitles: ["适应窗口", "25%", "50%", "100%", "200%"])
@@ -556,9 +560,13 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private func layoutPreview() {
         guard !layingOutPreview else { return }
         layingOutPreview = true; defer { layingOutPreview = false }
+        defer { updateHeaderOverlap() }
         let insets = workbench.viewingInsets
         footerTrailing?.constant = -insets.right
         emptyTrailing?.constant = -insets.right
+        // Overlay scrollers start below the header instead of running under the toolbar.
+        let scrollerInsets = NSEdgeInsets(top: workbench.headerHeight, left: 0, bottom: 0, right: 0)
+        if previewScroll.scrollerInsets.top != scrollerInsets.top { previewScroll.scrollerInsets = scrollerInsets }
         viewing.fitControls(to: max(0, center.view.bounds.width - insets.left - insets.right))
         guard let rendered else { return }
         let pixels = rendered.pixelSize, backing = window?.backingScaleFactor ?? 2
@@ -594,6 +602,13 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         viewing.showsComposition = false
         viewing.composition.selectItem(at: CanvasRatio.allCases.firstIndex(of: settings.canvas) ?? 1)
         viewing.composition.displayTitle = "\(settings.canvas.rawValue) · \(Int(pixels.width)) × \(Int(pixels.height))"
+    }
+    /// The header backdrop also appears whenever artwork actually sits beneath it.
+    private func updateHeaderOverlap() {
+        guard let workbench else { return }
+        let rect = canvas.image == nil || previewScroll.isHidden ? NSRect.zero : canvas.imageRect
+        let band = workbench.headerBackdrop
+        workbench.contentUnderHeader = !rect.isEmpty && band.convert(rect, from: canvas).intersects(band.bounds)
     }
     @objc func fitPreview(_ sender: Any?) { zoom = nil; layoutPreview() }
     @objc func actualPixels(_ sender: Any?) { zoom = 1; layoutPreview() }
@@ -736,6 +751,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         exportAction.count = items.count; exportAction.isEnabled = !isExporting
         updatePanelControls()
         if items.isEmpty { empty.isHidden = false; footer.isHidden = true; previewScroll.isHidden = true }
+        updateHeaderOverlap()
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         let editingText = (window?.firstResponder as? NSTextView)?.isEditable == true

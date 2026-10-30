@@ -22,6 +22,8 @@ final class DevelopmentEntry: NSObject {
         preferences.increaseContrast = CommandLine.arguments.contains("--preview-increase-contrast")
         func apply(_ view: NSView) {
             (view as? CanvasToolbarBehavior)?.preferences = preferences
+            (view as? HeaderBackdrop)?.preferences = preferences
+            (view as? ThinScroller)?.preferences = preferences
             (view as? MaterialSurface)?.preferences = preferences
             (view as? SymbolButton)?.preferences = preferences
             view.subviews.forEach(apply)

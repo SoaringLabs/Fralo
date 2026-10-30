@@ -19,7 +19,10 @@ final class WorkbenchView: NSView {
     let right: FloatingPanel
     let content: NSView
     let toolbarBehavior = CanvasToolbarBehavior(frame: .zero)
-    private var workspaceItem: NSSplitViewItem?
+    let headerBackdrop = HeaderBackdrop(frame: .zero)
+    /// Artwork currently extends under the header; keeps the backdrop up without hover.
+    var contentUnderHeader = false { didSet { if oldValue != contentUnderHeader { updateHeaderBackdrop() } } }
+    private var headerEngaged = false
     var headerHeight: CGFloat {
         // Accessories animate their safe-area contribution. Only the window toolbar
         // obstruction belongs in our fixed viewing budget; hover must not re-fit art.
@@ -29,7 +32,7 @@ final class WorkbenchView: NSView {
     /// the inspector floats above the same scrolling canvas as the toolbar.
     var viewingInsets: NSEdgeInsets {
         NSEdgeInsets(top: headerHeight + 12, left: 24, bottom: 76,
-                     right: inspectorHidden || previewing ? 24 : Self.inspectorWidth + 10 + 24)
+                     right: inspectorHidden || previewing ? 24 : Self.inspectorWidth + Self.inspectorInset + 24)
     }
     private let region = WorkspaceRegion()
     private(set) var sidebarItem: NSSplitViewItem!
@@ -49,6 +52,8 @@ final class WorkbenchView: NSView {
     private var transition = 0
     override var isFlipped: Bool { true }
     static let inspectorWidth: CGFloat = 312
+    /// Clears the six-point overlay knob at the window's trailing edge, with room to spare.
+    static let inspectorInset: CGFloat = 16
 
     init(left: DockedSidebar, right: FloatingPanel, content: NSView) {
         self.left = left; self.right = right; self.content = content
@@ -64,8 +69,8 @@ final class WorkbenchView: NSView {
                                          view.topAnchor.constraint(equalTo: topAnchor), view.bottomAnchor.constraint(equalTo: bottomAnchor)])
         }
         stage.autoresizingMask = [.width, .height]; stage.frame = region.bounds
-        for view in [stage, content, toolbarBehavior, right] { region.addSubview(view) }
-        toolbarBehavior.onVisibilityChange = { [weak self] visible in self?.setToolbarBackgroundVisible(visible) }
+        for view in [stage, content, headerBackdrop, toolbarBehavior, right] { region.addSubview(view) }
+        toolbarBehavior.onVisibilityChange = { [weak self] visible in self?.headerEngaged = visible; self?.updateHeaderBackdrop() }
         region.onLayout = { [weak self] in
             guard let self else { return }
             if !self.animatingInspector { self.arrangeWorkspace() }
@@ -90,7 +95,6 @@ final class WorkbenchView: NSView {
         let main = NSSplitViewItem(viewController: workspaceController)
         main.allowsFullHeightLayout = true
         main.minimumThickness = 740; main.titlebarSeparatorStyle = .none
-        workspaceItem = main
         controller.addSplitViewItem(sidebarItem); controller.addSplitViewItem(main)
         left.configureHeader(for: sidebarItem)
         sidebarObservation = sidebarItem.observe(\.isCollapsed, options: [.new]) { [weak self] item, _ in
@@ -155,24 +159,19 @@ final class WorkbenchView: NSView {
         right.isHidden = inspectorHidden || previewing
         needsLayout = true; onPanelVisibilityChange?()
     }
-    private func setToolbarBackgroundVisible(_ visible: Bool) {
-        guard let window else { return }
-        let style: NSTitlebarSeparatorStyle = visible ? .automatic : .none
-        // Switching public system traits leaves all rendering to AppKit. Avoid repeated
-        // writes during window updates so hover never becomes a layout/render loop.
-        if window.titlebarAppearsTransparent == visible { window.titlebarAppearsTransparent = !visible }
-        if window.titlebarSeparatorStyle != style { window.titlebarSeparatorStyle = style }
-        if workspaceItem?.titlebarSeparatorStyle != style { workspaceItem?.titlebarSeparatorStyle = style }
+    private func updateHeaderBackdrop() {
+        headerBackdrop.setShown(headerEngaged || contentUnderHeader)
     }
     private func arrangeWorkspace(animated: Bool = false) {
         let area = region.bounds
-        // The floating inspector keeps a 10 pt inset from the window edge.
-        let edge: CGFloat = 10, width = Self.inspectorWidth
+        // The floating inspector stays clear of the full-height scroller at the window edge.
+        let edge = Self.inspectorInset, width = Self.inspectorWidth
         let chrome = headerHeight
         let top: CGFloat = chrome + 8
         let height = max(0, area.height - top - edge)
         let rightRect = NSRect(x: inspectorHidden || previewing ? area.width + edge : area.width - edge - width, y: top, width: width, height: height)
         toolbarBehavior.frame = NSRect(x: 0, y: 0, width: area.width, height: chrome)
+        headerBackdrop.frame = toolbarBehavior.frame
         for (view, frame) in [(right as NSView, rightRect), (content, area)] {
             if animated { view.animator().frame = frame } else { view.frame = frame }
         }

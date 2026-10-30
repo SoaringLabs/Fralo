@@ -42,6 +42,46 @@ final class CanvasChromeTests: XCTestCase {
         XCTAssertFalse(behavior.isEngaged); XCTAssertFalse(behavior.isPointerInside)
     }
 
+    @MainActor func testHeaderBackdropFadesNativeMaterialWithDelayedHide() async throws {
+        _ = NSApplication.shared
+        let backdrop = HeaderBackdrop(frame: NSRect(x: 0, y: 0, width: 600, height: 52))
+        XCTAssertNil(backdrop.hitTest(NSPoint(x: 300, y: 20)), "The backdrop never takes toolbar or canvas input")
+        XCTAssertEqual(backdrop.effect.material, .titlebar); XCTAssertEqual(backdrop.effect.blendingMode, .withinWindow)
+        XCTAssertEqual(backdrop.alphaValue, 0)
+        backdrop.setShown(true); XCTAssertEqual(backdrop.alphaValue, 1)
+        backdrop.setShown(false); XCTAssertEqual(backdrop.alphaValue, 0, "Offscreen changes apply immediately")
+
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; defer { window.close() }
+        window.contentView?.addSubview(backdrop)
+        backdrop.setShown(true); backdrop.setShown(false)
+        XCTAssertTrue(backdrop.isShown, "Hiding waits so pointer travel between items does not flicker")
+        backdrop.setShown(true)
+        try await Task.sleep(nanoseconds: UInt64((HeaderBackdrop.hideDelay + 0.1) * 1_000_000_000))
+        XCTAssertTrue(backdrop.isShown, "Showing again cancels the pending hide")
+        backdrop.setShown(false)
+        try await Task.sleep(nanoseconds: UInt64((HeaderBackdrop.hideDelay + 0.1) * 1_000_000_000))
+        XCTAssertFalse(backdrop.isShown)
+
+        var reduced = DesignPreferences(); reduced.reduceTransparency = true; reduced.reduceMotion = true
+        backdrop.preferences = reduced
+        XCTAssertTrue(backdrop.isUsingOpaqueFallback)
+        backdrop.setShown(true); XCTAssertEqual(backdrop.alphaValue, 1, "Reduce Motion switches without fading")
+        backdrop.setShown(false); XCTAssertEqual(backdrop.alphaValue, 0)
+    }
+
+    @MainActor func testThinScrollerDrawsAlongEitherAxisWithAFullDragTarget() throws {
+        _ = NSApplication.shared
+        let horizontal = ThinScroller(frame: NSRect(x: 0, y: 0, width: 240, height: 17))
+        horizontal.knobProportion = 0.3; horizontal.doubleValue = 0.5; horizontal.isEnabled = true
+        let knob = horizontal.rect(for: .knob)
+        XCTAssertFalse(knob.isEmpty)
+        XCTAssertEqual(knob.minY, horizontal.bounds.minY); XCTAssertEqual(knob.height, horizontal.bounds.height)
+        let vertical = ThinScroller(frame: NSRect(x: 0, y: 0, width: 17, height: 240))
+        vertical.knobProportion = 0.3; vertical.doubleValue = 0.5; vertical.isEnabled = true
+        XCTAssertEqual(vertical.rect(for: .knob).width, vertical.bounds.width)
+    }
+
     @MainActor func testFooterKeepsExistingCapsuleAndPassesCanvasInput() throws {
         _ = NSApplication.shared
         let overlay = CanvasControlsOverlay(frame: NSRect(x: 0, y: 0, width: 800, height: 76))
@@ -91,6 +131,9 @@ final class CanvasChromeTests: XCTestCase {
             XCTAssertFalse(scroll.automaticallyAdjustsContentInsets)
             XCTAssertEqual(scroll.contentInsets.top, 0)
             XCTAssertEqual(scroll.contentInsets.bottom, 0)
+            XCTAssertTrue(scroll.verticalScroller is ThinScroller); XCTAssertTrue(scroll.horizontalScroller is ThinScroller)
+            XCTAssertEqual(scroll.scrollerInsets.top, root.headerHeight, accuracy: 0.1, "Scrollers start below the header")
+            XCTAssertFalse(root.contentUnderHeader, "Fitted artwork stays clear of the header")
             let rect = canvas.imageRect
             XCTAssertGreaterThanOrEqual(rect.minY, canvas.viewingInsets.top)
             XCTAssertLessThanOrEqual(rect.maxY, scroll.contentView.bounds.height - canvas.viewingInsets.bottom + 0.1)
@@ -108,6 +151,8 @@ final class CanvasChromeTests: XCTestCase {
                 let document = try XCTUnwrap(window.toolbar?.items.first { $0.itemIdentifier.rawValue == "document" }?.view)
                 let documentFrame = document.frame
                 root.toolbarBehavior.setEngaged(engaged); root.layoutSubtreeIfNeeded()
+                if engaged { XCTAssertTrue(root.headerBackdrop.isShown) }
+                XCTAssertTrue(window.titlebarAppearsTransparent, "Hover fades our backdrop; the system titlebar never swaps")
                 XCTAssertEqual(canvas.zoom, fittedZoom); XCTAssertEqual(canvas.imageRect, rect)
                 XCTAssertTrue(root.toolbarBehavior.subviews.isEmpty)
                 XCTAssertEqual(document.frame, documentFrame, "Informational text must not move native toolbar actions")
@@ -115,6 +160,13 @@ final class CanvasChromeTests: XCTestCase {
                 XCTAssertFalse(title.isHidden, "Filename remains visible independently of background interaction")
             }
             controller.actualPixels(nil); root.layoutSubtreeIfNeeded()
+            scroll.contentView.scroll(to: .zero); scroll.reflectScrolledClipView(scroll.contentView)
+            XCTAssertFalse(root.contentUnderHeader)
+            scroll.contentView.scroll(to: NSPoint(x: 0, y: 300)); scroll.reflectScrolledClipView(scroll.contentView)
+            XCTAssertTrue(root.contentUnderHeader, "Artwork scrolled beneath the header raises the backdrop")
+            XCTAssertTrue(root.headerBackdrop.isShown)
+            scroll.contentView.scroll(to: .zero); scroll.reflectScrolledClipView(scroll.contentView)
+            XCTAssertFalse(root.contentUnderHeader)
             XCTAssertGreaterThanOrEqual(canvas.imageRect.minY, canvas.viewingInsets.top)
             XCTAssertGreaterThanOrEqual(canvas.bounds.height - canvas.imageRect.maxY, canvas.viewingInsets.bottom)
             XCTAssertEqual(scroll.frame.height, root.content.bounds.height, accuracy: 0.1)
@@ -127,7 +179,8 @@ final class CanvasChromeTests: XCTestCase {
                 root.inspectorHidden = hidden; root.layoutSubtreeIfNeeded(); controller.fitPreview(nil)
                 XCTAssertEqual(root.content.frame, root.content.superview!.bounds)
                 XCTAssertEqual(root.toolbarBehavior.frame.width, root.content.frame.width, accuracy: 0.1)
-                XCTAssertEqual(canvas.viewingInsets.right, hidden ? 24 : WorkbenchView.inspectorWidth + 34)
+                XCTAssertEqual(canvas.viewingInsets.right, hidden ? 24 : WorkbenchView.inspectorWidth + WorkbenchView.inspectorInset + 24)
+                if !hidden { XCTAssertEqual(root.right.frame.maxX, root.content.bounds.width - WorkbenchView.inspectorInset, accuracy: 0.1) }
                 XCTAssertEqual(canvas.imageRect.midX, canvas.viewingInsets.left + (scroll.contentView.bounds.width - canvas.viewingInsets.left - canvas.viewingInsets.right) / 2, accuracy: 0.1)
             }
         }
