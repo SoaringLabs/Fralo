@@ -317,7 +317,8 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     func selectAppearance(_ value: String, persist: Bool = true) {
         guard let choice = AppAppearance(rawValue: value) else { return }
         appearanceChoice = choice
-        window?.appearance = choice.appearance
+        // App-wide, so About, Settings, alerts and update windows follow the workbench.
+        NSApp.appearance = choice.appearance
         settingsController?.set(choice)
         if persist { preferences.set(value, forKey: "workbenchAppearance") }
     }

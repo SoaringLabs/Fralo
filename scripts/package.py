@@ -143,6 +143,8 @@ def main():
                 "format": "UDZO", "filesystem": "HFS+",
                 "files": [str(app)],
                 "symlinks": {"Applications": "/Applications"},
+                # Mounted volume shows the app icon instead of a generic disk.
+                "icon": str(app / "Contents/Resources/Fralo.icns"),
                 # Keep the signed bundle's FinderInfo untouched; Finder hides .app normally.
                 "background": str(background),
                 "default_view": "icon-view",

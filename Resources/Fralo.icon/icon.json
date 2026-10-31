@@ -9,7 +9,15 @@
   "groups": [
     {
       "name": "Cyan glass",
-      "blend-mode": "darken",
+      "blend-mode-specializations": [
+        {
+          "value": "darken"
+        },
+        {
+          "appearance": "tinted",
+          "value": "normal"
+        }
+      ],
       "specular-highlight-placement": "inside",
       "layers": [
         {
@@ -33,7 +41,15 @@
     },
     {
       "name": "Magenta glass",
-      "blend-mode": "darken",
+      "blend-mode-specializations": [
+        {
+          "value": "darken"
+        },
+        {
+          "appearance": "tinted",
+          "value": "normal"
+        }
+      ],
       "specular-highlight-placement": "inside",
       "layers": [
         {
@@ -57,7 +73,15 @@
     },
     {
       "name": "Amber glass",
-      "blend-mode": "darken",
+      "blend-mode-specializations": [
+        {
+          "value": "darken"
+        },
+        {
+          "appearance": "tinted",
+          "value": "normal"
+        }
+      ],
       "specular-highlight-placement": "inside",
       "layers": [
         {

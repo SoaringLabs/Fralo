@@ -7,6 +7,7 @@ import FraloDesignSystem
 final class AppearanceTests: XCTestCase {
     @MainActor func testSettingsSynchronizePersistAndReopenWithoutChangingArtwork() async throws {
         _ = NSApplication.shared
+        defer { NSApp.appearance = nil }
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -36,8 +37,16 @@ final class AppearanceTests: XCTestCase {
             settings.choices.choose(index)
             XCTAssertEqual(controller.appearanceChoice, value)
             XCTAssertEqual(settings.selection, value)
-            XCTAssertEqual(controller.window?.appearance?.name, name)
-            XCTAssertEqual(settings.window?.appearance?.name, name)
+            XCTAssertEqual(NSApp.appearance?.name, name)
+            if let name {
+                // Stands in for About, alert and update windows that Fralo does not own.
+                let standalone = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 80, height: 60), styleMask: [.titled], backing: .buffered, defer: false)
+                standalone.isReleasedWhenClosed = false
+                defer { standalone.close() }
+                for window in [controller.window, settings.window, standalone] {
+                    XCTAssertEqual(window?.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]), name)
+                }
+            }
             XCTAssertEqual(defaults.string(forKey: "workbenchAppearance"), value.rawValue)
             let menu = controller.appearanceMenu()
             XCTAssertEqual(menu.items.filter { $0.state == .on }.count, 1)
@@ -55,11 +64,12 @@ final class AppearanceTests: XCTestCase {
         let restarted = MainWindowController(store: store, preferences: defaults, restoreWindow: false)
         defer { restarted.window?.close() }
         XCTAssertEqual(restarted.appearanceChoice, .light)
-        XCTAssertEqual(restarted.window?.appearance?.name, .aqua)
+        XCTAssertEqual(NSApp.appearance?.name, .aqua)
     }
 
     @MainActor func testPreviewOverrideDoesNotPersistAndInvalidAppearanceIsIgnored() async throws {
         _ = NSApplication.shared
+        defer { NSApp.appearance = nil }
         let suite = "fralo-appearance-override-\(UUID())"; let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set("dark", forKey: "workbenchAppearance")

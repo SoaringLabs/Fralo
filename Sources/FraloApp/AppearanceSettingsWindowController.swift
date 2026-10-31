@@ -25,7 +25,7 @@ final class AppearanceSettingsWindowController: NSWindowController {
         let heading = FraloStyle.stack([FraloStyle.text("外观", role: .title),
             FraloStyle.paragraph("选择浅色、深色，或随系统自动切换。")], spacing: 6)
         let title = FraloStyle.stack([icon, heading], axis: .horizontal, spacing: 14)
-        let note = FraloStyle.paragraph("更改会自动保存，并即时应用到 Fralo 的工作窗口。")
+        let note = FraloStyle.paragraph("更改会自动保存，并即时应用到 Fralo 的所有窗口。")
         let column = FraloStyle.stack([title, choices, note], spacing: 22, fillWidth: true)
         column.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(column)
         NSLayoutConstraint.activate([column.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 28),
@@ -38,7 +38,6 @@ final class AppearanceSettingsWindowController: NSWindowController {
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     func set(_ value: AppAppearance) {
         selection = value; choices.selectedIndex = AppAppearance.allCases.firstIndex(of: value)
-        window?.appearance = value.appearance
     }
     func present() {
         showWindow(nil); window?.makeKeyAndOrderFront(nil)
