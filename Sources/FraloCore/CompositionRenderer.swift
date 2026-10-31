@@ -7,7 +7,7 @@ import UniformTypeIdentifiers
 public struct RenderedComposition {
     public let image: CGImage
     public let pixelSize: CGSize
-    /// A stable fit-to-window envelope, independent of the selected shadow's export padding.
+    /// Viewing-only fit envelope; independent of shadow choice and normalized across phone models.
     public let previewReferenceSize: CGSize
     public var previewLayers: CompositionPreviewLayers?
     init(image: CGImage, pixelSize: CGSize, previewReferenceSize: CGSize? = nil) {
@@ -125,7 +125,17 @@ public enum CompositionRenderer {
         draw(device, in: rect, context: context); context.restoreGState()
         guard let image = context.makeImage() else { throw FraloError.message("无法合成成品。") }
         let maximumMargin = ceil(strongestShadowBlur * 3 + shadowOffsetY)
-        let reference = settings.mode == .background ? size : CGSize(width: nativeSize.width + maximumMargin * 2, height: nativeSize.height + maximumMargin * 2)
+        var reference = settings.mode == .background ? size : CGSize(width: nativeSize.width + maximumMargin * 2, height: nativeSize.height + maximumMargin * 2)
+        if settings.mode == .transparent, settings.display == .phone {
+            // Fit every phone against the same normalized envelope. Fixed pixel margins make
+            // smaller phones look smaller even in Fit. Anchor to the smallest native frame so
+            // the strongest shadow still fits for every model, in either orientation.
+            let frames = CompositionSettings.phoneModels.map { FrameGeometry(model: $0).orientedSize(settings.orientation) }
+            let anchor = frames.min { max($0.width, $0.height) < max($1.width, $1.height) } ?? nativeSize
+            let scale = max(nativeSize.width, nativeSize.height) / max(anchor.width, anchor.height)
+            reference = CGSize(width: (anchor.width + maximumMargin * 2) * scale,
+                               height: (anchor.height + maximumMargin * 2) * scale)
+        }
         var result = RenderedComposition(image: image, pixelSize: size, previewReferenceSize: reference)
         if preparePreviewLayers, let background = previewBackground {
             // Rasterize the shadow at composition scale once, rather than on every pointer event.

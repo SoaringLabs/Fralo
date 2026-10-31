@@ -81,10 +81,18 @@ final class CompositionTests: XCTestCase {
                     for (shadow, margin): (ShadowStyle, CGFloat) in [(.none, 0), (.soft, 84), (.strong, 138)] {
                         settings.transparentShadow = shadow
                         var silhouette: [UInt8]?
+                        var referenceSize: CGSize?
                         for source in sources {
                             let result = try CompositionRenderer.render(source, settings: settings, maxDimension: 240)
                             XCTAssertEqual(result.pixelSize, CGSize(width: base.width + margin * 2, height: base.height + margin * 2))
-                            XCTAssertEqual(result.previewReferenceSize, CGSize(width: base.width + 276, height: base.height + 276))
+                            if display == .phone {
+                                XCTAssertGreaterThanOrEqual(result.previewReferenceSize.width, result.pixelSize.width)
+                                XCTAssertGreaterThanOrEqual(result.previewReferenceSize.height, result.pixelSize.height)
+                            } else {
+                                XCTAssertEqual(result.previewReferenceSize, CGSize(width: base.width + 276, height: base.height + 276))
+                            }
+                            if let referenceSize { XCTAssertEqual(result.previewReferenceSize, referenceSize, "Source dimensions must not affect fitting") }
+                            referenceSize = result.previewReferenceSize
                             XCTAssertLessThanOrEqual(max(result.image.width, result.image.height), 240)
                             let bytes = try pixels(result.image)
                             let alpha = stride(from: 3, to: bytes.count, by: 4).map { bytes[$0] }
@@ -92,6 +100,32 @@ final class CompositionTests: XCTestCase {
                             silhouette = alpha
                         }
                     }
+                }
+            }
+        }
+    }
+    func testPhoneFitEnvelopeNormalizesModelsAndContainsEveryShadow() throws {
+        let source = try input()
+        for orientation in Orientation.allCases {
+            var normalized: CGSize?
+            for model in CompositionSettings.phoneModels {
+                var previous: CGSize?
+                for shadow in ShadowStyle.allCases {
+                    var settings = CompositionSettings()
+                    settings.phoneModel = model; settings.orientation = orientation; settings.transparentShadow = shadow
+                    let result = try CompositionRenderer.render(source, settings: settings, maxDimension: 160)
+                    let native = settings.deviceCanvasSize
+                    let length = max(native.width, native.height)
+                    let envelope = CGSize(width: result.previewReferenceSize.width / length, height: result.previewReferenceSize.height / length)
+                    if let normalized {
+                        XCTAssertEqual(envelope.width, normalized.width, accuracy: 0.000001)
+                        XCTAssertEqual(envelope.height, normalized.height, accuracy: 0.000001)
+                    }
+                    normalized = envelope
+                    XCTAssertGreaterThanOrEqual(result.previewReferenceSize.width, result.pixelSize.width)
+                    XCTAssertGreaterThanOrEqual(result.previewReferenceSize.height, result.pixelSize.height)
+                    if let previous { XCTAssertEqual(result.previewReferenceSize, previous, "Changing shadow must not change fit") }
+                    previous = result.previewReferenceSize
                 }
             }
         }
