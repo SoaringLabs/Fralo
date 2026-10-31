@@ -179,11 +179,10 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         }
         operationFeedback.translatesAutoresizingMaskIntoConstraints = false; center.view.addSubview(operationFeedback)
         feedbackTop = operationFeedback.topAnchor.constraint(equalTo: center.view.topAnchor)
-        let preferredWidth = operationFeedback.widthAnchor.constraint(equalToConstant: 304)
-        preferredWidth.priority = .defaultHigh
+        // The capsule hugs its message; long failure details truncate rather than widen past the stage.
         NSLayoutConstraint.activate([
-            feedbackTop!, preferredWidth,
-            operationFeedback.widthAnchor.constraint(lessThanOrEqualTo: footer.widthAnchor),
+            feedbackTop!, operationFeedback.widthAnchor.constraint(lessThanOrEqualToConstant: 420),
+            operationFeedback.widthAnchor.constraint(lessThanOrEqualTo: footer.widthAnchor, constant: -24),
             operationFeedback.centerXAnchor.constraint(equalTo: footer.centerXAnchor)
         ])
     }
@@ -575,7 +574,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         defer { updateCanvasOverlays() }
         let insets = workbench.viewingInsets
         footerTrailing?.constant = -insets.right
-        feedbackTop?.constant = workbench.headerHeight + 16
+        feedbackTop?.constant = workbench.headerHeight + 12
         // The empty frame and append outline share the canvas' viewing margins; no floating bar while empty.
         emptyStage.viewingInsets = NSEdgeInsets(top: insets.top, left: insets.left, bottom: 24, right: insets.right)
         appendOverlay.viewingInsets = NSEdgeInsets(top: workbench.headerHeight + 8, left: 14, bottom: 14,
@@ -655,10 +654,10 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         do {
             let data = settings.format == .png ? try CompositionRenderer.data(rendered.image, settings: settings) : try FrameRenderer.pngData(rendered.image)
             guard imageClipboard.writePNG(data) else {
-                operationFeedback.show(.failure, title: "复制失败", detail: "无法写入剪贴板，请重试复制。")
+                operationFeedback.show(.failure, title: "复制失败", detail: "无法写入剪贴板，请重试")
                 return
             }
-            operationFeedback.show(.success, title: "已复制当前图片", detail: "可粘贴到其他应用")
+            operationFeedback.show(.success, title: "已复制到剪贴板")
         } catch {
             operationFeedback.show(.failure, title: "复制失败", detail: error.localizedDescription)
         }

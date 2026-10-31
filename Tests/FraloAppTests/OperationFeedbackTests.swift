@@ -14,42 +14,36 @@ final class OperationFeedbackTests: XCTestCase {
         XCTAssertNil(feedback.kind)
     }
 
-    @MainActor func testFeedbackEntersGraduallyInVisibleWindow() throws {
+    @MainActor func testFeedbackSpringsInAndReversesExitWithoutHiding() throws {
         _ = NSApplication.shared
         guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { throw XCTSkip("System Reduce Motion is active") }
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 200), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
-        let feedback = OperationFeedback(); feedback.frame = NSRect(x: 40, y: 40, width: 304, height: 70)
+        let feedback = OperationFeedback(); feedback.frame = NSRect(x: 40, y: 40, width: 220, height: OperationFeedback.height)
         window.contentView?.addSubview(feedback); window.orderFront(nil)
         defer { feedback.dismiss(); window.close() }
-        feedback.show(.success, title: "已复制当前图片", detail: "可粘贴到其他应用")
+        feedback.show(.success, title: "已复制到剪贴板")
         XCTAssertFalse(feedback.isHidden)
-        XCTAssertLessThan(feedback.surface.alphaValue, 1, "Visible feedback must ease in instead of appearing instantly")
-        let entrance = try XCTUnwrap(feedback.animation)
-        entrance.currentProgress = 0.5
-        XCTAssertGreaterThan(feedback.surface.alphaValue, 0)
-        XCTAssertLessThan(feedback.surface.alphaValue, 1)
-        XCTAssertGreaterThan(feedback.verticalOffset, 0)
+        XCTAssertEqual(feedback.phase, .entering)
+        let layer = try XCTUnwrap(feedback.layer)
+        XCTAssertTrue(layer.animation(forKey: "feedback.transform") is CASpringAnimation, "Visible feedback must spring in")
+        XCTAssertEqual((layer.animation(forKey: "feedback.opacity") as? CABasicAnimation)?.fromValue as? Float, 0)
+        XCTAssertTrue(feedback.close.isHidden, "Passing success needs no close control")
         feedback.dismiss(animated: true)
-        let exit = try XCTUnwrap(feedback.animation)
-        exit.currentProgress = 0.5
-        let presentedOpacity = feedback.surface.alphaValue
-        feedback.show(.success, title: "再次复制", detail: "")
-        XCTAssertEqual(feedback.surface.alphaValue, presentedOpacity, accuracy: 0.001, "Reversing exit must keep the presented opacity")
-        exit.currentProgress = 1
-        XCTAssertFalse(feedback.isHidden, "A stale exit cannot hide a newer message")
-        feedback.animation?.currentProgress = 1
-        XCTAssertEqual(feedback.surface.alphaValue, 1)
-        XCTAssertEqual(feedback.verticalOffset, 0)
-        XCTAssertNil(feedback.animation)
+        XCTAssertEqual(feedback.phase, .exiting)
+        XCTAssertFalse(feedback.isHidden, "Exit hides only once its animation completes")
+        feedback.show(.success, title: "再次复制")
+        XCTAssertEqual(feedback.phase, .entering, "A new message reverses the exit")
+        XCTAssertFalse(feedback.isHidden)
+        XCTAssertEqual(CATransform3DIsIdentity(layer.transform), true)
         feedback.surface.preferences.reduceMotion = true
         feedback.dismiss(animated: true)
+        XCTAssertNil(layer.animation(forKey: "feedback.transform"), "Reduce Motion keeps only the crossfade")
+        XCTAssertNotNil(layer.animation(forKey: "feedback.opacity"))
+        feedback.dismiss()
         XCTAssertTrue(feedback.isHidden)
-        XCTAssertNil(feedback.animation)
-        feedback.show(.success, title: "减少动态效果", detail: "")
-        XCTAssertEqual(feedback.surface.alphaValue, 1)
-        XCTAssertEqual(feedback.verticalOffset, 0)
-        XCTAssertNil(feedback.animation)
+        XCTAssertEqual(feedback.phase, .hidden)
+        XCTAssertNil(feedback.kind)
     }
 
     @MainActor private final class RejectingClipboard: ImageClipboard {
@@ -70,7 +64,7 @@ final class OperationFeedbackTests: XCTestCase {
             controller.copyCurrent(nil)
             XCTAssertEqual(feedback.kind, .success)
             XCTAssertFalse(feedback.isHidden)
-            XCTAssertEqual(feedback.title.stringValue, "已复制当前图片")
+            XCTAssertEqual(feedback.title.stringValue, "已复制到剪贴板")
             XCTAssertEqual(toolbar.dimensions.stringValue, readout)
             XCTAssertTrue(window.firstResponder === focus)
             XCTAssertNotNil(board.data(forType: .png))
@@ -129,14 +123,16 @@ final class OperationFeedbackTests: XCTestCase {
                     var preferences = DesignPreferences()
                     preferences.reduceMotion = true; preferences.reduceTransparency = true; preferences.increaseContrast = true
                     feedback.surface.preferences = preferences
-                    feedback.show(.failure, title: "复制失败", detail: "无法写入剪贴板，请重试复制。")
+                    feedback.show(.failure, title: "复制失败", detail: "无法写入剪贴板，请重试")
                     window.contentView?.layoutSubtreeIfNeeded()
                     XCTAssertTrue(feedback.surface.isUsingOpaqueFallback)
-                    XCTAssertGreaterThan(feedback.bounds.height, 40)
+                    XCTAssertEqual(feedback.bounds.height, OperationFeedback.height)
                     XCTAssertGreaterThanOrEqual(feedback.title.bounds.width, feedback.title.intrinsicContentSize.width)
-                    XCTAssertGreaterThan(feedback.detail.bounds.width, 140)
+                    XCTAssertGreaterThanOrEqual(feedback.detail.bounds.width, feedback.detail.intrinsicContentSize.width - 1)
+                    XCTAssertFalse(feedback.close.isHidden, "A failure stays until dismissed")
                     let close = feedback.close.convert(feedback.close.bounds, to: feedback)
-                    XCTAssertEqual(feedback.bounds.maxX - close.maxX, 10, accuracy: 1)
+                    XCTAssertEqual(feedback.bounds.maxX - close.maxX, 6, accuracy: 1)
+                    XCTAssertLessThanOrEqual(feedback.bounds.width, 420)
                     XCTAssertGreaterThanOrEqual(feedback.frame.minY, root.headerHeight)
                     XCTAssertTrue(feedback.superview!.bounds.contains(feedback.frame))
                     let panel = root.right.convert(root.right.bounds, to: feedback.superview)
