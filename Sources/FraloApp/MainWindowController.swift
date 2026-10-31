@@ -51,12 +51,12 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private var rendered: RenderedComposition?
     private var renderedID: String?
     private(set) var previewRequest = 0
-    private var thumbnailRequest = 0
+    private let thumbnails = ThumbnailPipeline()
+    private var itemIndices: [String: Int] = [:]
     private var positioningLayers: CompositionPreviewLayers?
     private var renderWork: DispatchWorkItem?
     private var previewToken = CancellationToken()
     private let renderQueue = DispatchQueue(label: "app.fralo.preview", qos: .userInitiated)
-    private let thumbnailQueue = DispatchQueue(label: "app.fralo.thumbnails", qos: .utility)
     private let sizeQueue = DispatchQueue(label: "app.fralo.output-size", qos: .utility)
     private var zoom: CGFloat? = nil
     private var backgroundImageSize: CGSize?
@@ -270,7 +270,9 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private func registerSettingsUndo(_ snapshot: CompositionSettings, name: String) {
         remember(name) { target in
             target.registerSettingsUndo(target.settings, name: name)
+            let framingChanged = Self.framing(target.settings) != Self.framing(snapshot)
             target.settings = snapshot; target.inspectorUI.restore(snapshot)
+            if framingChanged { target.scheduleThumbnails() }
             do { try target.store.save(snapshot) } catch { target.showError(error.localizedDescription, title: "无法保存设置") }
             target.requestPreview()
         }
@@ -412,6 +414,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private func moveSelection(_ delta: Int) { list.moveSelection(by: delta) }
     private func selectionChanged() { updateActions(); requestPreview() }
     private func refreshList() {
+        itemIndices = Dictionary(uniqueKeysWithValues: items.enumerated().map { ($0.element.input.id, $0.offset) })
         list.update(items.map { BatchEntry(id: $0.input.id, title: $0.input.name, detail: $0.pixelSize.map { "\(Int($0.width)) × \(Int($0.height))" } ?? "",
                                            image: $0.thumbnail, failed: $0.error != nil) })
     }
@@ -466,42 +469,37 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         rememberBatch("删除图片")
         items.remove(at: selectedIndex); refreshList()
         if !items.isEmpty { list.select(min(selectedIndex, items.count - 1)) }
-        updateActions(); requestPreview()
+        updateActions(); scheduleThumbnails(); requestPreview()
         if items.isEmpty { window?.makeFirstResponder(emptyAction) }
     }
     @objc func newBatch(_ sender: Any?) {
         guard !isExporting else { return }
         if !items.isEmpty { rememberBatch("清空所有") }
-        items.removeAll(); previewRequest += 1; thumbnailRequest += 1; rendered = nil; renderedID = nil
+        items.removeAll(); previewRequest += 1; thumbnails.cancel(); rendered = nil; renderedID = nil
         refreshList(); updateActions(); requestPreview()
         window?.makeFirstResponder(emptyAction)
     }
 
     /// Settings that change the framed thumbnail silhouette.
     private static func framing(_ s: CompositionSettings) -> [String] {
-        [s.display.rawValue, s.phoneModel.rawValue, s.orientation.rawValue, s.browser.rawValue, s.windowRatio.rawValue]
+        [ThumbnailPipeline.styleKey(s)]
     }
     private func scheduleThumbnails() {
-        thumbnailRequest += 1
-        let generation = thumbnailRequest, inputs = items.map(\.input)
-        // Thumbnails show the framed result, without shadow, so the list previews what will be exported.
-        var framing = settings; framing.mode = .transparent; framing.transparentShadow = .none; framing.deviceOpacity = 1
-        for input in inputs {
-            thumbnailQueue.async { [weak self, framing] in
-                let result: Result<(CGImage, CGSize), Error> = autoreleasepool { Result {
-                    (try CompositionRenderer.render(input, settings: framing, maxDimension: 180).image, try input.dimensions())
-                } }
-                DispatchQueue.main.async {
-                    guard let self, self.thumbnailRequest == generation, let index = self.items.firstIndex(where: { $0.input.id == input.id }) else { return }
-                    switch result {
-                    case .success(let (image, size)):
-                        self.items[index].thumbnail = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
-                        self.items[index].pixelSize = size; self.items[index].error = nil
-                    case .failure(let error): self.items[index].error = error.localizedDescription
-                    }
-                    self.refreshList()
-                }
+        var inputs = items.map(\.input)
+        if let selectedIndex, selectedIndex > 0 { inputs.insert(inputs.remove(at: selectedIndex), at: 0) }
+        thumbnails.request(inputs, settings: settings) { [weak self] id, result in
+            guard let self, let index = self.itemIndices[id] else { return }
+            switch result {
+            case .success(let value):
+                self.items[index].thumbnail = NSImage(cgImage: value.image, size: NSSize(width: value.image.width, height: value.image.height))
+                self.items[index].pixelSize = value.pixelSize; self.items[index].error = nil
+            case .failure(let error):
+                self.items[index].thumbnail = nil; self.items[index].error = error.localizedDescription
             }
+            let item = self.items[index]
+            self.list.updateEntry(BatchEntry(id: id, title: item.input.name,
+                detail: item.pixelSize.map { "\(Int($0.width)) × \(Int($0.height))" } ?? "",
+                image: item.thumbnail, failed: item.error != nil), at: index)
         }
     }
     private func requestPreview(preservePositioning: Bool = false) {
