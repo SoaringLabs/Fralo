@@ -107,8 +107,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item(edit, "粘贴图片", #selector(MainWindowController.pasteImage(_:)), "v")
         edit.addItem(withTitle: "全选", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         edit.addItem(.separator())
-        item(edit, "移除当前图片", #selector(MainWindowController.removeSelected(_:)), "\u{8}", modifiers: [])
-        item(edit, "清空批次", #selector(MainWindowController.newBatch(_:)))
+        item(edit, "删除", #selector(MainWindowController.removeSelected(_:)), "\u{8}", modifiers: [])
+        item(edit, "清空所有", #selector(MainWindowController.newBatch(_:)))
 
         let view = NSMenu(title: "显示"); let viewItem = NSMenuItem(title: "显示", action: nil, keyEquivalent: ""); viewItem.submenu = view; bar.addItem(viewItem)
         item(view, "显示/隐藏侧边栏", #selector(MainWindowController.toggleSidebar(_:)), "s", modifiers: [.command, .control])

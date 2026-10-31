@@ -24,6 +24,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private let viewing = ViewToolbar()
     private let exportAction = ExportAction(count: 0)
     private let batchCount = FraloStyle.text("0", role: .body)
+    private let sidebarGuidance = FraloStyle.text("↑ ↓ 切换图片", role: .caption, secondary: true)
     private let addButton = SymbolButton("plus", label: "添加图片")
     private var transparencyGrid = false
     private let filename = FraloStyle.text("", role: .heading), position = FraloStyle.text("", role: .caption, secondary: true)
@@ -107,7 +108,19 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         batchCount.font = .monospacedDigitSystemFont(ofSize: 13, weight: .medium); batchCount.textColor = .labelColor
         addButton.onPress = { [weak self] in self?.addImages(nil) }
         let heading = FraloStyle.stack([title, batchCount, NSView(), addButton], axis: .horizontal, spacing: 6)
-        let left = DockedSidebar(header: heading, body: list, footer: NSView())
+        sidebarGuidance.alignment = .center
+        sidebarGuidance.textColor = NSColor(name: nil) { appearance in
+            var color = NSColor.secondaryLabelColor
+            appearance.performAsCurrentDrawingAppearance {
+                color = NSColor.secondaryLabelColor.blended(withFraction: 0.12, of: .labelColor) ?? .secondaryLabelColor
+            }
+            return color
+        }
+        sidebarGuidance.identifier = .init("batch-keyboard-guidance")
+        sidebarGuidance.setAccessibilityLabel("使用向上和向下方向键切换图片")
+        let guidanceFooter = FraloStyle.stack([sidebarGuidance], spacing: 0, fillWidth: true)
+        guidanceFooter.detachesHiddenViews = true
+        let left = DockedSidebar(header: heading, body: list, footer: guidanceFooter)
         left.installPlaceholder(sidebarPlaceholder); left.dropRouter = dropRouter
         sidebarPlaceholder.addButton.onPress = { [weak self] in self?.addImages(nil) }
         list.onSelection = { [weak self] _ in self?.selectionChanged() }
@@ -308,8 +321,8 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     /// Shared by the more menu, the list's context menu and the batch button so their wording, icons and shortcuts agree.
     private func batchItemsMenu() -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(actionItem("移除当前图片", #selector(removeSelected(_:)), symbol: "minus.circle", key: "\u{8}", modifiers: []))
-        menu.addItem(actionItem("清空批次", #selector(newBatch(_:)), symbol: "xmark.bin"))
+        menu.addItem(actionItem("删除", #selector(removeSelected(_:)), symbol: "trash", key: "\u{8}", modifiers: []))
+        menu.addItem(actionItem("清空所有", #selector(newBatch(_:)), symbol: "xmark.bin"))
         return menu
     }
     private func updatePanelControls() {
@@ -450,7 +463,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     }
     @objc func removeSelected(_ sender: Any?) {
         guard !isExporting, let selectedIndex else { return }
-        rememberBatch("移除图片")
+        rememberBatch("删除图片")
         items.remove(at: selectedIndex); refreshList()
         if !items.isEmpty { list.select(min(selectedIndex, items.count - 1)) }
         updateActions(); requestPreview()
@@ -458,7 +471,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     }
     @objc func newBatch(_ sender: Any?) {
         guard !isExporting else { return }
-        if !items.isEmpty { rememberBatch("清空批次") }
+        if !items.isEmpty { rememberBatch("清空所有") }
         items.removeAll(); previewRequest += 1; thumbnailRequest += 1; rendered = nil; renderedID = nil
         refreshList(); updateActions(); requestPreview()
         window?.makeFirstResponder(emptyAction)
@@ -781,6 +794,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         inspectorUI?.setEditingEnabled(!isExporting)
         batchCount.stringValue = "\(items.count)"; inspectorUI?.batchCount = items.count
         addButton.isEnabled = !isExporting
+        workbench.left.showsFooter = items.count >= 2 && !isExporting
         window?.subtitle = headerSubtitle
         exportAction.count = items.count; exportAction.isEnabled = !isExporting
         updatePanelControls()
