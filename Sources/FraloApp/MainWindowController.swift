@@ -112,8 +112,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         sidebarPlaceholder.addButton.onPress = { [weak self] in self?.addImages(nil) }
         list.onSelection = { [weak self] _ in self?.selectionChanged() }
         list.onDelete = { [weak self] in self?.removeSelected(nil) }
-        let menu = NSMenu(); menu.addItem(actionItem("移除当前图片", #selector(removeSelected(_:))))
-        menu.addItem(actionItem("清空批次", #selector(newBatch(_:)))); list.documentView?.menu = menu
+        list.documentView?.menu = batchItemsMenu()
         exportAction.onExportAll = { [weak self] in self?.exportAll(nil) }
         exportAction.onExportCurrent = { [weak self] in self?.exportCurrent(nil) }
         let inspectorBody = buildInspector()
@@ -297,14 +296,20 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
 
     private func moreMenu() -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(actionItem("添加图片…", #selector(addImages(_:))))
-        menu.addItem(actionItem("导入文件夹…", #selector(addFolder(_:))))
-        menu.addItem(actionItem("粘贴图片", #selector(pasteImage(_:))))
+        menu.addItem(actionItem("添加图片…", #selector(addImages(_:)), symbol: "photo.badge.plus", key: "o"))
+        menu.addItem(actionItem("导入文件夹…", #selector(addFolder(_:)), symbol: "folder.badge.plus", key: "o", modifiers: [.command, .shift]))
+        menu.addItem(actionItem("粘贴图片", #selector(pasteImage(_:)), symbol: "doc.on.clipboard", key: "v"))
         menu.addItem(.separator())
-        menu.addItem(actionItem("移除当前图片", #selector(removeSelected(_:))))
-        menu.addItem(actionItem("清空批次", #selector(newBatch(_:))))
+        batchItemsMenu().items.forEach { $0.menu?.removeItem($0); menu.addItem($0) }
         menu.addItem(.separator())
-        menu.addItem(actionItem("应用设置…", #selector(showSettings(_:))))
+        menu.addItem(actionItem("设置…", #selector(showSettings(_:)), symbol: "gearshape", key: ","))
+        return menu
+    }
+    /// Shared by the more menu, the list's context menu and the batch button so their wording, icons and shortcuts agree.
+    private func batchItemsMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.addItem(actionItem("移除当前图片", #selector(removeSelected(_:)), symbol: "minus.circle", key: "\u{8}", modifiers: []))
+        menu.addItem(actionItem("清空批次", #selector(newBatch(_:)), symbol: "xmark.bin"))
         return menu
     }
     private func updatePanelControls() {
@@ -322,8 +327,15 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         window?.recalculateKeyViewLoop()
     }
 
-    private func actionItem(_ title: String, _ action: Selector) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; return item
+    /// Key equivalents mirror the main menu so pop-up menus teach the shortcut; the main menu still handles the keystroke.
+    private func actionItem(_ title: String, _ action: Selector, symbol: String? = nil, key: String = "",
+                            modifiers: NSEvent.ModifierFlags = .command) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        item.keyEquivalentModifierMask = modifiers; item.target = self
+        item.image = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
+        // macOS 27 hides menu images by default; these icons are part of the confirmed FRALO-15 design.
+        if #available(macOS 27.0, *), item.image != nil { item.preferredImageVisibility = .visible }
+        return item
     }
     func selectAppearance(_ value: String, persist: Bool = true) {
         guard let choice = AppAppearance(rawValue: value) else { return }
@@ -388,8 +400,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
                                            image: $0.thumbnail, failed: $0.error != nil) })
     }
     @objc private func batchMenu(_ sender: NSButton) {
-        let menu = NSMenu(); menu.addItem(actionItem("移除当前图片", #selector(removeSelected(_:))))
-        menu.addItem(actionItem("清空批次", #selector(newBatch(_:))))
+        let menu = batchItemsMenu()
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 2), in: sender)
     }
     @objc func addImages(_ sender: Any?) {
