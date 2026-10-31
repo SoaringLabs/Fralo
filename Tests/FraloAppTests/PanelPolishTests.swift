@@ -35,7 +35,7 @@ final class PanelPolishTests: XCTestCase {
         XCTAssertEqual(Array(toolbar.items.suffix(6).map(\.itemIdentifier)), [.init("copyCurrent"), .init("exportCurrent"), .space, .init("inspector"), .space, .init("more")])
         XCTAssertEqual(more.menu.items.filter { !$0.isSeparatorItem }.map(\.title), ["添加图片…", "导入文件夹…", "粘贴图片", "移除当前图片", "清空批次", "设置…"])
         XCTAssertTrue(more.menu.items.filter { !$0.isSeparatorItem }.allSatisfy { $0.image?.isTemplate == true })
-        if #available(macOS 27.0, *) { XCTAssertTrue(more.menu.items.filter { !$0.isSeparatorItem }.allSatisfy { $0.preferredImageVisibility == .visible }) }
+        if #available(macOS 27.0, *) { XCTAssertTrue(more.menu.items.filter { !$0.isSeparatorItem }.allSatisfy { $0.value(forKey: "preferredImageVisibility") as? Int == 1 }) }
         XCTAssertEqual(more.menu.items.filter { !$0.isSeparatorItem }.map(\.keyEquivalent), ["o", "o", "v", "\u{8}", "", ","])
         for size in [NSSize(width: 1030, height: 640), NSSize(width: 1400, height: 1000), NSSize(width: 1900, height: 1000)] {
             window.setContentSize(size); root.layoutSubtreeIfNeeded()

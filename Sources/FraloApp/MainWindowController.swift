@@ -334,7 +334,10 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         item.keyEquivalentModifierMask = modifiers; item.target = self
         item.image = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
         // macOS 27 hides menu images by default; these icons are part of the confirmed FRALO-15 design.
-        if #available(macOS 27.0, *), item.image != nil { item.preferredImageVisibility = .visible }
+        // Set by key so SDKs older than macOS 27 still build; 1 is NSMenuItemImageVisibilityVisible.
+        if item.image != nil, item.responds(to: Selector(("setPreferredImageVisibility:"))) {
+            item.setValue(1, forKey: "preferredImageVisibility")
+        }
         return item
     }
     func selectAppearance(_ value: String, persist: Bool = true) {
