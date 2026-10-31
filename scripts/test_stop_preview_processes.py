@@ -1,8 +1,9 @@
-"""Process cleanup must stay inside its exact workspace and preview kind."""
+"""Process cleanup must match known repository worktrees and the exact preview kind."""
 from pathlib import Path
 import importlib.util
 import signal
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location(
     "preview_processes", Path(__file__).with_name("stop-preview-processes.py"))
@@ -11,6 +12,25 @@ spec.loader.exec_module(preview)
 
 
 class PreviewProcessTests(unittest.TestCase):
+    def test_launcher_collects_old_previews_across_repository_worktrees(self):
+        root = Path('/workspace/Fralo')
+        old = Path('/worktrees/previous/Fralo')
+        suffix = '.build/workbench-preview/session-123/Fralo Workbench Preview.app/Contents/MacOS/FraloApp'
+        paths = {1: str(root / suffix), 2: str(old / suffix),
+                 3: '/Applications/Fralo.app/Contents/MacOS/FraloApp',
+                 4: str(Path('/unrelated/Fralo') / suffix)}
+        captured = {}
+        def output(args, **kwargs):
+            if args[0] == 'git': return f'worktree {root}\0HEAD abc\0\0worktree {old}\0HEAD def\0\0'
+            return '1\n2\n3\n4\n'
+        with patch.object(preview, 'ROOT', root), \
+             patch.object(preview.subprocess, 'check_output', side_effect=output), \
+             patch.object(preview, 'executable_reader', return_value=paths.get), \
+             patch.object(preview, 'stop_previews', side_effect=lambda targets, read: captured.update(targets)), \
+             patch.object(preview.sys, 'argv', ['stop-preview-processes.py', 'workbench']):
+            preview.main()
+        self.assertEqual(captured, {1: paths[1], 2: paths[2]}, 'Old same-repository worktree previews must also exit')
+
     def test_exact_workspace_and_kind(self):
         root = Path("/workspace/Fralo")
         path = root / ".build/workbench-preview/session-123/Fralo Workbench Preview.app/Contents/MacOS/FraloApp"

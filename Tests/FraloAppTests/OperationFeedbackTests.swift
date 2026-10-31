@@ -5,6 +5,53 @@ import FraloDesignSystem
 @testable import FraloApp
 
 final class OperationFeedbackTests: XCTestCase {
+    @MainActor func testReduceMotionNotificationDoesNotRevealIdleFeedback() {
+        _ = NSApplication.shared
+        let feedback = OperationFeedback()
+        feedback.surface.preferences.reduceMotion = true
+        NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
+        XCTAssertTrue(feedback.isHidden, "An accessibility change cannot reveal an empty message")
+        XCTAssertNil(feedback.kind)
+    }
+
+    @MainActor func testFeedbackEntersGraduallyInVisibleWindow() throws {
+        _ = NSApplication.shared
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { throw XCTSkip("System Reduce Motion is active") }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 200), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let feedback = OperationFeedback(); feedback.frame = NSRect(x: 40, y: 40, width: 304, height: 70)
+        window.contentView?.addSubview(feedback); window.orderFront(nil)
+        defer { feedback.dismiss(); window.close() }
+        feedback.show(.success, title: "已复制当前图片", detail: "可粘贴到其他应用")
+        XCTAssertFalse(feedback.isHidden)
+        XCTAssertLessThan(feedback.surface.alphaValue, 1, "Visible feedback must ease in instead of appearing instantly")
+        let entrance = try XCTUnwrap(feedback.animation)
+        entrance.currentProgress = 0.5
+        XCTAssertGreaterThan(feedback.surface.alphaValue, 0)
+        XCTAssertLessThan(feedback.surface.alphaValue, 1)
+        XCTAssertGreaterThan(feedback.verticalOffset, 0)
+        feedback.dismiss(animated: true)
+        let exit = try XCTUnwrap(feedback.animation)
+        exit.currentProgress = 0.5
+        let presentedOpacity = feedback.surface.alphaValue
+        feedback.show(.success, title: "再次复制", detail: "")
+        XCTAssertEqual(feedback.surface.alphaValue, presentedOpacity, accuracy: 0.001, "Reversing exit must keep the presented opacity")
+        exit.currentProgress = 1
+        XCTAssertFalse(feedback.isHidden, "A stale exit cannot hide a newer message")
+        feedback.animation?.currentProgress = 1
+        XCTAssertEqual(feedback.surface.alphaValue, 1)
+        XCTAssertEqual(feedback.verticalOffset, 0)
+        XCTAssertNil(feedback.animation)
+        feedback.surface.preferences.reduceMotion = true
+        feedback.dismiss(animated: true)
+        XCTAssertTrue(feedback.isHidden)
+        XCTAssertNil(feedback.animation)
+        feedback.show(.success, title: "减少动态效果", detail: "")
+        XCTAssertEqual(feedback.surface.alphaValue, 1)
+        XCTAssertEqual(feedback.verticalOffset, 0)
+        XCTAssertNil(feedback.animation)
+    }
+
     @MainActor private final class RejectingClipboard: ImageClipboard {
         var writes = 0
         func writePNG(_ data: Data) -> Bool { writes += 1; return false }
