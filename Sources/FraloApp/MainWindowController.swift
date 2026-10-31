@@ -12,6 +12,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private var inspectorUI: CompositionInspector!
     private let preferences: UserDefaults
     private let pasteboard: NSPasteboard
+    private let imageClipboard: any ImageClipboard
     private let inspectorUsesNativeGlass: Bool
     private(set) var appearanceChoice = AppAppearance.system
     private(set) var settingsController: AppearanceSettingsWindowController?
@@ -37,7 +38,8 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private let history = UndoManager()
     private var continuousSettingsStart: CompositionSettings?
     private var dragSettingsStart: CompositionSettings?
-    private var copyFeedback: DispatchWorkItem?
+    let operationFeedback = OperationFeedback()
+    private var feedbackTop: NSLayoutConstraint?
     private let emptyAction = ActionButton("添加图片", role: .primary, symbol: "plus")
     private let footer = CanvasControlsOverlay()
     private var footerTrailing: NSLayoutConstraint?
@@ -73,8 +75,9 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private var selectedIndex: Int? { list.selectedIndex }
 
     init(store: SettingsStore = SettingsStore(), preferences: UserDefaults = .standard, pasteboard: NSPasteboard = .general, restoreWindow: Bool = true,
-         inspectorUsesNativeGlass: Bool = false) {
+         inspectorUsesNativeGlass: Bool = false, imageClipboard: (any ImageClipboard)? = nil) {
         self.store = CompositionStore(legacy: store); self.preferences = preferences; self.pasteboard = pasteboard
+        self.imageClipboard = imageClipboard ?? pasteboard
         self.inspectorUsesNativeGlass = inspectorUsesNativeGlass
         do { settings = try self.store.load() } catch { settings = CompositionSettings(); initialWarning = error.localizedDescription }
         let area = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 1000)
@@ -174,6 +177,14 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
                 view.topAnchor.constraint(equalTo: center.view.topAnchor), view.bottomAnchor.constraint(equalTo: center.view.bottomAnchor)
             ])
         }
+        operationFeedback.translatesAutoresizingMaskIntoConstraints = false; center.view.addSubview(operationFeedback)
+        feedbackTop = operationFeedback.topAnchor.constraint(equalTo: center.view.topAnchor)
+        // The capsule hugs its message; long failure details truncate rather than widen past the stage.
+        NSLayoutConstraint.activate([
+            feedbackTop!, operationFeedback.widthAnchor.constraint(lessThanOrEqualToConstant: 420),
+            operationFeedback.widthAnchor.constraint(lessThanOrEqualTo: footer.widthAnchor, constant: -24),
+            operationFeedback.centerXAnchor.constraint(equalTo: footer.centerXAnchor)
+        ])
     }
 
     private func buildInspector() -> NSView {
@@ -467,8 +478,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         }
     }
     private func requestPreview(preservePositioning: Bool = false) {
-        copyFeedback?.cancel()
-        if viewing.dimensions.stringValue == "已复制" { viewing.showStatus("") }
+        operationFeedback.dismiss()
         if !preservePositioning {
             dragSettingsStart = nil
             artworkDragChanged = false; dragDevicePosition = nil; positioningLayers = nil
@@ -564,6 +574,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         defer { updateCanvasOverlays() }
         let insets = workbench.viewingInsets
         footerTrailing?.constant = -insets.right
+        feedbackTop?.constant = workbench.headerHeight + 12
         // The empty frame and append outline share the canvas' viewing margins; no floating bar while empty.
         emptyStage.viewingInsets = NSEdgeInsets(top: insets.top, left: insets.left, bottom: 24, right: insets.right)
         appendOverlay.viewingInsets = NSEdgeInsets(top: workbench.headerHeight + 8, left: 14, bottom: 14,
@@ -596,7 +607,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             }
             if previewScroll.contentView.bounds.size == available { break }
         }
-        let percent = viewing.dimensions.stringValue == "已复制" ? "已复制" : "\(Int((factor * backing * 100).rounded()))%"
+        let percent = "\(Int((factor * backing * 100).rounded()))%"
         viewing.showStatus(percent, detail: "\(Int(pixels.width)) × \(Int(pixels.height)) px")
         // Presets keep their checkmark; a stepped zoom between presets selects none.
         let presets: [CGFloat?] = [nil, 0.25, 0.5, 1, 2]
@@ -642,19 +653,14 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         guard let rendered, let index = selectedIndex, renderedID == items[index].input.id else { return }
         do {
             let data = settings.format == .png ? try CompositionRenderer.data(rendered.image, settings: settings) : try FrameRenderer.pngData(rendered.image)
-            pasteboard.clearContents(); pasteboard.setData(data, forType: .png)
-            let generation = previewRequest
-            copyFeedback?.cancel(); viewing.showStatus("已复制")
-            NSAccessibility.post(element: canvas, notification: .announcementRequested,
-                userInfo: [.announcement: "已复制当前图片", .priority: NSAccessibilityPriorityLevel.medium.rawValue])
-            let feedback = DispatchWorkItem { [weak self] in
-                MainActor.assumeIsolated {
-                    guard let self, self.previewRequest == generation, self.viewing.dimensions.stringValue == "已复制" else { return }
-                    self.viewing.showStatus(""); self.layoutPreview()
-                }
+            guard imageClipboard.writePNG(data) else {
+                operationFeedback.show(.failure, title: "复制失败", detail: "无法写入剪贴板，请重试")
+                return
             }
-            copyFeedback = feedback; DispatchQueue.main.asyncAfter(deadline: .now() + 1.6, execute: feedback)
-        } catch { showError(error.localizedDescription) }
+            operationFeedback.show(.success, title: "已复制到剪贴板")
+        } catch {
+            operationFeedback.show(.failure, title: "复制失败", detail: error.localizedDescription)
+        }
     }
     @objc func exportAll(_ sender: Any?) {
         guard !items.isEmpty, !isExporting else { return }

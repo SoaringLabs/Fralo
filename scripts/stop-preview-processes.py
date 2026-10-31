@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stop only matching preview executables from this workspace before relaunch."""
+"""Stop matching previews across this repository's worktrees before relaunch."""
 from pathlib import Path
 import argparse
 import ctypes
@@ -41,6 +41,17 @@ def executable_reader():
     return read
 
 
+def repository_worktrees(root):
+    # NUL records preserve spaces and non-ASCII paths without Git's path quoting.
+    output = subprocess.check_output(
+        ['git', '-C', str(root), 'worktree', 'list', '--porcelain', '-z'], text=True)
+    roots = [Path(record.removeprefix('worktree ')).resolve()
+             for record in output.split('\0') if record.startswith('worktree ')]
+    if root.resolve() not in roots:
+        raise RuntimeError('Cannot establish preview repository ownership; launch stopped')
+    return roots
+
+
 def stop_previews(targets, read_executable, send_signal=os.kill,
                   clock=time.monotonic, sleep=time.sleep):
     # Recheck the executable before every signal and while waiting: PIDs can be reused.
@@ -73,13 +84,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("kind", choices=PREVIEWS)
     args = parser.parse_args()
+    roots = repository_worktrees(ROOT)
     read_executable = executable_reader()
     pids = subprocess.check_output(["ps", "-axo", "pid="], text=True).split()
     targets = {}
     for value in pids:
         pid = int(value)
         executable = read_executable(pid)
-        if executable and matches_preview(executable, ROOT, args.kind):
+        if executable and any(matches_preview(executable, root, args.kind) for root in roots):
             targets[pid] = executable
     stop_previews(targets, read_executable)
     if targets:
