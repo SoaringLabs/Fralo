@@ -47,4 +47,12 @@ FRALO_THUMBNAIL_BENCHMARK=1 FRALO_THUMBNAIL_COUNT=500 swift test --build-system 
 
 采用 Apple [Loading](https://developer.apple.com/design/human-interface-guidelines/loading) 的后台加载、加载期间继续操作原则，保留已有缩略图/占位图逐项替换；沿用 [Sidebars](https://developer.apple.com/design/human-interface-guidelines/sidebars) 的现有原生列表与键盘导航。没有新增视觉样式或交互层级。
 
-界面验证结果在任务交付记录中补充。用户主观性能验收、完整 VoiceOver 测试及旧版 macOS 实机验证仍待完成；自动测试和截图不代表完整 HIG 认证。任务原始富文本内嵌图片未能经 Plane MCP 读取，性能问题依据完整文字需求与实际代码路径复现。
+`computer_use` 用 100 张有效图片与 1 张损坏图片实际验证：浅色 1400×850 与深色 1030×640 下的设备/形态切换、列表底部等待更新、上下键选择、撤销、坏图反馈和返回有效图片恢复均通过。深色预览组合启用了减少动态效果、降低透明度和增强对比度，未逐项隔离测试。截图保存在本机 `/tmp/fralo19-ui-evidence/01-light-phone.png` 至 `07-handoff.png`。
+
+交付时通过启动脚本保留一个 1400×850 的新版 Workbench Preview，旧同类实例已退出；正式安装版及其他类型预览保留。需要重开时在本任务 worktree 执行：
+
+```sh
+scripts/run-workbench-preview.sh --preview-window=1400x850 --preview-appearance=light /tmp/fralo19-ui-inputs
+```
+
+样本目录与截图均为本机临时验收材料，清理后须自行准备输入路径。用户主观性能验收、真实用户图片、完整 VoiceOver 测试及旧版 macOS 实机验证仍待完成；自动测试和截图不代表完整 HIG 认证。任务原始富文本内嵌图片未能经 Plane MCP 读取，性能问题依据完整文字需求与实际代码路径复现。
