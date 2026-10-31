@@ -30,7 +30,7 @@ final class ThumbnailPipeline {
         switch settings.display {
         case .phone: return "phone/\(settings.phoneModel.rawValue)/\(settings.orientation.rawValue)"
         case .tablet: return "tablet/\(settings.orientation.rawValue)"
-        case .browser: return "browser/\(settings.browser.rawValue)/\(settings.windowRatio.rawValue)"
+        case .browser: return "browser/\(settings.browser.rawValue)/\(settings.windowRatio.rawValue)/\(settings.browserAppearance.rawValue)"
         }
     }
 
@@ -47,6 +47,7 @@ final class ThumbnailPipeline {
         framing.display = settings.display; framing.phoneModel = settings.phoneModel
         framing.orientation = settings.orientation; framing.browser = settings.browser
         framing.windowRatio = settings.windowRatio
+        framing.browserAppearance = settings.browserAppearance
         let work = DispatchWorkItem {
             for input in inputs {
                 guard !current.isCancelled else { return }

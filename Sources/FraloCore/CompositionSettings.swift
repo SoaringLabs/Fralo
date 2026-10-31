@@ -4,6 +4,8 @@ import CoreGraphics
 public enum DisplayKind: String, Codable, CaseIterable, Sendable { case phone, tablet, browser }
 public enum CompositionMode: String, Codable, CaseIterable, Sendable { case transparent, background }
 public enum BrowserStyle: String, Codable, CaseIterable, Sendable { case safari, chrome }
+/// Export artwork, deliberately independent of the application's appearance.
+public enum BrowserAppearance: String, Codable, CaseIterable, Sendable { case light, dark }
 public enum WindowRatio: String, Codable, CaseIterable, Sendable {
     case standard = "16:10", wide = "16:9", classic = "4:3"
     public var ratio: Double { self == .standard ? 1.6 : self == .wide ? 16.0 / 9 : 4.0 / 3 }
@@ -38,6 +40,7 @@ public struct CompositionSettings: Codable, Equatable, Sendable {
     public var phoneModel: DeviceModel = .iPhone18ProMax
     public var orientation: Orientation = .portrait
     public var browser: BrowserStyle = .safari
+    public var browserAppearance: BrowserAppearance = .light
     public var windowRatio: WindowRatio = .standard
     public var mode: CompositionMode = .transparent
     public var canvas: CanvasRatio = .landscape
@@ -73,7 +76,7 @@ public struct CompositionSettings: Codable, Equatable, Sendable {
     public static let phoneModels: [DeviceModel] = [.iPhone18Pro, .iPhone18ProMax]
     public init() {}
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, display, phoneModel, orientation, browser, windowRatio, mode, canvas, deviceScale, deviceX, deviceY, deviceOpacity, background, backgroundColor, localBackgroundPath, backgroundScale, backgroundX, backgroundY, backgroundOpacity, transparentShadow, backgroundShadow, format, jpegQuality, jpegFill, pngLossless, pngQuality
+        case schemaVersion, display, phoneModel, orientation, browser, browserAppearance, windowRatio, mode, canvas, deviceScale, deviceX, deviceY, deviceOpacity, background, backgroundColor, localBackgroundPath, backgroundScale, backgroundX, backgroundY, backgroundOpacity, transparentShadow, backgroundShadow, format, jpegQuality, jpegFill, pngLossless, pngQuality
     }
     public init(from decoder: Decoder) throws {
         self.init()
@@ -83,6 +86,7 @@ public struct CompositionSettings: Codable, Equatable, Sendable {
         phoneModel = try values.decodeIfPresent(DeviceModel.self, forKey: .phoneModel) ?? .iPhone18ProMax
         orientation = try values.decode(Orientation.self, forKey: .orientation)
         browser = try values.decode(BrowserStyle.self, forKey: .browser)
+        browserAppearance = try values.decodeIfPresent(BrowserAppearance.self, forKey: .browserAppearance) ?? .light
         windowRatio = try values.decode(WindowRatio.self, forKey: .windowRatio)
         mode = try values.decode(CompositionMode.self, forKey: .mode)
         canvas = try values.decode(CanvasRatio.self, forKey: .canvas)

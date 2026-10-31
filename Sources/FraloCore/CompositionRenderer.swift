@@ -222,21 +222,23 @@ public enum CompositionRenderer {
         let context = try bitmap(output); context.scaleBy(x: reduction, y: reduction)
         context.translateBy(x: (nativeSize.width - size.width * fit) / 2, y: (nativeSize.height - size.height * fit) / 2)
         context.scaleBy(x: fit, y: fit)
-        let bodyColor = tablet ? CGColor(srgbRed: 0.12, green: 0.13, blue: 0.14, alpha: 1) : CGColor(srgbRed: 0.92, green: 0.92, blue: 0.93, alpha: 1)
+        let dark = settings.browserAppearance == .dark
+        let bodyColor = tablet ? CGColor(srgbRed: 0.12, green: 0.13, blue: 0.14, alpha: 1)
+            : dark ? CGColor(srgbRed: 0.16, green: 0.16, blue: 0.17, alpha: 1) : CGColor(srgbRed: 0.92, green: 0.92, blue: 0.93, alpha: 1)
         fill(CGRect(origin: .zero, size: size), radius: tablet ? 62 : 16, color: bodyColor, context: context)
         if tablet {
             context.setStrokeColor(CGColor(gray: 0.55, alpha: 1)); context.setLineWidth(3)
             context.addPath(CGPath(roundedRect: CGRect(origin: .zero, size: size).insetBy(dx: 3, dy: 3), cornerWidth: 60, cornerHeight: 60, transform: nil)); context.strokePath()
             context.setFillColor(CGColor(gray: 0.02, alpha: 1)); context.fillEllipse(in: CGRect(x: size.width / 2 - 5, y: 13, width: 10, height: 10))
         } else if settings.browser == .chrome {
-            ChromeShellArtwork.draw(in: context, width: size.width)
+            ChromeShellArtwork.draw(in: context, width: size.width, appearance: settings.browserAppearance)
         } else {
             for (i, color) in [ArtworkColor(1, 0.36, 0.33), ArtworkColor(1, 0.75, 0.24), ArtworkColor(0.18, 0.8, 0.3)].enumerated() {
                 context.setFillColor(color.cgColor); context.fillEllipse(in: CGRect(x: 22 + i * 25, y: 24, width: 15, height: 15))
             }
             let barY: CGFloat = 14
-            fill(CGRect(x: 230, y: barY, width: size.width - 460, height: 36), radius: 9, color: CGColor(gray: 0.98, alpha: 1), context: context)
-            context.setStrokeColor(CGColor(gray: 0.45, alpha: 1)); context.setLineWidth(2)
+            fill(CGRect(x: 230, y: barY, width: size.width - 460, height: 36), radius: 9, color: CGColor(gray: dark ? 0.23 : 0.98, alpha: 1), context: context)
+            context.setStrokeColor(CGColor(gray: dark ? 0.8 : 0.45, alpha: 1)); context.setLineWidth(2)
             for (index, x) in [CGFloat(125), CGFloat(166)].enumerated() {
                 let edge: CGFloat = index == 0 ? 6 : -6
                 context.move(to: CGPoint(x: x + edge, y: barY + 11)); context.addLine(to: CGPoint(x: x, y: barY + 18)); context.addLine(to: CGPoint(x: x + edge, y: barY + 25)); context.strokePath()

@@ -118,7 +118,10 @@ final class ThumbnailPipelineTests: XCTestCase {
         }
         for browser in BrowserStyle.allCases {
             for ratio in WindowRatio.allCases {
-                var s = CompositionSettings(); s.display = .browser; s.browser = browser; s.windowRatio = ratio; styles.append(s)
+                for appearance in BrowserAppearance.allCases {
+                    var s = CompositionSettings(); s.display = .browser; s.browser = browser; s.windowRatio = ratio
+                    s.browserAppearance = appearance; styles.append(s)
+                }
             }
         }
         for style in styles {

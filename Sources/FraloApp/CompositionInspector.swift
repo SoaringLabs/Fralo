@@ -100,7 +100,7 @@ final class CompositionInspector: NSView {
             self?.stopBackgroundDrag(); self?.rebuildDevice(); self?.rebuildAppearance(); self?.rebuildBackground()
         }
         devicePicker.onChange = { [weak self] index in
-            self?.editDevice { $0.display = DisplayKind.allCases[index] }; self?.rebuildDevice()
+            self?.editDevice { $0.display = DisplayKind.allCases[index] }; self?.rebuildDevice(); self?.rebuildAppearance()
         }
         formatPicker.onChange = { [weak self] index in
             self?.edit { $0.format = index == 0 ? .png : .jpeg }; self?.rebuildExport()
@@ -283,6 +283,14 @@ final class CompositionInspector: NSView {
     }
     private func rebuildAppearance() {
         var views: [NSView] = []
+        if settings.display == .browser {
+            let appearance = ValuePicker(["浅色", "深色"], label: "浏览器配色", selected: settings.browserAppearance == .light ? 0 : 1) { [weak self] index in
+                self?.editDevice { $0.browserAppearance = index == 0 ? .light : .dark }
+            }
+            appearance.controlSize = .small
+            appearance.toolTip = "仅改变浏览器套壳，不改变截图或 Fralo 界面外观"
+            views.append(field("浏览器配色", appearance, width: 172))
+        }
         let shadow = ValuePicker(["无", "柔和", "明显"], label: "阴影", selected: ShadowStyle.allCases.firstIndex(of: settings.shadow)!) { [weak self] index in
             self?.editDevice { if $0.mode == .transparent { $0.transparentShadow = ShadowStyle.allCases[index] } else { $0.backgroundShadow = ShadowStyle.allCases[index] } }
         }

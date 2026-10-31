@@ -4,12 +4,13 @@ import CoreText
 /// Neutral macOS Chrome artwork. All coordinates use the shell's 1500-point width.
 /// No screenshot analysis or user browsing information enters the browser controls.
 enum ChromeShellArtwork {
-    static func draw(in context: CGContext, width: CGFloat) {
-        let ink = color(0x5f6368), toolbar = color(0xffffff)
+    static func draw(in context: CGContext, width: CGFloat, appearance: BrowserAppearance) {
+        let dark = appearance == .dark
+        let ink = color(dark ? 0xe8eaed : 0x5f6368), toolbar = color(dark ? 0x35363a : 0xffffff)
         context.saveGState(); defer { context.restoreGState() }
         context.addPath(CGPath(roundedRect: CGRect(x: 0, y: 0, width: width, height: 102), cornerWidth: 16, cornerHeight: 16, transform: nil))
         context.clip()
-        context.setFillColor(color(0xdee1e6)); context.fill(CGRect(x: 0, y: 0, width: width, height: 44))
+        context.setFillColor(color(dark ? 0x202124 : 0xdee1e6)); context.fill(CGRect(x: 0, y: 0, width: width, height: 44))
         context.setFillColor(toolbar); context.fill(CGRect(x: 0, y: 44, width: width, height: 42))
 
         for (index, tint) in [0xff5f57, 0xfebc2e, 0x28c840].enumerated() {
@@ -33,14 +34,14 @@ enum ChromeShellArtwork {
         context.strokeEllipse(in: CGRect(x: 136, y: 17, width: 16, height: 16))
         line([(144, 17), (144, 33)], in: context); line([(136, 25), (152, 25)], in: context)
         context.strokeEllipse(in: CGRect(x: 140, y: 17, width: 8, height: 16))
-        text("Untitled", at: CGPoint(x: 162, y: 30), in: context)
+        text("Untitled", at: CGPoint(x: 162, y: 30), color: color(dark ? 0xe8eaed : 0x3c4043), in: context)
         line([(362, 20), (370, 28)], in: context); line([(370, 20), (362, 28)], in: context)
         line([(415, 24), (427, 24)], in: context); line([(421, 18), (421, 30)], in: context)
         line([(width - 31, 22), (width - 27, 26), (width - 23, 22)], in: context)
 
         // Navigation uses full arrows; the forward action is disabled in this neutral window.
         arrow(at: 27, forward: false, in: context)
-        context.setStrokeColor(color(0xb6b9bd)); arrow(at: 61, forward: true, in: context)
+        context.setStrokeColor(color(dark ? 0x777b80 : 0xb6b9bd)); arrow(at: 61, forward: true, in: context)
         context.setStrokeColor(ink)
         let reload = CGMutablePath()
         reload.addArc(center: CGPoint(x: 96, y: 65), radius: 7, startAngle: -.pi / 4, endAngle: .pi * 1.55, clockwise: false)
@@ -49,7 +50,7 @@ enum ChromeShellArtwork {
 
         let address = CGRect(x: 122, y: 49, width: width - 258, height: 32)
         context.addPath(CGPath(roundedRect: address, cornerWidth: 16, cornerHeight: 16, transform: nil))
-        context.setFillColor(color(0xf1f3f4)); context.fillPath()
+        context.setFillColor(color(dark ? 0x202124 : 0xf1f3f4)); context.fillPath()
         // Site controls and bookmark star inside the omnibox; address intentionally blank.
         line([(135, 61), (149, 61)], in: context); line([(135, 69), (149, 69)], in: context)
         ellipse(CGRect(x: 138, y: 59, width: 4, height: 4), color: ink, in: context)
@@ -71,14 +72,14 @@ enum ChromeShellArtwork {
         puzzle.addCurve(to: CGPoint(x: x + 8, y: 69), control1: CGPoint(x: x + 16, y: 61), control2: CGPoint(x: x + 16, y: 71))
         puzzle.addLine(to: CGPoint(x: x + 8, y: 73)); puzzle.addLine(to: CGPoint(x: x - 7, y: 73))
         puzzle.closeSubpath(); context.addPath(puzzle); context.strokePath()
-        ellipse(CGRect(x: width - 80, y: 53, width: 24, height: 24), color: color(0xe8eaed), in: context)
+        ellipse(CGRect(x: width - 80, y: 53, width: 24, height: 24), color: color(dark ? 0x5f6368 : 0xe8eaed), in: context)
         ellipse(CGRect(x: width - 72, y: 57, width: 8, height: 8), color: ink, in: context)
         context.saveGState()
         context.addEllipse(in: CGRect(x: width - 78, y: 55, width: 20, height: 20)); context.clip()
         ellipse(CGRect(x: width - 76, y: 67, width: 16, height: 14), color: ink, in: context)
         context.restoreGState()
         for y: CGFloat in [59, 65, 71] { ellipse(CGRect(x: width - 26.5, y: y - 1.5, width: 3, height: 3), color: ink, in: context) }
-        context.setStrokeColor(color(0xdadce0)); context.setLineWidth(1)
+        context.setStrokeColor(color(dark ? 0x5f6368 : 0xdadce0)); context.setLineWidth(1)
         line([(0, 85.5), (width, 85.5)], in: context)
     }
 
@@ -99,9 +100,9 @@ enum ChromeShellArtwork {
     private static func color(_ hex: UInt32) -> CGColor {
         CGColor(srgbRed: CGFloat((hex >> 16) & 255) / 255, green: CGFloat((hex >> 8) & 255) / 255, blue: CGFloat(hex & 255) / 255, alpha: 1)
     }
-    private static func text(_ value: String, at origin: CGPoint, in context: CGContext) {
+    private static func text(_ value: String, at origin: CGPoint, color: CGColor, in context: CGContext) {
         let font = CTFontCreateWithName("Helvetica" as CFString, 13, nil)
-        let string = CFAttributedStringCreate(nil, value as CFString, [kCTFontAttributeName: font, kCTForegroundColorAttributeName: color(0x3c4043)] as CFDictionary)!
+        let string = CFAttributedStringCreate(nil, value as CFString, [kCTFontAttributeName: font, kCTForegroundColorAttributeName: color] as CFDictionary)!
         context.saveGState(); context.translateBy(x: origin.x, y: origin.y); context.scaleBy(x: 1, y: -1)
         context.textMatrix = .identity; context.textPosition = .zero
         CTLineDraw(CTLineCreateWithAttributedString(string), context); context.restoreGState()

@@ -96,6 +96,7 @@ final class EmptyStageView: NSView {
         let cornerRadius: CGFloat
         let display: DisplayKind
         let orientation: Orientation
+        var browserAppearance: BrowserAppearance = .light
     }
     enum Feedback: Equatable { case idle, accepting, rejecting }
 
@@ -192,17 +193,19 @@ final class EmptyStageView: NSView {
         device.image.draw(in: frame, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
         NSGraphicsContext.restoreGraphicsState()
         if device.display == .browser, let screen = screenRect {
-            // A blank page follows the window's appearance instead of the shell's dark placeholder.
+            // Viewing-only blank page follows the export shell, independently of the app.
             pageColor.setFill(); NSBezierPath(rect: screen).fill()
         }
     }
     private var isDark: Bool { effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua }
-    private var pageColor: NSColor { isDark ? NSColor(srgbRed: 0.125, green: 0.129, blue: 0.141, alpha: 1) : NSColor(srgbRed: 0.97, green: 0.97, blue: 0.975, alpha: 1) }
+    private var pageColor: NSColor { device?.browserAppearance == .dark ? NSColor(srgbRed: 0.125, green: 0.129, blue: 0.141, alpha: 1) : NSColor(srgbRed: 0.97, green: 0.97, blue: 0.975, alpha: 1) }
 
-    /// Device screens are dark glass in either appearance; a browser page follows the window.
+    /// Match the drop target's text and controls to the surface they're drawn over.
     private func refreshZoneAppearance() {
-        let darkGlass = !isShowingError && device != nil && device?.display != .browser
-        zone.appearance = darkGlass ? NSAppearance(named: .darkAqua) : nil
+        if !isShowingError, let device {
+            let darkGlass = device.display != .browser || device.browserAppearance == .dark
+            zone.appearance = NSAppearance(named: darkGlass ? .darkAqua : .aqua)
+        } else { zone.appearance = nil }
         effectiveAppearance.performAsCurrentDrawingAppearance {
             tint.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.07).cgColor
         }
