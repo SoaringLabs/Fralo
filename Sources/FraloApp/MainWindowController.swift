@@ -888,7 +888,8 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
                 switch result {
                 case .success(let (image, screen, radius)):
                     self.emptyStage.device = .init(image: NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height)),
-                                                   screen: screen, cornerRadius: radius, display: framing.display, orientation: framing.orientation)
+                                                   screen: screen, cornerRadius: radius, display: framing.display, orientation: framing.orientation,
+                                                   browserAppearance: framing.browserAppearance)
                 case .failure: self.emptyStage.device = nil; self.emptyFrameKey = nil
                 }
             }
