@@ -394,6 +394,12 @@ public final class BatchList: PanelScrollView, NSTableViewDataSource, NSTableVie
         self.entries = entries; table.reloadData()
         if !entries.isEmpty { select(entries.firstIndex { $0.id == oldID } ?? 0) }
     }
+    /// Content-only refresh: do not rebuild the table, reselect, or scroll to selection.
+    public func updateEntry(_ entry: BatchEntry, at index: Int) {
+        guard entries.indices.contains(index), entries[index].id == entry.id else { return }
+        entries[index] = entry
+        table.reloadData(forRowIndexes: IndexSet(integer: index), columnIndexes: IndexSet(integer: 0))
+    }
     public func select(_ index: Int) {
         guard entries.indices.contains(index) else { return }
         table.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
