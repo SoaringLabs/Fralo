@@ -65,8 +65,8 @@ The installed App and CLI do not depend on Python. Convert the selected artwork 
 scripts/generate-dmg-background.swift as part of packaging; no Finder automation
 or manual icon placement is needed to build the DMG.
 
-After publication, use the repository's Issues and pull requests.
-The planned repository is https://github.com/SoaringLabs/Fralo; it may not exist yet.
+Report bugs and propose changes through the Issues and pull requests of
+https://github.com/SoaringLabs/Fralo.
 
 The app and preview scripts currently select SwiftPM's native build backend. With
 the installed Xcode 27 toolchain, the default backend stamps `LC_BUILD_VERSION`

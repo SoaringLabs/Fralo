@@ -10,7 +10,7 @@ Regenerate the three portrait inputs (1320 × 2868):
 After building the CLI:
 
     ./dist/fralo render examples --output artifacts/demo-output \
-      --model iphone-18-pro-max --orientation portrait --padding 0 --json
+      --model iphone-18-pro-max --orientation portrait --json
 
 Choose this folder in the App to reproduce the README screenshots.
 The renderer adds the device frame, rounded screen corners, and Dynamic Island.
