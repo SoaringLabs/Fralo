@@ -1,5 +1,7 @@
 <div align="center">
 
+**English** · [简体中文](README.zh-CN.md)
+
 <img src="docs/assets/icon.png" width="128" height="128" alt="Fralo app icon">
 
 # Fralo
@@ -15,8 +17,7 @@
 [**Download**](https://github.com/SoaringLabs/Fralo/releases/latest) ·
 [Changelog](CHANGELOG.md) ·
 [Install guide](INSTALL.md) ·
-[Contributing](CONTRIBUTING.md) ·
-[简体中文](README.zh-CN.md)
+[Contributing](CONTRIBUTING.md)
 
 </div>
 
