@@ -49,6 +49,8 @@ public struct CompositionSettings: Codable, Equatable, Sendable {
     public var deviceOpacity = 1.0
     public var background: BackgroundKind = .warm
     public var backgroundColor = ArtworkColor(0.88, 0.87, 0.84)
+    /// Second gradient stop; `backgroundColor` is the first.
+    public var backgroundEndColor = ArtworkColor(0.55, 0.62, 0.65)
     public var localBackgroundPath: String?
     public var backgroundScale = 1.0
     public var backgroundX = 0.0, backgroundY = 0.0
@@ -61,6 +63,9 @@ public struct CompositionSettings: Codable, Equatable, Sendable {
     public var pngQuality = 0.85
     public var jpegFill = ArtworkColor(1, 1, 1)
     public var shadow: ShadowStyle { mode == .transparent ? transparentShadow : backgroundShadow }
+    /// Transparent output keeps its alpha: always PNG with an opaque device. The stored choices return in background mode.
+    public var outputFormat: ImageFormat { mode == .transparent ? .png : format }
+    public var outputDeviceOpacity: Double { mode == .transparent ? 1 : deviceOpacity }
     /// Output envelope for the device, before transparent shadow padding. Source pixels never set this size.
     public var deviceCanvasSize: CGSize {
         switch display {
@@ -76,7 +81,7 @@ public struct CompositionSettings: Codable, Equatable, Sendable {
     public static let phoneModels: [DeviceModel] = [.iPhone18Pro, .iPhone18ProMax]
     public init() {}
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, display, phoneModel, orientation, browser, browserAppearance, windowRatio, mode, canvas, deviceScale, deviceX, deviceY, deviceOpacity, background, backgroundColor, localBackgroundPath, backgroundScale, backgroundX, backgroundY, backgroundOpacity, transparentShadow, backgroundShadow, format, jpegQuality, jpegFill, pngLossless, pngQuality
+        case schemaVersion, display, phoneModel, orientation, browser, browserAppearance, windowRatio, mode, canvas, deviceScale, deviceX, deviceY, deviceOpacity, background, backgroundColor, backgroundEndColor, localBackgroundPath, backgroundScale, backgroundX, backgroundY, backgroundOpacity, transparentShadow, backgroundShadow, format, jpegQuality, jpegFill, pngLossless, pngQuality
     }
     public init(from decoder: Decoder) throws {
         self.init()
@@ -96,6 +101,7 @@ public struct CompositionSettings: Codable, Equatable, Sendable {
         deviceOpacity = try values.decode(Double.self, forKey: .deviceOpacity)
         background = try values.decode(BackgroundKind.self, forKey: .background)
         backgroundColor = try values.decode(ArtworkColor.self, forKey: .backgroundColor)
+        backgroundEndColor = try values.decodeIfPresent(ArtworkColor.self, forKey: .backgroundEndColor) ?? backgroundEndColor
         localBackgroundPath = try values.decodeIfPresent(String.self, forKey: .localBackgroundPath)
         backgroundScale = try values.decode(Double.self, forKey: .backgroundScale)
         backgroundX = try values.decode(Double.self, forKey: .backgroundX)
@@ -113,7 +119,7 @@ public struct CompositionSettings: Codable, Equatable, Sendable {
         let values: [(Double, ClosedRange<Double>)] = [(deviceScale, 0.1...1.5), (deviceX, -1...1), (deviceY, -1...1),
             (deviceOpacity, 0...1), (backgroundScale, 1...4), (backgroundX, -1...1), (backgroundY, -1...1),
             (backgroundOpacity, 0...1), (jpegQuality, 0.1...1), (pngQuality, 0.1...1)]
-        guard schemaVersion == 1, values.allSatisfy({ $0.0.isFinite && $0.1.contains($0.0) }), backgroundColor.isValid, jpegFill.isValid, Self.phoneModels.contains(phoneModel) else {
+        guard schemaVersion == 1, values.allSatisfy({ $0.0.isFinite && $0.1.contains($0.0) }), backgroundColor.isValid, backgroundEndColor.isValid, jpegFill.isValid, Self.phoneModels.contains(phoneModel) else {
             throw FraloError.message("成图配置包含不支持的版本或无效数值。")
         }
         return self

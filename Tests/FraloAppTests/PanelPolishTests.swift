@@ -79,11 +79,8 @@ final class PanelPolishTests: XCTestCase {
         let restored = MainWindowController(store: store, preferences: defaults, restoreWindow: false)
         defer { restored.window?.close() }
         XCTAssertTrue(try XCTUnwrap(restored.window?.contentView as? WorkbenchView).inspectorHidden)
-        viewing.preview.performClick(nil)
-        XCTAssertEqual(viewing.preview.state, .on); XCTAssertTrue(canvas.showsTransparencyGrid, "The floating bar toggles the transparent-bounds checkerboard")
         XCTAssertFalse(root.previewing)
-        viewing.preview.performClick(nil); XCTAssertEqual(viewing.preview.state, .off)
-        XCTAssertEqual(viewing.preview.accessibilityRole(), .checkBox, "VoiceOver must hear the transparency toggle's state")
+        XCTAssertNil(NSApp.mainMenu?.items.flatMap { $0.submenu?.items ?? [] }.first { $0.title == "显示透明区域" })
         let fitted = try XCTUnwrap(canvas.zoom), backing = try XCTUnwrap(window.backingScaleFactor as CGFloat?)
         viewing.zoomIn.performClick(nil)
         let stepped = try XCTUnwrap(canvas.zoom) * backing
@@ -341,7 +338,7 @@ final class PanelPolishTests: XCTestCase {
         let inspector = try XCTUnwrap(root.right.body as? CompositionInspector)
         for _ in 0..<150 where !inspector.outputSize.stringValue.hasPrefix("约 ") { try await Task.sleep(nanoseconds: 20_000_000) }
         XCTAssertTrue(inspector.outputSize.stringValue.hasSuffix(" / 张"), "The per-image size is estimated automatically after each preview")
-        let compression = try XCTUnwrap(descendants(inspector).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == "PNG 体积" })
+        let compression = try XCTUnwrap(descendants(inspector).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == "文件大小" })
         let previous = canvas.image; compression.choose(1)
         for _ in 0..<250 where canvas.image === previous { try await Task.sleep(nanoseconds: 20_000_000) }
         XCTAssertFalse(inspector.settings.pngLossless)

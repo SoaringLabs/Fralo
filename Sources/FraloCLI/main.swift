@@ -15,7 +15,6 @@ Fralo \(FraloInfo.version) — 本地批量截图套框 · \(FraloInfo.developer
   --output, -o <目录>        输出目录（必填）
   --model <ID>               例如 iphone-18-pro-max，fralo models 查看全部
   --orientation <方向>       portrait 或 landscape（竖屏或横屏）
-  --padding <像素>           四周透明边距，0–2048
   --overwrite                显式允许覆盖已有输出；始终保护原始输入
   --json                     标准输出为 JSON；进度写到标准错误
   --help, -h                 帮助
@@ -47,7 +46,7 @@ private func run() throws -> Int32 {
         let store = SettingsStore(); try json(SettingsDescription(path: store.url.path, settings: try store.load())); return 0
     }
     if args.first == "render" { args.removeFirst() }
-    var paths: [URL] = [], directory: URL?, model: DeviceModel?, orientation: Orientation?, padding: Int?
+    var paths: [URL] = [], directory: URL?, model: DeviceModel?, orientation: Orientation?
     var overwrite = false, machineReadable = false, index = 0, positionalOnly = false
     func path(_ value: String) -> URL { URL(fileURLWithPath: (value as NSString).expandingTildeInPath) }
     func argument(_ flag: String) throws -> String {
@@ -70,10 +69,6 @@ private func run() throws -> Int32 {
             let value = try argument(option)
             guard let value = Orientation(rawValue: value) else { throw FraloError.message("方向只能是 portrait 或 landscape。") }
             orientation = value
-        case "--padding":
-            let value = try argument(option)
-            guard let value = Int(value) else { throw FraloError.message("边距必须为整数。") }
-            padding = value
         case "--overwrite": overwrite = true
         case "--json": machineReadable = true
         default:
@@ -88,7 +83,6 @@ private func run() throws -> Int32 {
     var settings = try SettingsStore().load()
     if let model { settings.model = model }
     if let orientation { settings.orientation = orientation }
-    if let padding { settings.padding = padding }
     settings = try settings.validated()
     let cancellation = CancellationToken()
     signal(SIGINT, SIG_IGN); signal(SIGTERM, SIG_IGN)

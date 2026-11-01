@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- Reorganized the settings panel into Device, Appearance, Composition, Background and Export,
+  with plainer labels; group headers no longer repeat the current values.
+- Transparent output is always PNG with an opaque device; JPEG, its fill color and device
+  opacity apply only to images with a background.
+- Gradient backgrounds have adjustable start and end colors.
+- Removed composition templates. Device size settles on 100% (the device just fills the
+  canvas) and warns when larger sizes crop it.
+- In the preview, dragging the device moves it and dragging empty canvas pans an image
+  background; the separate background-dragging switch is gone.
+- A custom background image is a fourth image tile next to the presets: it shows as
+  selected, and after trying a preset you can switch back without choosing the file again.
+- Removed the Show Transparent Area toggle from the canvas bar and the View menu.
+- Removed transparent padding. Exports always fit the complete device; the CLI no longer
+  accepts `--padding`, and a `padding` value in older settings files is ignored.
+
 ## 0.1.0 — 2026-10-17
 
 First public release.

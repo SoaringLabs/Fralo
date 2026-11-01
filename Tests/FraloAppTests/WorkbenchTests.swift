@@ -147,11 +147,9 @@ final class WorkbenchTests: XCTestCase {
         inspector.mode.choose(1)
         for _ in 0..<150 where canvas.image?.size != CanvasRatio.landscape.size { try await Task.sleep(nanoseconds: 20_000_000) }
         XCTAssertEqual(canvas.image?.size, CanvasRatio.landscape.size)
-        inspector.dragBackground = true
         inspector.devicePicker.choose(1)
         inspector.devicePicker.choose(0)
         for _ in 0..<150 where !canvas.allowsPositioning { try await Task.sleep(nanoseconds: 20_000_000) }
-        XCTAssertFalse(inspector.dragBackground, "Editing the device must leave background dragging")
         let point = canvas.convert(NSPoint(x: canvas.imageRect.midX, y: canvas.imageRect.midY), to: nil)
         let down = try XCTUnwrap(NSEvent.mouseEvent(with: .leftMouseDown, location: point, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
         canvas.mouseDown(with: down)
@@ -177,7 +175,7 @@ final class WorkbenchTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let store = SettingsStore(url: root.appendingPathComponent("settings.json"))
-        var settings = CompositionSettings(); settings.format = .jpeg; settings.deviceOpacity = 0.5
+        var settings = CompositionSettings(); settings.mode = .background; settings.format = .jpeg; settings.deviceOpacity = 0.5
         try CompositionStore(legacy: store).save(settings)
         let board = NSPasteboard.withUniqueName(); defer { board.releaseGlobally() }
         let suite = "fralo-copy-\(UUID())"; let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

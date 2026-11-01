@@ -132,7 +132,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item(view, "放大", #selector(MainWindowController.zoomIn(_:)), "=")
         view.items.last?.isHidden = true; view.items.last?.allowsKeyEquivalentWhenHidden = true
         item(view, "缩小", #selector(MainWindowController.zoomOut(_:)), "-")
-        item(view, "显示透明区域", #selector(MainWindowController.toggleTransparencyGrid(_:)))
         let appearance = NSMenuItem(title: "外观", action: nil, keyEquivalent: ""); appearance.submenu = controller.appearanceMenu(); view.addItem(appearance)
 
         let window = NSMenu(title: "窗口"); let windowItem = NSMenuItem(title: "窗口", action: nil, keyEquivalent: ""); windowItem.submenu = window; bar.addItem(windowItem)

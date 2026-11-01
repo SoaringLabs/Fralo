@@ -139,7 +139,7 @@ final class DevelopmentTests: XCTestCase {
             try? FileManager.default.removeItem(at: path)
         }
         let store = SettingsStore()
-        let settings = RenderSettings(model: .iPhone17Pro, orientation: .landscape, padding: 17)
+        let settings = RenderSettings(model: .iPhone17Pro, orientation: .landscape)
         try store.save(settings)
         let stateBefore = try Data(contentsOf: path)
         let state = DesignLabState()

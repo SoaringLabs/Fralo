@@ -81,7 +81,7 @@ final class DesignSystemTests: XCTestCase {
     @MainActor func testPreviewActivityIsDelayedCancelledAndKeepsToolbarGeometry() async throws {
         let toolbar = ViewToolbar(); toolbar.frame = NSRect(x: 0, y: 0, width: 420, height: 48)
         toolbar.layoutSubtreeIfNeeded()
-        let before = toolbar.preview.frame
+        let before = toolbar.zoomIn.frame
         toolbar.beginPreviewUpdate(); toolbar.finishPreviewUpdate()
         try await Task.sleep(nanoseconds: 230_000_000)
         XCTAssertFalse(toolbar.isUpdatingPreview, "A fast render must not flash a stale loading indicator")
@@ -89,7 +89,7 @@ final class DesignSystemTests: XCTestCase {
         try await Task.sleep(nanoseconds: 230_000_000)
         toolbar.layoutSubtreeIfNeeded()
         XCTAssertTrue(toolbar.isUpdatingPreview)
-        XCTAssertEqual(toolbar.preview.frame, before, "Showing progress must not shift toolbar actions")
+        XCTAssertEqual(toolbar.zoomIn.frame, before, "Showing progress must not shift toolbar actions")
         toolbar.beginPreviewUpdate(); toolbar.finishPreviewUpdate()
         try await Task.sleep(nanoseconds: 230_000_000)
         XCTAssertFalse(toolbar.isUpdatingPreview)
@@ -127,17 +127,20 @@ final class DesignSystemTests: XCTestCase {
         let toolbar = ViewToolbar(); toolbar.frame = NSRect(x: 0, y: 0, width: 260, height: ViewToolbar.height)
         toolbar.layoutSubtreeIfNeeded()
         let side = FraloStyle.Button.compactHeight
-        for button in [toolbar.zoomOut, toolbar.zoomIn, toolbar.preview] {
+        for button in [toolbar.zoomOut, toolbar.zoomIn] {
             XCTAssertEqual(button.frame.size, NSSize(width: side, height: side), "“minus” and “plus” must draw identical hover surfaces")
         }
         XCTAssertEqual(toolbar.zoomOut.frame.midY, toolbar.zoomIn.frame.midY, accuracy: 0.01)
         for _ in 0..<3 { toolbar.zoomIn.performClick(nil) }
         XCTAssertEqual(toolbar.zoomIn.state, .off)
-        toolbar.preview.performClick(nil)
-        XCTAssertEqual(toolbar.preview.state, .off, "The owner, not the click, turns the transparency toggle on")
-        XCTAssertEqual(toolbar.preview.accessibilityRole(), .checkBox)
-        toolbar.preview.state = .on
-        XCTAssertEqual(toolbar.preview.accessibilityValue() as? Bool, true)
+        func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
+        XCTAssertFalse(descendants(toolbar).contains { $0.accessibilityLabel() == "显示透明区域" }, "The transparency toggle was removed")
+        let toggle = SymbolButton("checkerboard.rectangle", label: "开关", toggles: true)
+        toggle.performClick(nil)
+        XCTAssertEqual(toggle.state, .off, "The owner, not the click, turns a toggle on")
+        XCTAssertEqual(toggle.accessibilityRole(), .checkBox)
+        toggle.state = .on
+        XCTAssertEqual(toggle.accessibilityValue() as? Bool, true)
         toolbar.zoomIn.isHovered = true; toolbar.zoomIn.isEnabled = false
         XCTAssertFalse(toolbar.zoomIn.isHovered, "A disabled button drops its hover surface")
     }

@@ -55,7 +55,10 @@ public final class VisualChoiceGroup: NSControl {
         select(selection, notify: false)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
-    public func setImages(_ images: [NSImage?]) {
+    public func setCardToolTip(_ text: String, at index: Int) {
+        guard cards.indices.contains(index) else { return }; cards[index].toolTip = text; cards[index].setAccessibilityHelp(text)
+    }
+        public func setImages(_ images: [NSImage?]) {
         for (index, card) in cards.enumerated() where images.indices.contains(index) { card.artwork = images[index] }
     }
     public override func layout() {
@@ -67,7 +70,8 @@ public final class VisualChoiceGroup: NSControl {
     }
     @objc private func pressed(_ sender: NSButton) { focusRingType = .none; window?.makeFirstResponder(self); choose(sender.tag) }
     public override func becomeFirstResponder() -> Bool {
-        if NSApp.currentEvent?.type == .keyDown { focusRingType = .exterior }
+        // Only keyboard focus draws a ring; focus restored after a click (e.g. a rebuilt group) stays quiet.
+        focusRingType = NSApp.currentEvent?.type == .keyDown ? .exterior : .none
         return super.becomeFirstResponder()
     }
     public func choose(_ index: Int) {
@@ -101,7 +105,8 @@ public final class VisualChoiceGroup: NSControl {
         }
     }
     public override var focusRingMaskBounds: NSRect { selection.map { cards[$0].convert(cards[$0].surfaceBounds, to: self) } ?? bounds }
-    public override func drawFocusRingMask() { NSBezierPath(roundedRect: focusRingMaskBounds.insetBy(dx: 2, dy: 2), xRadius: 12, yRadius: 12).fill() }
+    /// Inset so the ring stays inside the group; edge-aligned cards would otherwise lose it to the parent's clip.
+    public override func drawFocusRingMask() { NSBezierPath(roundedRect: focusRingMaskBounds.insetBy(dx: 4, dy: 4), xRadius: 10, yRadius: 10).fill() }
 }
 
 @MainActor
@@ -153,26 +158,42 @@ private final class VisualChoiceCard: NSButton {
         (accented ? NSColor(white: dark ? 1 : 0, alpha: dark ? 0.09 : 0.06) : neutral).setFill(); path.fill()
         (accented ? NSColor.controlAccentColor.withAlphaComponent(0.90) : NSColor.labelColor.withAlphaComponent(preferences.effectiveIncreaseContrast ? 0.65 : 0.09)).setStroke()
         path.lineWidth = accented || preferences.effectiveIncreaseContrast ? 1.5 : 0.5; path.stroke()
+        // A tile without a detail line centers image and title as one block instead of leaving the detail row empty.
+        let tileImageHeight = max(20, bounds.height - 50)
+        let titleOnlyTile = !horizontal && !captionsBelow && item.detail.isEmpty
+        let tileTop = titleOnlyTile ? max(10, (bounds.height - tileImageHeight - 22) / 2) : 10
         let imageArea = horizontal ? NSRect(x: 14, y: 10, width: 56, height: bounds.height - 20)
             : captionsBelow ? surfaceBounds.insetBy(dx: 12, dy: 12)
-            : NSRect(x: 12, y: 10, width: bounds.width - 24, height: max(20, bounds.height - 50))
-        if let image = artwork ?? NSImage(systemSymbolName: item.symbol, accessibilityDescription: nil)?.withSymbolConfiguration(.init(paletteColors: [.secondaryLabelColor])) {
-            let scale = min(imageArea.width / max(1, image.size.width), imageArea.height / max(1, image.size.height))
-            let size = NSSize(width: image.size.width * scale, height: image.size.height * scale)
-            image.draw(in: NSRect(x: imageArea.midX - size.width / 2, y: imageArea.midY - size.height / 2, width: size.width, height: size.height),
-                from: .zero, operation: .sourceOver, fraction: isEnabled ? 1 : 0.35, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
+            : NSRect(x: 12, y: tileTop, width: bounds.width - 24, height: tileImageHeight)
+        if let artwork {
+            draw(artwork, fitting: imageArea)
+        } else if let symbol = NSImage(systemSymbolName: item.symbol, accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: horizontal ? 22 : 17, weight: .regular).applying(.init(paletteColors: [.secondaryLabelColor]))) {
+            // A placeholder symbol keeps its text-like size instead of filling the artwork area.
+            let size = symbol.size
+            symbol.draw(in: NSRect(x: imageArea.midX - size.width / 2, y: imageArea.midY - size.height / 2, width: size.width, height: size.height),
+                from: .zero, operation: .sourceOver, fraction: isEnabled ? 1 : 0.35, respectFlipped: true, hints: nil)
         }
         let textX: CGFloat = horizontal ? 84 : 8
         let textWidth = bounds.width - textX - (horizontal ? 34 : 8)
         let paragraph = NSMutableParagraphStyle(); paragraph.alignment = horizontal ? .left : .center; paragraph.lineBreakMode = .byTruncatingTail
-        let y = horizontal ? bounds.midY - 16 : captionsBelow ? surfaceBounds.maxY + 5 : bounds.height - 36
+        let y = horizontal ? bounds.midY - 16 : captionsBelow ? surfaceBounds.maxY + 5 : titleOnlyTile ? imageArea.maxY + 4 : bounds.height - 36
         (item.title as NSString).draw(in: NSRect(x: textX, y: y, width: max(0, textWidth), height: 18),
             withAttributes: [.font: NSFont.systemFont(ofSize: horizontal ? 14 : 12, weight: chosen ? .semibold : .medium), .foregroundColor: isEnabled ? NSColor.labelColor : .disabledControlTextColor, .paragraphStyle: paragraph])
         (item.detail as NSString).draw(in: NSRect(x: textX, y: y + 18, width: max(0, textWidth), height: 15),
             withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: paragraph])
         if chosen && isEnabled, let mark = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil)?.withSymbolConfiguration(.init(paletteColors: [.white, .controlAccentColor])) {
-            mark.draw(in: NSRect(x: bounds.width - 24, y: 10, width: 14, height: 14), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+            // Narrow tiles tuck a smaller check into the corner so it covers less of the thumbnail.
+            let compact = bounds.width < 80
+            mark.draw(in: compact ? NSRect(x: bounds.width - 19, y: 6, width: 12, height: 12) : NSRect(x: bounds.width - 24, y: 10, width: 14, height: 14),
+                      from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
         }
+    }
+    private func draw(_ image: NSImage, fitting area: NSRect) {
+        let scale = min(area.width / max(1, image.size.width), area.height / max(1, image.size.height))
+        let size = NSSize(width: image.size.width * scale, height: image.size.height * scale)
+        image.draw(in: NSRect(x: area.midX - size.width / 2, y: area.midY - size.height / 2, width: size.width, height: size.height),
+            from: .zero, operation: .sourceOver, fraction: isEnabled ? 1 : 0.35, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
     }
     /// One-line choice: symbol, title and a trailing check, e.g. 竖屏 / 横屏.
     private func drawOption() {

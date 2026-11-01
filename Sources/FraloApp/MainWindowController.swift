@@ -26,7 +26,6 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private let batchCount = FraloStyle.text("0", role: .body)
     private let sidebarGuidance = FraloStyle.text("↑ ↓ 切换图片", role: .caption, secondary: true)
     private let addButton = SymbolButton("plus", label: "添加图片")
-    private var transparencyGrid = false
     private let filename = FraloStyle.text("", role: .heading), position = FraloStyle.text("", role: .caption, secondary: true)
     private let previewScroll = PreviewScrollView()
     private let canvas = CanvasSurface(frame: .zero)
@@ -60,6 +59,8 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private let sizeQueue = DispatchQueue(label: "app.fralo.output-size", qos: .utility)
     private var zoom: CGFloat? = nil
     private var backgroundImageSize: CGSize?
+    /// Set when a drag starts on the canvas outside the device over a pannable image background.
+    private var dragsBackground = false
     private var dragDevicePosition: CGPoint?
     private var artworkDragChanged = false
     private weak var previewRestoreFocus: NSResponder?
@@ -130,7 +131,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         exportAction.onExportCurrent = { [weak self] in self?.exportCurrent(nil) }
         let inspectorBody = buildInspector()
         dimensions.alignment = .center
-        inspectorUI.mode.setAccessibilityLabel("出图模式")
+        inspectorUI.mode.setAccessibilityLabel("成品背景")
         let right = FloatingPanel(header: FraloStyle.stack([inspectorUI.mode], spacing: 8, fillWidth: true),
                                   body: inspectorBody, footer: inspectorUI.makeFooter(action: exportAction), bodySpacing: 16,
                                   useNativeGlass: inspectorUsesNativeGlass)
@@ -168,7 +169,6 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         fitMenu.target = self; fitMenu.action = #selector(zoomMenuChanged(_:))
         viewing.composition.removeAllItems(); viewing.composition.addItems(withTitles: CanvasRatio.allCases.map(\.rawValue))
         viewing.composition.onChange = { [weak self] index in self?.inspectorUI.chooseCanvas(CanvasRatio.allCases[index]) }
-        viewing.preview.onPress = { [weak self] in self?.toggleTransparencyGrid() }
         viewing.zoomOut.onPress = { [weak self] in self?.zoomOut(nil) }
         viewing.zoomIn.onPress = { [weak self] in self?.zoomIn(nil) }
         viewing.translatesAutoresizingMaskIntoConstraints = false; footer.addSubview(viewing)
@@ -218,11 +218,21 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
                 if initial != self.settings { self.registerSettingsUndo(initial, name: "调整出图设置") }
             }
         }
-        inspectorUI.onDragTargetChange = { [weak self] in self?.updateCanvasInteraction() }
+        canvas.onDragStart = { [weak self] point in self?.beginArtworkDrag(at: point) }
         canvas.onDrag = { [weak self] delta in self?.dragArtwork(delta) }
         canvas.onDragEnd = { [weak self] in self?.finishArtworkDrag() }
         return inspectorUI
     }
+    /// The device moves when the drag starts on it; empty canvas pans an image background that overflows the canvas.
+    private func beginArtworkDrag(at fraction: CGPoint) {
+        dragsBackground = false
+        guard settings.mode == .background, Self.pansBackground(settings), backgroundImageSize != nil, let layers = positioningLayers else { return }
+        let point = CGPoint(x: fraction.x * layers.canvasSize.width, y: fraction.y * layers.canvasSize.height)
+        let background = layers.backgroundRect(settings: settings)
+        let overflows = background.width > layers.canvasSize.width + 0.5 || background.height > layers.canvasSize.height + 0.5
+        dragsBackground = overflows && !layers.deviceRect(settings: settings).contains(point)
+    }
+    private static func pansBackground(_ settings: CompositionSettings) -> Bool { settings.background != .solid && settings.background != .gradient }
     private func dragArtwork(_ delta: CGPoint, snapping: Bool = true) {
         guard settings.mode == .background, positioningLayers != nil, !isExporting else { return }
         if !artworkDragChanged {
@@ -233,7 +243,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             inspectorUI.showOutputSize(nil); viewing.finishPreviewUpdate(); updateActions()
         }
         artworkDragChanged = true
-        if inspectorUI.dragBackground {
+        if dragsBackground {
             if let backgroundImageSize { CompositionRenderer.panBackground(&settings, delta: delta, imageSize: backgroundImageSize) }
         } else {
             let previous = dragDevicePosition ?? CGPoint(x: settings.deviceX, y: settings.deviceY)
@@ -251,9 +261,10 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
 
     private func finishArtworkDrag() {
         canvas.centerGuideX = false; canvas.centerGuideY = false; dragDevicePosition = nil
+        let movedBackground = dragsBackground; dragsBackground = false
         guard artworkDragChanged else { return }; artworkDragChanged = false
         if let initial = dragSettingsStart, initial != settings {
-            registerSettingsUndo(initial, name: inspectorUI.dragBackground ? "移动背景" : "移动设备")
+            registerSettingsUndo(initial, name: movedBackground ? "移动背景" : "移动设备")
         }
         dragSettingsStart = nil
         do { try store.save(settings) } catch { showError(error.localizedDescription, title: "无法保存设置") }
@@ -298,14 +309,15 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     @objc func nextImage(_ sender: Any?) { moveSelection(1) }
     @objc func nudgeArtwork(_ sender: NSMenuItem) {
         guard let point = (sender.representedObject as? NSValue)?.pointValue else { return }
+        dragsBackground = false
         dragArtwork(CGPoint(x: point.x / settings.canvas.size.width, y: point.y / settings.canvas.size.height), snapping: false)
         finishArtworkDrag()
     }
     private func updateCanvasInteraction() {
         let enabled = settings.mode == .background && selectedIndex != nil && positioningLayers != nil && !isExporting
         canvas.allowsPositioning = enabled
-        let target = inspectorUI.dragBackground ? "背景取景" : "设备位置"
-        let help = enabled ? "拖动调整" + target + "；按 ⌥ 和方向键微调。上下键切换图片，Esc 返回编辑。" : "上下键切换图片，Tab 切换焦点，Esc 返回编辑。"
+        let background = Self.pansBackground(settings) ? "，拖动空白处调整背景" : ""
+        let help = enabled ? "拖动设备调整位置" + background + "；按 ⌥ 和方向键微调设备。上下键切换图片，Esc 返回编辑。" : "上下键切换图片，Tab 切换焦点，Esc 返回编辑。"
         canvas.toolTip = help; canvas.setAccessibilityHelp(help)
     }
 
@@ -516,7 +528,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         guard let index = selectedIndex else {
             canvas.image = nil; showEmptyGuidance(); emptyStage.isHidden = false
             previewScroll.isHidden = true; footer.isHidden = true; filename.stringValue = ""; position.stringValue = ""
-            window?.title = "Fralo"; dimensions.stringValue = "尚无成品"; inspectorUI.outputInfo.stringValue = "尺寸随截图确定"; viewing.finishPreviewUpdate(); updateActions(); return
+            window?.title = "Fralo"; dimensions.stringValue = "尚无成品"; inspectorUI.outputInfo.stringValue = "添加截图后显示尺寸"; viewing.finishPreviewUpdate(); updateActions(); return
         }
         let input = items[index].input, snapshot = settings, generation = previewRequest
         window?.title = input.name; filename.stringValue = input.name; position.stringValue = "\(index + 1) / \(items.count)"
@@ -528,7 +540,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
                 let backdrop = try CompositionRenderer.backgroundData(snapshot)
                 let frame = try CompositionRenderer.render(input, settings: snapshot, backgroundData: backdrop, preparePreviewLayers: true)
                 guard !token.isCancelled else { throw CancellationError() }
-                let encoded = snapshot.format == .jpeg || !snapshot.pngLossless ? try CompositionRenderer.data(frame.image, settings: snapshot) : nil
+                let encoded = snapshot.outputFormat == .jpeg || !snapshot.pngLossless ? try CompositionRenderer.data(frame.image, settings: snapshot) : nil
                 guard !token.isCancelled else { throw CancellationError() }
                 let display = try encoded.map { try ImageInput(data: $0, name: "preview").decode() } ?? frame.image
                 return (frame, display, try input.dimensions(), try backdrop.map { try ImageInput(data: $0, name: "background.png").dimensions() }, encoded?.count)
@@ -555,7 +567,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
                         self.canvas.setAccessibilityLabel("成品画布，" + input.name)
                         self.canvas.showsElevation = snapshot.mode == .background
                         self.applyCanvasBacking()
-                        self.dimensions.stringValue = "\(snapshot.format == .png ? "PNG" : "JPEG") · \(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height))"
+                        self.dimensions.stringValue = "\(snapshot.outputFormat == .png ? "PNG" : "JPEG") · \(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height))"
                         self.emptyStage.isHidden = true; self.layoutPreview()
                         if byteCount == nil { self.calculateCurrentSize() }
                     case .failure(let error):
@@ -677,7 +689,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         if sender is NSMenuItem, let editor = window?.firstResponder as? NSTextView, editor.isEditable { editor.copy(sender); return }
         guard let rendered, let index = selectedIndex, renderedID == items[index].input.id else { return }
         do {
-            let data = settings.format == .png ? try CompositionRenderer.data(rendered.image, settings: settings) : try FrameRenderer.pngData(rendered.image)
+            let data = settings.outputFormat == .png ? try CompositionRenderer.data(rendered.image, settings: settings) : try FrameRenderer.pngData(rendered.image)
             guard imageClipboard.writePNG(data) else {
                 operationFeedback.show(.failure, title: "复制失败", detail: "无法写入剪贴板，请重试")
                 return
@@ -702,8 +714,8 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         guard let index = selectedIndex, !isExporting else { return }
         window?.makeFirstResponder(nil)
         let input = items[index].input
-        let panel = NSSavePanel(); panel.allowedContentTypes = [settings.format == .png ? .png : .jpeg]; panel.canCreateDirectories = true
-        panel.nameFieldStringValue = BatchExporter.outputNames(for: [input], format: settings.format)[0]
+        let panel = NSSavePanel(); panel.allowedContentTypes = [settings.outputFormat == .png ? .png : .jpeg]; panel.canCreateDirectories = true
+        panel.nameFieldStringValue = BatchExporter.outputNames(for: [input], format: settings.outputFormat)[0]
         panel.beginSheetModal(for: window!) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             self?.startExport([input], directory: url.deletingLastPathComponent(), overwrite: true, names: [url.lastPathComponent])
@@ -790,7 +802,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         synchronizePanelsWithBatch()
         updateCanvasInteraction()
         inspectorUI?.setEditingEnabled(!isExporting)
-        batchCount.stringValue = "\(items.count)"; inspectorUI?.batchCount = items.count
+        batchCount.stringValue = "\(items.count)"
         addButton.isEnabled = !isExporting
         workbench.left.showsFooter = items.count >= 2 && !isExporting
         window?.subtitle = headerSubtitle
@@ -832,7 +844,6 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         if menuItem.action == #selector(zoomIn(_:)) { return canvas.image != nil && viewing.zoomIn.isEnabled }
         if menuItem.action == #selector(zoomOut(_:)) { return canvas.image != nil && viewing.zoomOut.isEnabled }
         if menuItem.action == #selector(fitPreview(_:)) || menuItem.action == #selector(actualPixels(_:)) { return canvas.image != nil }
-        if menuItem.action == #selector(toggleTransparencyGrid(_:)) { menuItem.state = transparencyGrid ? .on : .off; return canvas.image != nil }
         return true
     }
     /// “1 / 4 · iPhone 18 Pro · 竖屏”: position in the batch, then the device being framed.
@@ -840,8 +851,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         guard let index = selectedIndex else {
             // Empty: what the first import will be framed as, instead of repeating the stage's prompt.
             guard items.isEmpty else { return "\(items.count) 张图片" }
-            let format = settings.format == .png ? "PNG" : "JPEG"
-            let output = settings.mode == .transparent ? (settings.format == .png ? "透明 PNG" : format) : "背景成图 · " + format
+            let output = settings.mode == .transparent ? "透明 PNG" : "带背景 · " + (settings.outputFormat == .png ? "PNG" : "JPEG")
             return deviceDescription + " · " + output
         }
         return "\(index + 1) / \(items.count) · " + deviceDescription
@@ -853,16 +863,11 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         case .browser: return (settings.browser == .safari ? "Safari" : "Chrome") + " · " + settings.windowRatio.rawValue
         }
     }
-    @objc func toggleTransparencyGrid(_ sender: Any? = nil) {
-        transparencyGrid.toggle(); viewing.preview.state = transparencyGrid ? .on : .off
-        applyCanvasBacking()
-    }
-    /// The checkerboard shows the export's transparent bounds; otherwise the device sits on the stage
-    /// with a viewing-only contact shadow. Neither enters exported pixels.
+    /// Transparent output sits on the stage with a viewing-only contact shadow; neither enters exported pixels.
     private func applyCanvasBacking() {
         let background = settings.mode == .background
-        canvas.showsTransparencyGrid = background || transparencyGrid
-        canvas.showsStageShadow = !background && !transparencyGrid && settings.shadow == .none
+        canvas.showsTransparencyGrid = background
+        canvas.showsStageShadow = !background && settings.shadow == .none
     }
     private func showEmptyGuidance() {
         emptyAction.title = "添加图片…"; emptyAction.image = NSImage(systemSymbolName: "plus", accessibilityDescription: nil)

@@ -62,12 +62,12 @@ def verify(binary, base):
 
     inherited = json.loads(run(["render", inputs, "--output", base / "inherited", "--json"]).stdout)
     assert inherited["succeeded"] == 10 and inherited["failed"] == 0
-    assert inherited["settings"]["model"] == "iphone-17-pro" and inherited["settings"]["padding"] == 11
-    checks.append("Saved settings inherited for all ten inputs")
+    assert inherited["settings"]["model"] == "iphone-17-pro" and "padding" not in inherited["settings"]
+    checks.append("Saved settings inherited for all ten inputs; legacy padding ignored")
 
     before = settings.read_bytes()
     arguments = ["render", inputs, "--output", base / "normal", "--model", "iphone-18-pro-max",
-                 "--padding", "0", "--orientation", "portrait", "--json"]
+                 "--orientation", "portrait", "--json"]
     normal = json.loads(run(arguments).stdout)
     assert normal["succeeded"] == 10 and settings.read_bytes() == before
     checks.append("Explicit overrides do not rewrite settings")
@@ -78,7 +78,7 @@ def verify(binary, base):
 
     original_output = Path(normal["entries"][0]["output"])
     output_hash = hashlib.sha256(original_output.read_bytes()).hexdigest()
-    overwritten = json.loads(run(["render", inputs, "--output", base / "normal", "--padding", "24",
+    overwritten = json.loads(run(["render", inputs, "--output", base / "normal", "--model", "iphone-16-pro",
                                   "--overwrite", "--json"]).stdout)
     assert overwritten["succeeded"] == 10
     assert hashlib.sha256(original_output.read_bytes()).hexdigest() != output_hash
@@ -90,7 +90,7 @@ def verify(binary, base):
     assert partial["succeeded"] == 10 and partial["failed"] == 1
     checks.append("Corrupt image returns exit 1 while valid inputs finish")
 
-    run(["render", inputs, "--output", base / "bad-padding", "--padding", "-1"], code=2)
+    run(["render", inputs, "--output", base / "bad-padding", "--padding", "0"], code=2)
     run(["render", inputs, "--output", base / "bad-orientation", "--orientation", "auto"], code=2)
     checks.append("Invalid arguments return exit 2")
 

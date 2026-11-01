@@ -506,3 +506,78 @@ Static captures verify endpoints; frame continuity is established by the sampled
 window regression, not screenshots. Subjective motion acceptance, full VoiceOver,
 older macOS hardware and live OS accessibility-preference toggling remain
 unverified. No PR, merge or completion acceptance is implied by these checks.
+
+### Inspector regrouping and plain labels (FRALO-16) — 2026-11-01
+
+Transparent padding is removed from Core settings, the CLI and documentation;
+older settings files that still contain `padding` load and export without it.
+The inspector follows the approved v12 static design: Device, Appearance and
+Export in transparent mode, with Composition and Background inserted between
+Appearance and Export for images with a background, so the outer groups keep
+their place when the mode changes. Group headers no longer show value summaries:
+the window subtitle names the device and output, and the fixed footer shows the
+pixel size and per-image estimate above the export action.
+
+Labels use everyday wording: the mode switch is 透明 / 带背景, shadow is
+无 / 浅 / 深, PNG size is 原画质 / 适中 / 最小, and canvas ratios name their
+shape. The background opacity slider, previously labelled as transparency, is now
+不透明度 like the device slider. Applying a template is the first Composition row
+because it changes several settings at once; device size and recentering moved
+there from Appearance. Transparent output is always PNG at full device opacity
+(`outputFormat`, `outputDeviceOpacity`); the stored JPEG and opacity choices
+return in background mode, so the JPEG fill control is no longer needed. Gradients
+gain an adjustable end color, defaulting to the previous fixed stop for older
+settings. Frame color remains planned for a later version.
+
+This follows Apple's [Writing](https://developer.apple.com/design/human-interface-guidelines/writing)
+guidance for clear, consistent labels and [Disclosure controls](https://developer.apple.com/design/human-interface-guidelines/disclosure-controls)
+guidance for showing settings only when relevant.
+
+Verification: all 163 Debug tests passed with the two existing opt-in probes
+skipped, and the CLI check script passed. New regressions cover group order per
+mode, the fixed PNG row, opacity and JPEG visibility, template application,
+gradient stops and legacy decoding. A native capture of the running preview
+checked the transparent state; offscreen window captures checked transparent,
+browser, gradient and image/JPEG states in light and dark appearance (offscreen
+captures cannot render the selected native glass segment). Full VoiceOver,
+Increase Contrast, Reduce Transparency and subjective acceptance remain
+unverified. No PR, merge or completion acceptance is implied by these checks.
+
+Follow-up the same day: templates are removed. Each set only a built-in background
+image, a canvas ratio and a device size close to the default, all one click away,
+while changing the Background group from inside Composition. Device size keeps its
+meaning (100% puts the device's long side on the canvas edge) and says so: the
+slider marks 100% and settles on it within 4%, with an alignment haptic, its tooltip
+and VoiceOver value name the reference (占画布 74%), and a note appears above 100%
+that the overflow is cropped. The 拖动调整背景 switch is replaced by direct
+manipulation: a press on the device moves the device, a press on empty canvas pans an
+image background that overflows the canvas, and keyboard nudging still moves the
+device. A new regression presses above and below a device moved up or down and drags
+diagonally, so the hit test is checked vertically as well as sideways.
+Tiles without a detail line (background presets, the appearance settings window)
+now center image and title as one block instead of reserving an empty detail row,
+which left them top-heavy.
+
+The custom background image is now the fourth image tile (自定义) rather than a
+file row under the presets, so it carries the same selection ring and check and stays
+available after trying a preset; the stored path already survived preset changes.
+Without an image the tile shows a plus and opens the file panel; a missing file shows
+a warning symbol and does the same. While it is chosen, a row under the tiles names
+the file with a 更换… button. Images are not copied into the app, and switching back
+resets size and position like any other choice. Narrow tiles draw a smaller check so
+it covers less of the thumbnail.
+Placeholder symbols in tiles (the add tile, browser cards before artwork loads) draw at
+a fixed 17 pt instead of filling the artwork area. Choosing a tile rebuilds the group
+and restores focus to it; that restored focus no longer draws the keyboard focus ring,
+which the inspector's edge clipped on the leading card. Keyboard focus still shows the
+ring, now inset so it stays inside the group.
+
+The 显示透明区域 checkerboard toggle is removed from the floating canvas bar and the
+View menu. With padding gone, transparent output is the device itself, so the
+checkerboard only revealed rounded corners and the shadow margin (whose size the footer
+already reports), and in background mode the toggle did nothing at all. Following the
+HIG guidance to keep toolbars to frequently used controls, the bar is now just zoom.
+Transparent previews always use the stage with the viewing-only contact shadow.
+Value choices in the groups (shadow, browser appearance, background type, format and
+file size) use the native regular segmented size, 24 pt, instead of small (20 pt): easier
+to hit, and still one step below the large (28 pt) mode and device-type tabs.

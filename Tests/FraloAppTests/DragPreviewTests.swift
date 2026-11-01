@@ -19,7 +19,8 @@ final class DragPreviewTests: XCTestCase {
             let store = SettingsStore(url: directory.appendingPathComponent(UUID().uuidString + ".json"))
             var settings = CompositionSettings(); settings.mode = .background; settings.background = .sage
             settings.pngLossless = false; settings.pngQuality = 0.345; settings.format = format
-            settings.deviceX = 0.2; settings.backgroundScale = 2; settings.deviceOpacity = 0.6; settings.backgroundShadow = .strong
+            // Background pans start on empty canvas left of the shifted device; device drags start on the centered device.
+            settings.deviceX = pan ? 0.2 : 0; settings.backgroundScale = 2; settings.deviceOpacity = 0.6; settings.backgroundShadow = .strong
             try CompositionStore(legacy: store).save(settings)
             let suite = "fralo-drag-\(UUID())", board = NSPasteboard.withUniqueName()
             let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -30,13 +31,11 @@ final class DragPreviewTests: XCTestCase {
             func descendants(_ v: NSView) -> [NSView] { [v] + v.subviews.flatMap { descendants($0) } }
             let root = try XCTUnwrap(window.contentView)
             let canvas = try XCTUnwrap(descendants(root).compactMap { $0 as? CanvasSurface }.first)
-            let inspector = try XCTUnwrap(descendants(root).compactMap { $0 as? CompositionInspector }.first)
             controller.importURLs([source])
             for _ in 0..<2000 where canvas.image == nil { try await Task.sleep(nanoseconds: 5_000_000) }
             root.layoutSubtreeIfNeeded()
             let initialImage = try XCTUnwrap(canvas.image)
-            inspector.dragBackground = pan
-            let origin = canvas.convert(CGPoint(x: canvas.imageRect.midX, y: canvas.imageRect.midY), to: nil)
+            let origin = canvas.convert(CGPoint(x: canvas.imageRect.minX + canvas.imageRect.width * (pan ? 0.2 : 0.5), y: canvas.imageRect.midY), to: nil)
             func event(_ type: NSEvent.EventType, _ fraction: CGFloat) throws -> NSEvent {
                 try XCTUnwrap(NSEvent.mouseEvent(with: type, location: CGPoint(x: origin.x + fraction * canvas.imageRect.width, y: origin.y),
                     modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
@@ -70,7 +69,7 @@ final class DragPreviewTests: XCTestCase {
             XCTAssertFalse(canvas.isPositioningArtwork)
             XCTAssertFalse(canvas.image === initialImage)
             let saved = try CompositionStore(legacy: store).load()
-            if pan { XCTAssertNotEqual(saved.backgroundX, settings.backgroundX) }
+            if pan { XCTAssertNotEqual(saved.backgroundX, settings.backgroundX); XCTAssertEqual(saved.deviceX, settings.deviceX, "Dragging empty canvas leaves the device in place") }
             else { XCTAssertEqual(saved.deviceX, settings.deviceX + 0.14, accuracy: 0.00001) }
             let expected = try CompositionRenderer.render(ImageInput(url: source), settings: saved, preparePreviewLayers: true)
             let expectedRect = try XCTUnwrap(expected.previewLayers).deviceRect(settings: saved)
@@ -119,6 +118,47 @@ final class DragPreviewTests: XCTestCase {
         for _ in 0..<500 where canvas.image === initial { try await Task.sleep(nanoseconds: 10_000_000) }
         XCTAssertFalse(canvas.image === initial); XCTAssertTrue(canvas.allowsPositioning)
         XCTAssertFalse(canvas.isPositioningArtwork)
+    }
+
+    /// The drag target comes from where the press lands, so check it with the device moved up and down, not only sideways.
+    @MainActor func testPressOnDeviceMovesItAndPressOnEmptyCanvasPansImageVertically() async throws {
+        _ = NSApplication.shared
+        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/FraloApp/Development/Fixtures/03-journal.png")
+        // deviceY > 0 moves the device down in the preview; the device spans 74% of the canvas height.
+        for (deviceY, pressY, pans) in [(0.3, 0.1, true), (0.3, 0.8, false), (-0.3, 0.9, true), (-0.3, 0.2, false)] {
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            let suite = "fralo-drag-target-\(UUID())", defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+            let store = SettingsStore(url: directory.appendingPathComponent("settings.json"))
+            var settings = CompositionSettings(); settings.mode = .background; settings.background = .sage
+            settings.backgroundScale = 2; settings.deviceY = deviceY
+            try CompositionStore(legacy: store).save(settings)
+            let controller = MainWindowController(store: store, preferences: defaults, restoreWindow: false)
+            let window = try XCTUnwrap(controller.window); window.isReleasedWhenClosed = false
+            defer { window.close(); defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: directory) }
+            func descendants(_ v: NSView) -> [NSView] { [v] + v.subviews.flatMap { descendants($0) } }
+            let canvas = try XCTUnwrap(descendants(try XCTUnwrap(window.contentView)).compactMap { $0 as? CanvasSurface }.first)
+            controller.importURLs([source])
+            for _ in 0..<2000 where !canvas.allowsPositioning { try await Task.sleep(nanoseconds: 5_000_000) }
+            let rect = canvas.imageRect
+            let start = canvas.convert(CGPoint(x: rect.midX, y: rect.minY + rect.height * pressY), to: nil)
+            func event(_ type: NSEvent.EventType, _ d: CGFloat) throws -> NSEvent {
+                try XCTUnwrap(NSEvent.mouseEvent(with: type, location: CGPoint(x: start.x + d, y: start.y + d), modifierFlags: [],
+                    timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
+            }
+            canvas.mouseDown(with: try event(.leftMouseDown, 0))
+            canvas.mouseDragged(with: try event(.leftMouseDragged, 12))
+            canvas.mouseUp(with: try event(.leftMouseUp, 12))
+            let saved = try CompositionStore(legacy: store).load()
+            let context = "deviceY \(deviceY), press at \(pressY)"
+            if pans {
+                XCTAssertEqual(saved.deviceY, deviceY, context); XCTAssertEqual(saved.deviceX, 0, context)
+                XCTAssertNotEqual(saved.backgroundY, 0, context); XCTAssertNotEqual(saved.backgroundX, 0, context)
+            } else {
+                XCTAssertNotEqual(saved.deviceY, deviceY, context); XCTAssertNotEqual(saved.deviceX, 0, context)
+                XCTAssertEqual(saved.backgroundX, 0, context); XCTAssertEqual(saved.backgroundY, 0, context)
+            }
+        }
     }
 
     /// Opt-in visible-window cadence probe. Run separately from the test suite and UI QA.

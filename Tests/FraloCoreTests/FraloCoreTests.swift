@@ -57,17 +57,6 @@ final class FraloCoreTests: XCTestCase {
             XCTAssertLessThanOrEqual(result.image.width - 1 - maxX, 1); XCTAssertLessThanOrEqual(result.image.height - 1 - maxY, 1)
         } }
     }
-    func testPaddingAddsExactlyTransparentPixelsAndPreservesContent() throws {
-        let input = try source()
-        let zero = try FrameRenderer.render(input, settings: RenderSettings())
-        let padded = try FrameRenderer.render(input, settings: RenderSettings(padding: 17))
-        XCTAssertEqual(padded.image.width, zero.image.width + 34); XCTAssertEqual(padded.image.height, zero.image.height + 34)
-        for y in 0..<padded.image.height {
-            XCTAssertEqual(pixel(padded.image, 0, y)[3], 0); XCTAssertEqual(pixel(padded.image, 16, y)[3], 0)
-        }
-        let x = zero.image.width / 2, y = zero.image.height / 2
-        XCTAssertEqual(pixel(zero.image, x, y), pixel(padded.image, x + 17, y + 17))
-    }
     func testOriginalResolutionIsNotReducedToFrameTemplate() throws {
         let sourceSize = CGSize(width: 2640, height: 5736)
         let plan = try RenderPlan(sourceSize: sourceSize, settings: RenderSettings())
@@ -94,17 +83,21 @@ final class FraloCoreTests: XCTestCase {
     }
     func testPreviewAndFullRenderUseSamePlan() throws {
         let input = try source(width: 264, height: 573)
-        let full = try FrameRenderer.render(input, settings: RenderSettings(padding: 6))
-        let preview = try FrameRenderer.render(input, settings: RenderSettings(padding: 6), maxDimension: 120)
+        let full = try FrameRenderer.render(input, settings: RenderSettings())
+        let preview = try FrameRenderer.render(input, settings: RenderSettings(), maxDimension: 120)
         XCTAssertEqual(full.plan.pixelSize, preview.plan.pixelSize)
         XCTAssertLessThanOrEqual(max(preview.image.width, preview.image.height), 121)
     }
     func testSettingsRoundTripDefaultsAndValidation() throws {
         let store = SettingsStore(url: folder.appendingPathComponent("settings.json"))
         XCTAssertEqual(try store.load(), RenderSettings())
-        let saved = RenderSettings(model: .iPhone16Pro, orientation: .landscape, padding: 24)
+        let saved = RenderSettings(model: .iPhone16Pro, orientation: .landscape)
         try store.save(saved); XCTAssertEqual(try store.load(), saved)
-        XCTAssertThrowsError(try store.save(RenderSettings(padding: -1)))
+        var unsupported = RenderSettings(); unsupported.schemaVersion = 2
+        XCTAssertThrowsError(try store.save(unsupported))
+        // Files written before transparent padding was removed still load.
+        try Data(#"{"schemaVersion":1,"model":"iphone-16-pro","orientation":"landscape","padding":24}"#.utf8).write(to: store.url)
+        XCTAssertEqual(try store.load(), saved)
         try Data("broken".utf8).write(to: store.url)
         XCTAssertThrowsError(try store.load())
     }
@@ -113,10 +106,10 @@ final class FraloCoreTests: XCTestCase {
         let report = try BatchExporter.run(inputs: [good, bad], settings: RenderSettings(), directory: folder)
         XCTAssertEqual(report.succeeded, 1); XCTAssertEqual(report.failed, 1)
         let before = try Data(contentsOf: folder.appendingPathComponent("screen-fralo.png"))
-        let repeatReport = try BatchExporter.run(inputs: [good], settings: RenderSettings(padding: 20), directory: folder)
+        let repeatReport = try BatchExporter.run(inputs: [good], settings: RenderSettings(model: .iPhone16Pro), directory: folder)
         XCTAssertEqual(repeatReport.skipped, 1)
         XCTAssertEqual(before, try Data(contentsOf: folder.appendingPathComponent("screen-fralo.png")))
-        let replaced = try BatchExporter.run(inputs: [good], settings: RenderSettings(padding: 20), directory: folder, overwrite: true)
+        let replaced = try BatchExporter.run(inputs: [good], settings: RenderSettings(model: .iPhone16Pro), directory: folder, overwrite: true)
         XCTAssertEqual(replaced.succeeded, 1); XCTAssertNotEqual(before, try Data(contentsOf: folder.appendingPathComponent("screen-fralo.png")))
         let decoded = try JSONDecoder().decode(ExportReport.self, from: JSONEncoder().encode(report))
         XCTAssertEqual(decoded.failed, 1)

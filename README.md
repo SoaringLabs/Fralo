@@ -2,8 +2,8 @@
 
 **本地批量截图套框，一次导入，一次导出。**
 
-Fralo 是原生 macOS 截图套框工具。拖入一批 PNG / JPEG，统一选择 iPhone 外框、
-横竖屏和透明边距，检查预览后导出透明 PNG，或复制当前成品给其他工具。
+Fralo 是原生 macOS 截图套框工具。拖入一批 PNG / JPEG，统一选择 iPhone 外框
+和横竖屏，检查预览后导出透明 PNG，或复制当前成品给其他工具。
 
 App 和 CLI 使用同一套 Core Graphics 渲染核心。截图处理无需联网、账号或上传截图。
 App 的更新检查会连接 GitHub，不发送截图；可在 Fralo 菜单关闭自动检查。
@@ -16,7 +16,7 @@ App 的更新检查会连接 GitHub，不发送截图；可在 Fralo 菜单关�
 
 ![实际 App 操作演示](docs/assets/workflow.gif)
 
-演示由实际操作关键帧组成，展示批次切换和透明边距调整；时间经过编排，不代表处理耗时。
+演示由实际操作关键帧组成，展示批次切换和设置调整；时间经过编排，不代表处理耗时。
 
 以上界面和演示使用虚构的 Field Notes 示例，不含个人资料。
 [示例图片与复现方式](examples/README.md)。
@@ -39,7 +39,7 @@ App 的更新检查会连接 GitHub，不发送截图；可在 Fralo 菜单关�
 ## App 使用
 
 1. 拖入 PNG / JPEG、多选文件、导入文件夹当前层，或按 ⌘V 粘贴截图。
-2. 选择机型、竖屏 / 横屏、透明边距。同批次共享设置，下次启动沿用上次设置。
+2. 选择机型、竖屏 / 横屏。同批次共享设置，下次启动沿用上次设置。
 3. 从左侧列表切换图片，适应窗口或放大到 100% 检查。
 4. “复制当前图片”复制完整分辨率透明 PNG；“导出全部”一次选择输出目录。
    旁边下拉提供“导出当前图片”。
@@ -74,7 +74,7 @@ App 的更新检查会连接 GitHub，不发送截图；可在 Fralo 菜单关�
     ./dist/fralo models
     ./dist/fralo render ./screenshots --output ./framed
     ./dist/fralo render one.png two.jpg --output ./framed \
-      --model iphone-18-pro-max --orientation portrait --padding 24 --json
+      --model iphone-18-pro-max --orientation portrait --json
     ./dist/fralo settings
 
 CLI 无需打开 App。配置优先级：
@@ -125,10 +125,10 @@ GitHub Actions 对 main 分支推送和 Pull Request 执行 Core 测试、构建
 外框为独立绘制的参数化图形，不是 Apple 官方或照片级精确模板，
 不包含 Apple 官方外框 PNG。
 
-输出按源图像素密度与完整设备边界确定，默认零透明边距，包含侧键。
+输出按源图像素密度与完整设备边界确定，紧贴设备外观（包含侧键），不加透明边距。
 原图等比适配，允许最多 3% 的比例裁切；超过时报告该张失败。
 设备圆角与灵动岛会遮住相应区域。用户须提供与所选方向对应的截图。
-预览缩放只影响查看倍率，不改变导出尺寸。透明边距范围为 0–2048px。
+预览缩放只影响查看倍率，不改变导出尺寸。
 
 首版聚焦透明设备素材：不含错误方向纠正、截图内容编辑、
 海报背景、其他设备类型或多套命名预设。
