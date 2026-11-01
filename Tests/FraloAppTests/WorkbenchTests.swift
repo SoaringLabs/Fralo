@@ -116,13 +116,14 @@ final class WorkbenchTests: XCTestCase {
         list.select(1)
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
         let canvas = try XCTUnwrap(descendants(root).compactMap { $0 as? CanvasSurface }.first)
-        for _ in 0..<150 where canvas.image == nil { try await Task.sleep(nanoseconds: 20_000_000) }
+        try await waitForWorkbenchState("selected batch preview") { canvas.image != nil }
+        try await waitForSidebar(root, collapsed: false)
         let image = try XCTUnwrap(canvas.image)
         root.layoutSubtreeIfNeeded()
         let expandedWidth = root.content.frame.width
         window.makeFirstResponder(list.documentView)
         controller.toggleSidebar(nil)
-        try await Task.sleep(nanoseconds: 350_000_000); root.layoutSubtreeIfNeeded()
+        try await waitForSidebar(root, collapsed: true)
         XCTAssertTrue(root.collapsed); XCTAssertTrue(root.sidebarItem.isCollapsed)
         XCTAssertEqual(canvas.image?.size, image.size)
         XCTAssertGreaterThan(root.content.frame.width, expandedWidth + 200, "Full collapse must return the sidebar width to the preview")
@@ -133,7 +134,7 @@ final class WorkbenchTests: XCTestCase {
         canvas.keyDown(with: up)
         XCTAssertEqual(list.selectedIndex, 0, "Keyboard navigation must still select the real batch while its list is hidden")
         controller.toggleSidebar(nil)
-        try await Task.sleep(nanoseconds: 350_000_000); root.layoutSubtreeIfNeeded()
+        try await waitForSidebar(root, collapsed: false)
         XCTAssertFalse(root.sidebarItem.isCollapsed); XCTAssertTrue(window.firstResponder === list.documentView)
         XCTAssertFalse(defaults.bool(forKey: "sidebarCollapsed"))
         list.select(1)
@@ -145,11 +146,11 @@ final class WorkbenchTests: XCTestCase {
         }
         let inspector = try XCTUnwrap(root.right.body as? CompositionInspector)
         inspector.mode.choose(1)
-        for _ in 0..<150 where canvas.image?.size != CanvasRatio.landscape.size { try await Task.sleep(nanoseconds: 20_000_000) }
+        try await waitForWorkbenchState("landscape preview") { canvas.image?.size == CanvasRatio.landscape.size }
         XCTAssertEqual(canvas.image?.size, CanvasRatio.landscape.size)
         inspector.devicePicker.choose(1)
         inspector.devicePicker.choose(0)
-        for _ in 0..<150 where !canvas.allowsPositioning { try await Task.sleep(nanoseconds: 20_000_000) }
+        try await waitForWorkbenchState("positionable preview") { canvas.allowsPositioning }
         let point = canvas.convert(NSPoint(x: canvas.imageRect.midX, y: canvas.imageRect.midY), to: nil)
         let down = try XCTUnwrap(NSEvent.mouseEvent(with: .leftMouseDown, location: point, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
         canvas.mouseDown(with: down)

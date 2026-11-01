@@ -25,33 +25,45 @@ final class InspectorTransitionTests: XCTestCase {
         let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("examples/01-today.png")
         let sourceBytes = try Data(contentsOf: fixture)
         controller.importURLs([fixture])
-        for _ in 0..<1000 where canvas.image == nil { try await Task.sleep(nanoseconds: 10_000_000) }
+        try await waitForWorkbenchState("imported inspector preview", timeout: .seconds(10)) { canvas.image != nil }
+        try await waitForSidebar(root, collapsed: false)
         let image = try XCTUnwrap(canvas.image)
         let storedSettings = try Data(contentsOf: directory.appendingPathComponent("settings.workbench.json"))
         for size in [NSSize(width: 1400, height: 850), NSSize(width: 1030, height: 640)] {
-            window.setContentSize(size); root.layoutSubtreeIfNeeded(); controller.fitPreview(nil)
+            window.setContentSize(size)
+            try await waitForWorkbenchState("resized inspector viewport", diagnostics: { workbenchState(root) }) {
+                root.layoutSubtreeIfNeeded()
+                return abs(root.bounds.width - size.width) < 1 && root.content.bounds.width > 300
+            }
+            controller.fitPreview(nil)
             let startInset = root.viewingInsets.right, startX = canvas.imageRect.midX
-            controller.toggleInspector(nil)
             if !root.motionPreferences.effectiveReduceMotion {
+                controller.toggleInspector(nil)
                 XCTAssertEqual(root.viewingInsets.right, startInset, accuracy: 0.01, "Starting a slide must not publish its final viewing margins")
                 XCTAssertEqual(canvas.imageRect.midX, startX, accuracy: 0.1)
-                var samples: [CGFloat] = []
-                for _ in 0..<6 {
-                    try await Task.sleep(nanoseconds: 20_000_000)
+                let animation = try XCTUnwrap(root.inspectorAnimation)
+                // Drive the real animation callback synchronously. Under load AppKit
+                // may legitimately skip all intermediate timer frames for an unshown
+                // window, so a sleeping task cannot reliably sample those frames.
+                for progress: NSAnimation.Progress in [0.25, 0.5, 0.75] {
+                    animation.currentProgress = progress
                     root.layoutSubtreeIfNeeded()
                     let inset = root.viewingInsets.right
-                    samples.append(inset)
+                    XCTAssertGreaterThan(inset, 24.1)
+                    XCTAssertLessThan(inset, startInset - 0.1)
                     let reveal = (inset - 24) / (WorkbenchView.inspectorWidth + WorkbenchView.inspectorInset)
                     XCTAssertEqual(root.right.frame.minX, root.content.bounds.width + WorkbenchView.inspectorInset - (WorkbenchView.inspectorWidth + 2 * WorkbenchView.inspectorInset) * reveal, accuracy: 0.1)
                     XCTAssertEqual(canvas.viewingInsets.right, inset, accuracy: 0.1)
                     XCTAssertEqual(toolbar.convert(toolbar.bounds, to: root.content).midX, (24 + root.content.bounds.width - inset) / 2, accuracy: 1)
                 }
-                XCTAssertTrue(samples.contains { $0 > 24.1 && $0 < startInset - 0.1 }, "The actual artwork must receive intermediate viewing geometry")
                 let currentInset = root.viewingInsets.right
                 controller.toggleInspector(nil)
                 XCTAssertEqual(root.viewingInsets.right, currentInset, accuracy: 0.01, "Reversal starts at the presented geometry")
-            } else { controller.toggleInspector(nil) }
-            try await Task.sleep(nanoseconds: 350_000_000)
+                XCTAssertFalse(animation.isAnimating, "Reversal must stop the superseded animation")
+            } else {
+                controller.toggleInspector(nil); controller.toggleInspector(nil)
+            }
+            try await waitForInspector(root, hidden: false)
             XCTAssertFalse(root.inspectorHidden); XCTAssertFalse(root.right.isHidden)
             XCTAssertEqual(root.viewingInsets.right, startInset, accuracy: 0.01)
             XCTAssertEqual(canvas.imageRect.midX, startX, accuracy: 0.1)
@@ -60,11 +72,11 @@ final class InspectorTransitionTests: XCTestCase {
             controller.toggleInspector(nil)
             window.setContentSize(NSSize(width: size.width + 25, height: size.height))
             root.layoutSubtreeIfNeeded()
-            try await Task.sleep(nanoseconds: 350_000_000)
+            try await waitForInspector(root, hidden: true)
             XCTAssertEqual(root.viewingInsets.right, 24, accuracy: 0.01); XCTAssertTrue(root.right.isHidden)
             XCTAssertEqual(canvas.zoom, explicitZoom); XCTAssertTrue(window.firstResponder === canvas)
             controller.toggleInspector(nil)
-            try await Task.sleep(nanoseconds: 350_000_000)
+            try await waitForInspector(root, hidden: false)
             XCTAssertEqual(canvas.zoom, explicitZoom); XCTAssertTrue(canvas.image === image)
         }
         XCTAssertEqual(try Data(contentsOf: directory.appendingPathComponent("settings.workbench.json")), storedSettings)

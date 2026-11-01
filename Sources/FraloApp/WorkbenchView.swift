@@ -47,7 +47,7 @@ final class WorkbenchView: NSView {
     private(set) var sidebarItem: NSSplitViewItem!
     private var sidebarObservation: NSKeyValueObservation?
     private var storedCollapsed = false
-    private var movingSidebar = false
+    private(set) var movingSidebar = false
     private var sidebarTransition = 0
     var collapsed: Bool {
         get { storedCollapsed }
@@ -63,7 +63,9 @@ final class WorkbenchView: NSView {
         didSet { if motionPreferences.effectiveReduceMotion { settleInspector(); updateVisibility() } }
     }
     private var inspectorReveal: CGFloat = 1
-    private var inspectorAnimation: InspectorAnimation?
+    // Keep lifecycle ownership here while allowing deterministic progress sampling
+    // of the actual AppKit animation in module tests.
+    private(set) var inspectorAnimation: NSAnimation?
     private var motionObservation: NSObjectProtocol?
     var onGeometryChange: (() -> Void)?
     var onPanelVisibilityChange: (() -> Void)?

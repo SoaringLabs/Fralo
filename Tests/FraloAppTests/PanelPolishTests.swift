@@ -38,7 +38,11 @@ final class PanelPolishTests: XCTestCase {
         if #available(macOS 27.0, *) { XCTAssertTrue(more.menu.items.filter { !$0.isSeparatorItem }.allSatisfy { $0.value(forKey: "preferredImageVisibility") as? Int == 1 }) }
         XCTAssertEqual(more.menu.items.filter { !$0.isSeparatorItem }.map(\.keyEquivalent), ["o", "o", "v", "\u{8}", "", ","])
         for size in [NSSize(width: 1030, height: 640), NSSize(width: 1400, height: 1000), NSSize(width: 1900, height: 1000)] {
-            window.setContentSize(size); root.layoutSubtreeIfNeeded()
+            window.setContentSize(size)
+            try await waitForWorkbenchState("initial fixed inspector layout", diagnostics: { workbenchState(root) }) {
+                root.layoutSubtreeIfNeeded()
+                return abs(root.right.bounds.width - WorkbenchView.inspectorWidth) < 0.1 && root.content.bounds.width > 300
+            }
             XCTAssertEqual(root.right.bounds.width, WorkbenchView.inspectorWidth, accuracy: 0.1)
             XCTAssertGreaterThan(root.content.bounds.width, 300)
         }
@@ -48,16 +52,21 @@ final class PanelPolishTests: XCTestCase {
         let input = directory.appendingPathComponent("input.png"); try FrameRenderer.pngData(XCTUnwrap(context.makeImage())).write(to: input)
         controller.importURLs([input])
         let canvas = try XCTUnwrap(descendants(root.content).compactMap { $0 as? CanvasSurface }.first)
-        for _ in 0..<150 where canvas.image == nil { try await Task.sleep(nanoseconds: 20_000_000) }
+        try await waitForWorkbenchState("imported preview and enabled output actions") {
+            canvas.image != nil && actions.allSatisfy { $0.isEnabled }
+        }
         XCTAssertTrue(actions[0].isEnabled); XCTAssertTrue(actions[1].isEnabled)
         let image = try XCTUnwrap(canvas.image), list = try XCTUnwrap(root.left.body as? BatchList)
         inspector.mode.choose(1)
-        for _ in 0..<150 where canvas.image === image { try await Task.sleep(nanoseconds: 20_000_000) }
+        try await waitForWorkbenchState("background preview") { canvas.image != nil && canvas.image !== image }
         let encoder = JSONEncoder(); encoder.outputFormatting = .sortedKeys
         let rendered = try XCTUnwrap(canvas.image), stored = try encoder.encode(CompositionStore(legacy: store).load())
         window.setContentSize(NSSize(width: 1030, height: 640))
-        root.layoutSubtreeIfNeeded()
         let viewing = try XCTUnwrap(descendants(root.content).compactMap { $0 as? ViewToolbar }.first)
+        try await waitForSidebar(root, collapsed: false)
+        try await waitForWorkbenchState("compact viewing controls", diagnostics: { workbenchState(root) }) {
+            root.layoutSubtreeIfNeeded(); return viewing.isCompact
+        }
         XCTAssertTrue(viewing.isCompact)
         XCTAssertGreaterThanOrEqual(viewing.zoom.bounds.width, viewing.zoom.intrinsicContentSize.width - 1, "The fixed inspector must not truncate the zoom action at minimum width")
         let previousWidth = root.content.bounds.width
@@ -65,7 +74,7 @@ final class PanelPolishTests: XCTestCase {
         let field = inspector.devicePicker
         XCTAssertTrue(window.makeFirstResponder(field))
         toggleInspector()
-        try await Task.sleep(nanoseconds: 350_000_000); root.layoutSubtreeIfNeeded()
+        try await waitForInspector(root, hidden: true)
         XCTAssertTrue(root.inspectorHidden); XCTAssertTrue(root.right.isHidden)
         XCTAssertEqual(inspectorAction.toolTip, "显示出图设置")
         XCTAssertTrue(window.firstResponder === canvas)
@@ -98,7 +107,8 @@ final class PanelPolishTests: XCTestCase {
         XCTAssertTrue(root.previewing); XCTAssertEqual(inspectorAction.toolTip, "显示出图设置")
         XCTAssertTrue(toolbar.items.contains { $0.itemIdentifier.rawValue == "add" }, "Previewing hides the list, so the toolbar offers “+”")
         toggleInspector()
-        try await Task.sleep(nanoseconds: 350_000_000); root.layoutSubtreeIfNeeded()
+        try await waitForInspector(root, hidden: false)
+        try await waitForSidebar(root, collapsed: false)
         XCTAssertFalse(root.previewing); XCTAssertFalse(root.inspectorHidden); XCTAssertFalse(root.right.isHidden)
         XCTAssertEqual(inspectorAction.toolTip, "隐藏出图设置")
         XCTAssertFalse(toolbar.items.contains { $0.itemIdentifier.rawValue == "add" }, "The list header owns “+” while the list is visible")
@@ -106,8 +116,8 @@ final class PanelPolishTests: XCTestCase {
         XCTAssertEqual(root.right.bounds.width, WorkbenchView.inspectorWidth, accuracy: 0.1)
         window.setContentSize(NSSize(width: 1900, height: 1000)); root.layoutSubtreeIfNeeded()
         // Native split/stack layout finishes on the run loop after a window resize.
-        for _ in 0..<20 where viewing.isCompact {
-            try await Task.sleep(nanoseconds: 20_000_000); root.layoutSubtreeIfNeeded()
+        try await waitForWorkbenchState("regular viewing controls", diagnostics: { workbenchState(root) }) {
+            root.layoutSubtreeIfNeeded(); return !viewing.isCompact
         }
         XCTAssertFalse(viewing.isCompact, "A wide preview viewport must restore the regular toolbar spacing")
     }
@@ -126,7 +136,7 @@ final class PanelPolishTests: XCTestCase {
         let toggle = try XCTUnwrap(window.toolbar?.items.first { $0.itemIdentifier.rawValue == "sidebar" })
         XCTAssertTrue(root.collapsed, "An empty batch starts with the list collapsed")
         XCTAssertFalse(defaults.bool(forKey: "sidebarCollapsed"), "Automatic collapse must not overwrite the user's preference")
-        controller.toggleSidebar(nil); try await Task.sleep(nanoseconds: 350_000_000); root.layoutSubtreeIfNeeded()
+        controller.toggleSidebar(nil); try await waitForSidebar(root, collapsed: false)
         XCTAssertFalse(root.collapsed); XCTAssertFalse(defaults.bool(forKey: "sidebarCollapsed"))
         let boundary = try XCTUnwrap(window.toolbar?.items.first { $0 is NSTrackingSeparatorToolbarItem } as? NSTrackingSeparatorToolbarItem)
         XCTAssertTrue(boundary.splitView === root.splitView)
@@ -152,7 +162,7 @@ final class PanelPolishTests: XCTestCase {
         XCTAssertTrue(window.makeFirstResponder(field))
         let responder = window.firstResponder
         controller.toggleSidebar(nil)
-        try await Task.sleep(nanoseconds: 350_000_000)
+        try await waitForSidebar(root, collapsed: true)
         XCTAssertTrue(window.firstResponder === responder, "Hiding the list must not steal an inspector editing session")
         XCTAssertTrue(root.sidebarItem.isCollapsed)
         XCTAssertEqual(window.toolbar?.items.first?.itemIdentifier.rawValue, "add")
@@ -161,7 +171,7 @@ final class PanelPolishTests: XCTestCase {
         defer { restored.window?.close() }
         XCTAssertTrue(try XCTUnwrap(restored.window?.contentView as? WorkbenchView).collapsed)
         controller.toggleSidebar(nil); controller.toggleSidebar(nil); controller.toggleSidebar(nil)
-        try await Task.sleep(nanoseconds: 350_000_000); root.layoutSubtreeIfNeeded()
+        try await waitForSidebar(root, collapsed: false)
         XCTAssertFalse(root.collapsed); XCTAssertFalse(root.sidebarItem.isCollapsed)
         XCTAssertEqual(window.toolbar?.items.first?.itemIdentifier, .flexibleSpace)
         XCTAssertEqual(window.toolbar?.items.filter { $0 is NSTrackingSeparatorToolbarItem }.count, 1)
