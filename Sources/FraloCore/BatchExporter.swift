@@ -77,7 +77,7 @@ public enum BatchExporter {
         let backdrop = try backgroundData ?? composition.flatMap { try CompositionRenderer.backgroundData($0) }
         guard !inputs.isEmpty else { throw FraloError.message("没有可导出的图片。") }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let names = explicitNames ?? outputNames(for: inputs, format: composition?.format ?? .png)
+        let names = explicitNames ?? outputNames(for: inputs, format: composition?.outputFormat ?? .png)
         guard names.count == inputs.count else { throw FraloError.message("导出文件名数量不匹配。") }
         let started = Date()
         var entries: [ExportEntry] = []

@@ -82,11 +82,9 @@ final class ScenarioWorkbench: NSView {
         canvas.onNext = { [weak self] in self?.moveSelection(1) }
         canvas.onEscape = { [weak self] in if self?.state.scenario.preview == true { self?.togglePreview() } }
         toolbar.zoom.onChange = { [weak self] index in self?.canvas.zoom = index == 0 ? nil : index == 1 ? 1 : 0.5 }
-        toolbar.preview.onPress = { [weak self] in self?.togglePreview() }
         toolbar.surface.preferences = state.preferences
         refreshInspector(); setSidebarVisibility(); render()
         sidebarContainer.isHidden = state.scenario.preview; controls.isHidden = state.scenario.preview
-        toolbar.preview.title = state.scenario.preview ? "返回编辑 · Esc" : "成品预览"
         applyLayout(animated: false)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
@@ -139,7 +137,6 @@ final class ScenarioWorkbench: NSView {
         let preview = state.scenario.preview
         if preview { restoreFocus = window?.firstResponder }
         sidebarContainer.isHidden = preview; rightPanel.isHidden = preview; controls.isHidden = preview
-        toolbar.preview.title = preview ? "返回编辑 · Esc" : "成品预览"
         NSAnimationContext.runAnimationGroup { context in
             context.duration = FraloMotion.duration(.preview, preferences: state.preferences)
             applyLayout(animated: context.duration > 0 && window != nil)

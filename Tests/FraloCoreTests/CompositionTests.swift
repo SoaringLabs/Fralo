@@ -237,37 +237,53 @@ final class CompositionTests: XCTestCase {
             }
         }
     }
-    func testOpacityBackgroundResourcesAndJPEGFill() throws {
-        let source = try input(); var s = CompositionSettings(); s.deviceOpacity = 0.5
+    func testTransparentOutputStaysOpaquePNGWhileBackgroundKeepsOpacityAndJPEGFill() throws {
+        let source = try input(); var s = CompositionSettings(); s.deviceOpacity = 0.5; s.format = .jpeg
         var image = try CompositionRenderer.render(source, settings: s).image
         var bytes = try pixels(image)
-        XCTAssertLessThanOrEqual(stride(from: 3, to: bytes.count, by: 4).map { bytes[$0] }.max()!, 129)
+        XCTAssertEqual(stride(from: 3, to: bytes.count, by: 4).map { bytes[$0] }.max()!, 255, "Transparent output ignores device opacity")
+        XCTAssertEqual(s.outputFormat, .png)
+        let transparentData = try CompositionRenderer.data(image, settings: s)
+        XCTAssertEqual(Array(transparentData.prefix(4)), [0x89, 0x50, 0x4E, 0x47], "A stored JPEG choice never applies to transparent output")
+        XCTAssertEqual(try pixels(ImageInput(data: transparentData, name: "copy.png").decode())[3], 0)
         s.mode = .background; s.deviceOpacity = 0; s.backgroundOpacity = 0.3
+        XCTAssertEqual(s.outputFormat, .jpeg); XCTAssertEqual(s.outputDeviceOpacity, 0)
         for background: BackgroundKind in [.warm, .mist, .sage] {
             s.background = background
             let result = try CompositionRenderer.render(source, settings: s)
             XCTAssertEqual(result.pixelSize, s.canvas.size)
             bytes = try pixels(result.image); XCTAssertEqual(Int(bytes[3]), 77, accuracy: 2)
         }
-        s.mode = .transparent; s.format = .jpeg; s.jpegFill = ArtworkColor(1, 0, 0)
+        s.backgroundOpacity = 0; s.jpegFill = ArtworkColor(1, 0, 0)
         image = try CompositionRenderer.render(source, settings: s).image
-        let data = try CompositionRenderer.data(image, settings: s)
-        let decoded = try ImageInput(data: data, name: "test.jpg").decode()
+        let decoded = try ImageInput(data: CompositionRenderer.data(image, settings: s), name: "test.jpg").decode()
         bytes = try pixels(decoded)
         XCTAssertEqual(bytes[3], 255); XCTAssertGreaterThan(bytes[0], 245); XCTAssertLessThan(bytes[1], 10)
-        let png = try FrameRenderer.pngData(image)
-        XCTAssertEqual(try pixels(ImageInput(data: png, name: "copy.png").decode())[3], 0, "PNG copy retains transparency independently of JPEG")
+    }
+    func testGradientUsesBothStopsAndOlderSettingsKeepTheFormerEndColor() throws {
+        var s = CompositionSettings(); s.mode = .background; s.background = .gradient; s.deviceOpacity = 0
+        s.backgroundColor = ArtworkColor(1, 0, 0); s.backgroundEndColor = ArtworkColor(0, 0, 1)
+        let image = try CompositionRenderer.render(try input(), settings: s).image, bytes = try pixels(image)
+        let first = Array(bytes[0..<3]), last = Array(bytes[(bytes.count - 4)..<(bytes.count - 1)])
+        let corners = [first, last]
+        XCTAssertTrue(corners.contains { $0[0] > 230 && $0[2] < 25 }, "One corner shows the start color")
+        XCTAssertTrue(corners.contains { $0[2] > 230 && $0[0] < 25 }, "The opposite corner shows the end color")
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(s)) as? [String: Any])
+        json.removeValue(forKey: "backgroundEndColor")
+        let legacy = try JSONDecoder().decode(CompositionSettings.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(legacy.backgroundEndColor, CompositionSettings().backgroundEndColor)
+        XCTAssertEqual(legacy.backgroundColor, s.backgroundColor)
     }
     func testCompositionExportKeepsFailureSkipCancelAndSourceProtection() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let source = try input(), bad = ImageInput(data: Data([0,1,2]), name: "bad.png")
-        var s = CompositionSettings(); s.display = .browser; s.format = .jpeg
+        var s = CompositionSettings(); s.display = .browser; s.mode = .background; s.format = .jpeg
         let report = try BatchExporter.run(inputs: [source, bad], settings: .init(), directory: root, composition: s)
         XCTAssertEqual(report.succeeded, 1); XCTAssertEqual(report.failed, 1); XCTAssertEqual(report.composition, s)
         XCTAssertTrue(report.entries[0].output.hasSuffix(".jpg"))
-        XCTAssertEqual(try ImageInput(url: URL(fileURLWithPath: report.entries[0].output)).dimensions(), CGSize(width: 3000, height: 1875))
+        XCTAssertEqual(try ImageInput(url: URL(fileURLWithPath: report.entries[0].output)).dimensions(), s.canvas.size)
         let roundtrip = try JSONDecoder().decode(ExportReport.self, from: JSONEncoder().encode(report)); XCTAssertEqual(roundtrip.composition, s)
         let again = try BatchExporter.run(inputs: [source], settings: .init(), directory: root, composition: s); XCTAssertEqual(again.skipped, 1)
         let token = CancellationToken(); token.cancel()
@@ -317,7 +333,7 @@ final class CompositionTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let legacy = SettingsStore(url: root.appendingPathComponent("settings.json"))
-        let old = RenderSettings(model: .iPhone16Pro, orientation: .landscape, padding: 42)
+        let old = RenderSettings(model: .iPhone16Pro, orientation: .landscape)
         try legacy.save(old); let bytes = try Data(contentsOf: legacy.url)
         let store = CompositionStore(legacy: legacy); var s = try store.load()
         XCTAssertEqual(s.orientation, .landscape); s.mode = .background; try store.save(s)

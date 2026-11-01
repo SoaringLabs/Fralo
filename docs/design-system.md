@@ -11,7 +11,7 @@ This phase supplies reusable controls and experiments before the product workben
 | Workspace | Standard macOS material, allowing restrained desktop color blending |
 | Floating panel | Denser system material with consistent insets and boundaries |
 | Artwork | An independent, accurate output image, never tinted by desktop material |
-| Preview backing | Optional checkerboard; the tight transparent-shell editing view uses the workspace behind it. Neither backing enters export |
+| Preview backing | Transparent output sits on the workspace stage with a viewing-only contact shadow; there is no checkerboard toggle. No backing enters export |
 
 `FraloStyle` owns typography and structural spacing. System colors keep text, controls and selection compatible with effective appearance. The current spacing steps are 4/8/12/16/24/32 pt. These are Fralo specifications, not Apple-mandated dimensions. Native controls keep their intrinsic sizing and behavior.
 

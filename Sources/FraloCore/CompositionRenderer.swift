@@ -97,7 +97,7 @@ public enum CompositionRenderer {
             switch settings.background {
             case .solid: context.setFillColor(settings.backgroundColor.cgColor); context.fill(CGRect(origin: .zero, size: size))
             case .gradient:
-                let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: [settings.backgroundColor.cgColor, CGColor(srgbRed: 0.55, green: 0.62, blue: 0.65, alpha: 1)] as CFArray, locations: [0, 1])!
+                let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: [settings.backgroundColor.cgColor, settings.backgroundEndColor.cgColor] as CFArray, locations: [0, 1])!
                 context.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: size.width, y: size.height), options: [])
             default:
                 let bytes = try backgroundData ?? Self.backgroundData(settings)
@@ -120,7 +120,7 @@ public enum CompositionRenderer {
             let w = nativeSize.width * fit, h = nativeSize.height * fit
             rect = CGRect(x: (size.width - w) / 2 + CGFloat(settings.deviceX) * size.width, y: (size.height - h) / 2 + CGFloat(settings.deviceY) * size.height, width: w, height: h)
         } else { rect = CGRect(x: margin, y: margin, width: nativeSize.width, height: nativeSize.height) }
-        context.saveGState(); context.setAlpha(settings.deviceOpacity)
+        context.saveGState(); context.setAlpha(settings.outputDeviceOpacity)
         if blur > 0 { context.setShadow(offset: CGSize(width: 0, height: shadowOffset), blur: blur, color: CGColor(srgbRed: 0, green: 0, blue: 0, alpha: settings.shadow == .strong ? 0.4 : 0.23)) }
         draw(device, in: rect, context: context); context.restoreGState()
         guard let image = context.makeImage() else { throw FraloError.message("无法合成成品。") }
@@ -141,7 +141,7 @@ public enum CompositionRenderer {
             // Rasterize the shadow at composition scale once, rather than on every pointer event.
             let spriteSize = CGSize(width: ceil(rect.width + margin * 2), height: ceil(rect.height + margin * 2))
             let sprite = try bitmap(spriteSize)
-            sprite.setAlpha(settings.deviceOpacity)
+            sprite.setAlpha(settings.outputDeviceOpacity)
             if blur > 0 { sprite.setShadow(offset: CGSize(width: 0, height: shadowOffset), blur: blur, color: CGColor(srgbRed: 0, green: 0, blue: 0, alpha: settings.shadow == .strong ? 0.4 : 0.23)) }
             draw(device, in: CGRect(x: margin, y: margin, width: rect.width, height: rect.height), context: sprite)
             guard let spriteImage = sprite.makeImage() else { throw FraloError.message("无法创建拖动预览。") }
@@ -169,7 +169,7 @@ public enum CompositionRenderer {
         return context.makeImage()!
     }
     public static func data(_ image: CGImage, settings: CompositionSettings) throws -> Data {
-        if settings.format == .png {
+        if settings.outputFormat == .png {
             return try settings.pngLossless ? FrameRenderer.pngData(image) : PNGPaletteEncoder.data(image, quality: settings.pngQuality)
         }
         let flattened = try Self.flattened(image, color: settings.jpegFill)

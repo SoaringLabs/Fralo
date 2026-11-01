@@ -456,6 +456,8 @@ public final class CanvasSurface: NSView {
         super.resetCursorRects()
         if allowsPositioning { addCursorRect(imageRect, cursor: .openHand) }
     }
+    /// Where a positioning drag begins, as a fraction of the artwork; lets the owner pick what the drag moves.
+    public var onDragStart: ((CGPoint) -> Void)?
     public var onDrag: ((CGPoint) -> Void)?
     public var onDragEnd: (() -> Void)?
     public var centerGuideX = false { didSet { if oldValue != centerGuideX { updateGuides() } } }
@@ -532,6 +534,9 @@ public final class CanvasSurface: NSView {
     public override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self); dragPoint = allowsPositioning ? convert(event.locationInWindow, from: nil) : nil
         if allowsPositioning && !positioningCursorPushed { NSCursor.closedHand.push(); positioningCursorPushed = true }
+        if let point = dragPoint, imageRect.width > 0, imageRect.height > 0 {
+            onDragStart?(CGPoint(x: (point.x - imageRect.minX) / imageRect.width, y: (point.y - imageRect.minY) / imageRect.height))
+        }
     }
     public override func mouseDragged(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
@@ -673,8 +678,8 @@ public final class CanvasSurface: NSView {
     }
 }
 
-/// Floating canvas controls: `[ − 59% ⌄ + ] | [▦]`. The zoom readout is itself the preset menu;
-/// the steppers and the checkerboard toggle are native borderless symbol buttons.
+/// Floating canvas controls: `[ − 59% ⌄ + ]`. The zoom readout is itself the preset menu;
+/// the steppers are native borderless symbol buttons.
 @MainActor
 public final class ViewToolbar: NSView {
     public static let height: CGFloat = 36
@@ -697,7 +702,6 @@ public final class ViewToolbar: NSView {
     private var activityVersion = 0
     public private(set) var isUpdatingPreview = false
     public var showsComposition = false { didSet { composition.isHidden = !showsComposition; zoom.isHidden = showsComposition } }
-    public let preview = SymbolButton("checkerboard.rectangle", label: "显示透明区域", toggles: true)
     public init() {
         super.init(frame: .zero)
         surface.isInteractive = true
@@ -713,10 +717,8 @@ public final class ViewToolbar: NSView {
         zoom.widthAnchor.constraint(greaterThanOrEqualToConstant: 72).isActive = true
         progress.style = .spinning; progress.controlSize = .small; progress.isDisplayedWhenStopped = false
         progress.setAccessibilityLabel("正在更新预览"); progress.translatesAutoresizingMaskIntoConstraints = false
-        let divider = NSBox(); divider.boxType = .separator
-        divider.widthAnchor.constraint(equalToConstant: 1).isActive = true; divider.heightAnchor.constraint(equalToConstant: 16).isActive = true
-        row = FraloStyle.stack([zoomOut, zoom, zoomIn, composition, divider, preview], axis: .horizontal, spacing: 2)
-        row.setCustomSpacing(8, after: zoomIn); row.setCustomSpacing(8, after: composition); row.setCustomSpacing(8, after: divider)
+        row = FraloStyle.stack([zoomOut, zoom, zoomIn, composition], axis: .horizontal, spacing: 2)
+        row.setCustomSpacing(8, after: zoomIn)
         row.translatesAutoresizingMaskIntoConstraints = false; surface.contentView.addSubview(row)
         // The spinner takes the readout's place while a render is slow, so no action shifts.
         surface.contentView.addSubview(progress)

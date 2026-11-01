@@ -31,14 +31,12 @@ public struct RenderSettings: Codable, Equatable, Sendable {
     public var schemaVersion: Int = 1
     public var model: DeviceModel
     public var orientation: Orientation
-    public var padding: Int
 
-    public init(model: DeviceModel = .iPhone18ProMax, orientation: Orientation = .portrait, padding: Int = 0) {
-        self.model = model; self.orientation = orientation; self.padding = padding
+    public init(model: DeviceModel = .iPhone18ProMax, orientation: Orientation = .portrait) {
+        self.model = model; self.orientation = orientation
     }
     public func validated() throws -> Self {
         guard schemaVersion == 1 else { throw FraloError.message("配置版本不受支持：\(schemaVersion)") }
-        guard (0...2048).contains(padding) else { throw FraloError.message("透明边距须为 0–2048 px 的整数。") }
         return self
     }
 }

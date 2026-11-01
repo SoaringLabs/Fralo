@@ -59,19 +59,18 @@ public struct RenderPlan {
         }
         let size = geometry.orientedSize(settings.orientation)
         if let canvasSize {
-            scale = min((canvasSize.width - CGFloat(settings.padding * 2)) / size.width,
-                        (canvasSize.height - CGFloat(settings.padding * 2)) / size.height)
+            scale = min(canvasSize.width / size.width, canvasSize.height / size.height)
             pixelSize = canvasSize
             origin = CGPoint(x: (canvasSize.width - size.width * scale) / 2, y: (canvasSize.height - size.height * scale) / 2)
         } else {
             // Preserve the legacy CLI's source-density contract.
             scale = max(sourceSize.width / screen.width, sourceSize.height / screen.height)
-            pixelSize = CGSize(width: ceil(size.width * scale) + CGFloat(settings.padding * 2), height: ceil(size.height * scale) + CGFloat(settings.padding * 2))
-            origin = CGPoint(x: settings.padding, y: settings.padding)
+            pixelSize = CGSize(width: ceil(size.width * scale), height: ceil(size.height * scale))
+            origin = .zero
         }
         guard scale.isFinite, scale > 0, pixelSize.width.isFinite, pixelSize.height.isFinite,
               pixelSize.width > 0, pixelSize.height > 0, pixelSize.width * pixelSize.height <= 100_000_000 else {
-            throw FraloError.message("输出图片过大，请检查截图与所选设备方向或减少边距。")
+            throw FraloError.message("输出图片过大，请检查截图与所选设备方向。")
         }
     }
 }
