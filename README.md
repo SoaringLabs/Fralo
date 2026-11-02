@@ -22,8 +22,8 @@
 </div>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/workbench-dark.png">
-  <img src="docs/assets/workbench-light.png" alt="The Fralo workbench with three generated screenshots, an iPhone 18 Pro Max frame, and a warm background">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/workbench-en-dark.png">
+  <img src="docs/assets/workbench-en-light.png" width="1200" alt="The English Fralo workbench with three generated Field Notes screenshots, an iPhone 18 Pro Max frame, and a warm background">
 </picture>
 
 Fralo is a native macOS app and command-line tool that puts your screenshots inside
@@ -52,8 +52,8 @@ built on the same Core Graphics rendering core.
 - **Safe exports.** Existing files are skipped unless you choose to overwrite, originals are
   never touched, exports can be canceled, and one failed image does not stop the batch.
 - **A real Mac app.** Native sidebar, toolbar, menus, keyboard shortcuts, undo and redo,
-  light and dark appearance, and support for Reduce Motion, Reduce Transparency, and
-  Increase Contrast.
+  English, Simplified Chinese, Traditional Chinese, and Japanese, light and dark appearance,
+  and support for Reduce Motion, Reduce Transparency, and Increase Contrast.
 - **Scriptable.** A bundled `fralo` CLI renders batches without opening the App.
 - **Signed updates.** In-app updates through [Sparkle](https://sparkle-project.org), with
   Ed25519-verified archives. Fralo checks GitHub once a day, never installs silently, and can
@@ -87,7 +87,7 @@ for first launch, updating, and uninstalling.
 
 ### Updating
 
-Fralo 0.1.1 and later update in place: choose **Fralo → 检查更新…** (Check for Updates).
+Fralo 0.1.1 and later update in place: choose **Fralo → Check for Updates…**.
 Installing waits for any running export to finish. Fralo 0.1.0 has no updater; install the
 latest DMG once.
 
@@ -97,9 +97,13 @@ latest DMG once.
 | --- | --- |
 | macOS | 14 Sonoma or later (runtime-verified on macOS 27; older versions are build targets only) |
 | Hardware | Apple silicon. Intel builds are not published. |
-| Interface language | Simplified Chinese |
+| Interface languages | English, Simplified Chinese, Traditional Chinese, Japanese |
 
 ## Usage
+
+Choose **Fralo → Settings… → Appearance → Language** to change the interface language
+immediately. The default follows your macOS preferred languages; unsupported languages
+fall back to English.
 
 1. **Add screenshots.** Drag PNG or JPEG files onto the window, press ⌘O to choose files,
    ⇧⌘O to import a folder (top level only), or ⌘V to paste.

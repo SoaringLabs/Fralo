@@ -23,7 +23,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/workbench-dark.png">
-  <img src="docs/assets/workbench-light.png" alt="Fralo 工作台：三张自生成示例截图、iPhone 18 Pro Max 外框与暖灰背景">
+  <img src="docs/assets/workbench-light.png" width="1200" alt="简体中文 Fralo 工作台：三张自生成 Field Notes 示例截图、iPhone 18 Pro Max 外框与暖灰背景">
 </picture>
 
 Fralo 是原生 macOS App 和命令行工具，把截图放进手机、平板和浏览器外框。
@@ -49,7 +49,8 @@ Core Graphics 渲染核心。
 - **安全导出。** 默认跳过已有文件，覆盖须显式选择；始终保护原图；导出可取消，
   单张失败不影响整批。
 - **地道的 Mac App。** 原生侧边栏、工具栏、菜单与快捷键，支持撤销 / 重做、
-  浅色 / 深色外观，以及减少动态效果、降低透明度和增强对比度。
+  英文、简体中文、繁体中文和日语界面，浅色 / 深色外观，
+  以及减少动态效果、降低透明度和增强对比度。
 - **可脚本化。** 内置 `fralo` CLI，无需打开 App 即可批量渲染。
 - **签名更新。** 通过 [Sparkle](https://sparkle-project.org) 应用内更新，更新包经 Ed25519 校验。
   每天检查一次 GitHub，从不静默安装，也可改为仅手动检查。
@@ -91,9 +92,12 @@ Fralo 0.1.1 及以后版本可在应用内升级：选择 **Fralo → 检查更�
 | --- | --- |
 | macOS | macOS 14 Sonoma 或更新（已在 macOS 27 运行验证；更早版本仅为编译目标） |
 | 硬件 | Apple 芯片。暂不提供 Intel 版本。 |
-| 界面语言 | 简体中文 |
+| 界面语言 | English、简体中文、繁體中文、日本語 |
 
 ## 使用
+
+在 **Fralo → 设置… → 外观 → 语言** 中选择界面语言，立即生效。默认跟随 macOS
+首选语言；不支持的语言回退为英文。
 
 1. **添加截图。** 把 PNG / JPEG 拖进窗口，或按 ⌘O 选择文件、⇧⌘O 导入文件夹（仅当前层）、
    ⌘V 粘贴。
