@@ -63,7 +63,8 @@ def validate_source(source, version):
 
 def content_digest(source):
     content = {key: value for key, value in source.items() if key != "reviewed_sha256"}
-    return hashlib.sha256(json.dumps(content, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+    reviewed = {"source": content, "generated": generated_files(source)}
+    return hashlib.sha256(json.dumps(reviewed, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
 
 
 def read_source(directory, version):

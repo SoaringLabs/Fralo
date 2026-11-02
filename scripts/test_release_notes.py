@@ -6,8 +6,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from release_notes import (LANGUAGES, check_all, check_release, content_digest,
+from release_notes import (HEADINGS, LANGUAGES, check_all, check_release, content_digest,
                            generated_files, render_notes, validate_source)
 
 
@@ -101,6 +102,16 @@ class ReleaseNotesTests(unittest.TestCase):
         self.write_release(reviewed=False)
         with self.assertRaisesRegex(ValueError, "need review"):
             check_release(self.directory, "9.9.9")
+
+    def test_template_edits_require_review_of_the_new_rendered_text(self):
+        self.write_release()
+        headings = list(HEADINGS["fixed"])
+        headings[-1] = "修正された不具合"
+        with patch.dict(HEADINGS, {"fixed": tuple(headings)}):
+            # Regenerating after a template change must not reuse the old proofreading.
+            self.write_release(reviewed=False)
+            with self.assertRaisesRegex(ValueError, "need review"):
+                check_release(self.directory, "9.9.9")
 
     def test_only_published_legacy_releases_are_exempt(self):
         for version in ("0.1.0", "0.1.1", "0.2.0"):
