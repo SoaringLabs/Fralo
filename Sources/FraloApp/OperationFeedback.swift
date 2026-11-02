@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import FraloDesignSystem
 
@@ -57,10 +58,10 @@ final class OperationFeedback: NSView {
         // Below the title, above every hugging preference: the detail truncates only at the stage's width limit.
         detail.setContentCompressionResistancePriority(.defaultHigh - 1, for: .horizontal)
         close.isBordered = false; close.bezelStyle = .regularSquare; close.imagePosition = .imageOnly
-        close.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "关闭操作提示")?
+        close.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: L10n.tr("关闭操作提示"))?
             .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
         close.contentTintColor = .secondaryLabelColor
-        close.toolTip = "关闭"; close.setAccessibilityLabel("关闭操作提示")
+        close.toolTip = L10n.tr("关闭"); close.setAccessibilityLabel(L10n.tr("关闭操作提示"))
         close.target = self; close.action = #selector(closePressed(_:))
         close.widthAnchor.constraint(equalToConstant: 24).isActive = true
         close.heightAnchor.constraint(equalToConstant: 24).isActive = true

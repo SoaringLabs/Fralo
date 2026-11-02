@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import XCTest
 import FraloCore
@@ -22,7 +23,7 @@ final class OperationFeedbackTests: XCTestCase {
         let feedback = OperationFeedback(); feedback.frame = NSRect(x: 40, y: 40, width: 220, height: OperationFeedback.height)
         window.contentView?.addSubview(feedback); window.orderFront(nil)
         defer { feedback.dismiss(); window.close() }
-        feedback.show(.success, title: "已复制到剪贴板")
+        feedback.show(.success, title: L10n.tr("已复制到剪贴板"))
         XCTAssertFalse(feedback.isHidden)
         XCTAssertEqual(feedback.phase, .entering)
         let layer = try XCTUnwrap(feedback.layer)
@@ -64,7 +65,7 @@ final class OperationFeedbackTests: XCTestCase {
             controller.copyCurrent(nil)
             XCTAssertEqual(feedback.kind, .success)
             XCTAssertFalse(feedback.isHidden)
-            XCTAssertEqual(feedback.title.stringValue, "已复制到剪贴板")
+            XCTAssertEqual(feedback.title.stringValue, L10n.tr("已复制到剪贴板"))
             XCTAssertEqual(toolbar.dimensions.stringValue, readout)
             XCTAssertTrue(window.firstResponder === focus)
             XCTAssertNotNil(board.data(forType: .png))
@@ -86,8 +87,8 @@ final class OperationFeedbackTests: XCTestCase {
             }
             XCTAssertGreaterThan(rejecting.writes, 0)
             XCTAssertEqual(controller.operationFeedback.kind, .failure)
-            XCTAssertEqual(controller.operationFeedback.title.stringValue, "复制失败")
-            XCTAssertTrue(controller.operationFeedback.detail.stringValue.contains("重试"))
+            XCTAssertEqual(controller.operationFeedback.title.stringValue, L10n.tr("复制失败"))
+            XCTAssertEqual(controller.operationFeedback.detail.stringValue, L10n.tr("无法写入剪贴板，请重试"))
             XCTAssertNil(board.data(forType: .png))
             controller.operationFeedback.close.performClick(nil)
             XCTAssertTrue(controller.operationFeedback.isHidden)
@@ -123,7 +124,7 @@ final class OperationFeedbackTests: XCTestCase {
                     var preferences = DesignPreferences()
                     preferences.reduceMotion = true; preferences.reduceTransparency = true; preferences.increaseContrast = true
                     feedback.surface.preferences = preferences
-                    feedback.show(.failure, title: "复制失败", detail: "无法写入剪贴板，请重试")
+                    feedback.show(.failure, title: L10n.tr("复制失败"), detail: L10n.tr("无法写入剪贴板，请重试"))
                     window.contentView?.layoutSubtreeIfNeeded()
                     XCTAssertTrue(feedback.surface.isUsingOpaqueFallback)
                     XCTAssertEqual(feedback.bounds.height, OperationFeedback.height)

@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import XCTest
 import FraloCore
@@ -27,13 +28,13 @@ final class InspectorArtworkTests: XCTestCase {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 360, height: 700), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false; defer { window.close() }; window.contentView = inspector
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
-        let direction = try XCTUnwrap(descendants(inspector).compactMap { $0 as? VisualChoiceGroup }.first { $0.accessibilityLabel() == "方向" })
+        let direction = try XCTUnwrap(descendants(inspector).compactMap { $0 as? VisualChoiceGroup }.first { $0.accessibilityLabel() == L10n.tr("方向") })
         window.makeFirstResponder(direction)
         direction.choose(1)
         XCTAssertEqual(inspector.settings.orientation, .landscape)
         let restored = try XCTUnwrap(window.firstResponder as? VisualChoiceGroup)
         XCTAssertTrue(restored === direction, "Changing direction must preserve the control and its focus")
-        XCTAssertEqual(restored.accessibilityLabel(), "方向")
+        XCTAssertEqual(restored.accessibilityLabel(), L10n.tr("方向"))
         restored.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
             windowNumber: window.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: 123)!)
         XCTAssertEqual(inspector.settings.orientation, .portrait)

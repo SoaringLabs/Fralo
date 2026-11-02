@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 
 /// Default Fralo action style; native button events with the selected soft appearance.
@@ -111,7 +112,7 @@ public class ActionButton: NSButton {
     }
     private func refresh() {
         if !isEnabled { isHovered = false }
-        setAccessibilityLabel(accessibleName + (isBusy ? "，正在处理" : ""))
+        setAccessibilityLabel(isBusy ? L10n.tr("\(accessibleName)，正在处理") : accessibleName)
         if isBusy && !preferences.effectiveReduceMotion { activity.startAnimation(nil) }
         else { activity.stopAnimation(nil) }
         activity.isHidden = !isBusy || preferences.effectiveReduceMotion

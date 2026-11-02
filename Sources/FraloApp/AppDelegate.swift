@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import FraloCore
 
@@ -54,9 +55,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if mainController?.isExporting == true {
-            let alert = NSAlert(); alert.messageText = "正在导出图片"
-            alert.informativeText = "退出将停止剩余导出，已经完成的文件会保留。"
-            alert.addButton(withTitle: "继续导出"); alert.addButton(withTitle: "停止并退出")
+            let alert = NSAlert(); alert.messageText = L10n.tr("正在导出图片")
+            alert.informativeText = L10n.tr("退出将停止剩余导出，已经完成的文件会保留。")
+            alert.addButton(withTitle: L10n.tr("继续导出")); alert.addButton(withTitle: L10n.tr("停止并退出"))
             if alert.runModal() == .alertFirstButtonReturn { return .terminateCancel }
             mainController?.requestQuitAfterExport()
             return .terminateLater
@@ -70,73 +71,73 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func installMenus(_ controller: MainWindowController) {
         let bar = NSMenu()
         let app = NSMenu(); let appItem = NSMenuItem(); appItem.submenu = app; bar.addItem(appItem)
-        let about = app.addItem(withTitle: "关于 Fralo", action: #selector(showAbout(_:)), keyEquivalent: "")
+        let about = app.addItem(withTitle: L10n.tr("关于 Fralo"), action: #selector(showAbout(_:)), keyEquivalent: "")
         about.target = self
-        let settings = app.addItem(withTitle: "设置…", action: #selector(MainWindowController.showSettings(_:)), keyEquivalent: ",")
+        let settings = app.addItem(withTitle: L10n.tr("设置…"), action: #selector(MainWindowController.showSettings(_:)), keyEquivalent: ",")
         settings.target = controller; settings.keyEquivalentModifierMask = .command
         app.addItem(.separator())
-        let check = app.addItem(withTitle: "检查更新…", action: #selector(UpdateController.checkForUpdates(_:)), keyEquivalent: "")
+        let check = app.addItem(withTitle: L10n.tr("检查更新…"), action: #selector(UpdateController.checkForUpdates(_:)), keyEquivalent: "")
         check.target = updateController
-        let automatic = app.addItem(withTitle: "自动检查更新（每天）", action: #selector(UpdateController.toggleAutomaticChecks(_:)), keyEquivalent: "")
+        let automatic = app.addItem(withTitle: L10n.tr("自动检查更新（每天）"), action: #selector(UpdateController.toggleAutomaticChecks(_:)), keyEquivalent: "")
         automatic.target = updateController
         app.addItem(.separator())
-        app.addItem(withTitle: "隐藏 Fralo", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        app.addItem(withTitle: L10n.tr("隐藏 Fralo"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         app.addItem(.separator())
-        app.addItem(withTitle: "退出 Fralo", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        app.addItem(withTitle: L10n.tr("退出 Fralo"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
-        let file = NSMenu(title: "文件"); let fileItem = NSMenuItem(title: "文件", action: nil, keyEquivalent: ""); fileItem.submenu = file; bar.addItem(fileItem)
+        let file = NSMenu(title: L10n.tr("文件")); let fileItem = NSMenuItem(title: L10n.tr("文件"), action: nil, keyEquivalent: ""); fileItem.submenu = file; bar.addItem(fileItem)
         func item(_ menu: NSMenu, _ title: String, _ action: Selector, _ key: String = "", modifiers: NSEvent.ModifierFlags = .command) {
             let value = NSMenuItem(title: title, action: action, keyEquivalent: key)
             value.target = controller; value.keyEquivalentModifierMask = modifiers; menu.addItem(value)
         }
-        item(file, "添加图片…", #selector(MainWindowController.addImages(_:)), "o")
-        item(file, "导入文件夹…", #selector(MainWindowController.addFolder(_:)), "o", modifiers: [.command, .shift])
-        item(file, "新批次", #selector(MainWindowController.newBatch(_:)), "n")
+        item(file, L10n.tr("添加图片…"), #selector(MainWindowController.addImages(_:)), "o")
+        item(file, L10n.tr("导入文件夹…"), #selector(MainWindowController.addFolder(_:)), "o", modifiers: [.command, .shift])
+        item(file, L10n.tr("新批次"), #selector(MainWindowController.newBatch(_:)), "n")
         file.addItem(.separator())
-        item(file, "导出全部…", #selector(MainWindowController.exportAll(_:)), "e", modifiers: [.command, .shift])
-        item(file, "导出当前图片…", #selector(MainWindowController.exportCurrent(_:)), "e")
+        item(file, L10n.tr("导出全部…"), #selector(MainWindowController.exportAll(_:)), "e", modifiers: [.command, .shift])
+        item(file, L10n.tr("导出当前图片…"), #selector(MainWindowController.exportCurrent(_:)), "e")
         file.addItem(.separator())
-        file.addItem(withTitle: "关闭窗口", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        file.addItem(withTitle: L10n.tr("关闭窗口"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
 
-        let edit = NSMenu(title: "编辑"); let editItem = NSMenuItem(title: "编辑", action: nil, keyEquivalent: ""); editItem.submenu = edit; bar.addItem(editItem)
-        item(edit, "撤销", #selector(MainWindowController.undoChange(_:)), "z")
-        item(edit, "重做", #selector(MainWindowController.redoChange(_:)), "z", modifiers: [.command, .shift])
+        let edit = NSMenu(title: L10n.tr("编辑")); let editItem = NSMenuItem(title: L10n.tr("编辑"), action: nil, keyEquivalent: ""); editItem.submenu = edit; bar.addItem(editItem)
+        item(edit, L10n.tr("撤销"), #selector(MainWindowController.undoChange(_:)), "z")
+        item(edit, L10n.tr("重做"), #selector(MainWindowController.redoChange(_:)), "z", modifiers: [.command, .shift])
         edit.addItem(.separator())
-        edit.addItem(withTitle: "剪切", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        item(edit, "复制当前图片", #selector(MainWindowController.copyCurrent(_:)), "c")
-        item(edit, "粘贴图片", #selector(MainWindowController.pasteImage(_:)), "v")
-        edit.addItem(withTitle: "全选", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        edit.addItem(withTitle: L10n.tr("剪切"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        item(edit, L10n.tr("复制当前图片"), #selector(MainWindowController.copyCurrent(_:)), "c")
+        item(edit, L10n.tr("粘贴图片"), #selector(MainWindowController.pasteImage(_:)), "v")
+        edit.addItem(withTitle: L10n.tr("全选"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         edit.addItem(.separator())
-        item(edit, "删除", #selector(MainWindowController.removeSelected(_:)), "\u{8}", modifiers: [])
-        item(edit, "清空所有", #selector(MainWindowController.newBatch(_:)))
+        item(edit, L10n.tr("删除"), #selector(MainWindowController.removeSelected(_:)), "\u{8}", modifiers: [])
+        item(edit, L10n.tr("清空所有"), #selector(MainWindowController.newBatch(_:)))
 
-        let view = NSMenu(title: "显示"); let viewItem = NSMenuItem(title: "显示", action: nil, keyEquivalent: ""); viewItem.submenu = view; bar.addItem(viewItem)
-        item(view, "显示/隐藏侧边栏", #selector(MainWindowController.toggleSidebar(_:)), "s", modifiers: [.command, .control])
-        item(view, "显示/隐藏出图设置", #selector(MainWindowController.toggleInspector(_:)), "i", modifiers: [.command, .option])
-        item(view, "成品预览", #selector(MainWindowController.togglePreview(_:)), "p", modifiers: [.command, .option])
+        let view = NSMenu(title: L10n.tr("显示")); let viewItem = NSMenuItem(title: L10n.tr("显示"), action: nil, keyEquivalent: ""); viewItem.submenu = view; bar.addItem(viewItem)
+        item(view, L10n.tr("显示/隐藏侧边栏"), #selector(MainWindowController.toggleSidebar(_:)), "s", modifiers: [.command, .control])
+        item(view, L10n.tr("显示/隐藏出图设置"), #selector(MainWindowController.toggleInspector(_:)), "i", modifiers: [.command, .option])
+        item(view, L10n.tr("成品预览"), #selector(MainWindowController.togglePreview(_:)), "p", modifiers: [.command, .option])
         view.addItem(.separator())
-        item(view, "上一张图片", #selector(MainWindowController.previousImage(_:)), "[")
-        item(view, "下一张图片", #selector(MainWindowController.nextImage(_:)), "]")
-        let position = NSMenuItem(title: "微调位置", action: nil, keyEquivalent: "")
-        let positionMenu = NSMenu(title: "微调位置"); position.submenu = positionMenu; view.addItem(position)
-        for (title, key, delta) in [("向左移动 1 px", "\u{F702}", NSPoint(x: -1, y: 0)), ("向右移动 1 px", "\u{F703}", NSPoint(x: 1, y: 0)),
-                                    ("向上移动 1 px", "\u{F700}", NSPoint(x: 0, y: -1)), ("向下移动 1 px", "\u{F701}", NSPoint(x: 0, y: 1))] {
+        item(view, L10n.tr("上一张图片"), #selector(MainWindowController.previousImage(_:)), "[")
+        item(view, L10n.tr("下一张图片"), #selector(MainWindowController.nextImage(_:)), "]")
+        let position = NSMenuItem(title: L10n.tr("微调位置"), action: nil, keyEquivalent: "")
+        let positionMenu = NSMenu(title: L10n.tr("微调位置")); position.submenu = positionMenu; view.addItem(position)
+        for (title, key, delta) in [(L10n.tr("向左移动 1 px"), "\u{F702}", NSPoint(x: -1, y: 0)), (L10n.tr("向右移动 1 px"), "\u{F703}", NSPoint(x: 1, y: 0)),
+                                    (L10n.tr("向上移动 1 px"), "\u{F700}", NSPoint(x: 0, y: -1)), (L10n.tr("向下移动 1 px"), "\u{F701}", NSPoint(x: 0, y: 1))] {
             item(positionMenu, title, #selector(MainWindowController.nudgeArtwork(_:)), key, modifiers: .option)
             positionMenu.items.last?.representedObject = NSValue(point: delta)
         }
         view.addItem(.separator())
-        item(view, "适应窗口", #selector(MainWindowController.fitPreview(_:)), "0")
-        item(view, "实际像素", #selector(MainWindowController.actualPixels(_:)), "1")
-        item(view, "放大", #selector(MainWindowController.zoomIn(_:)), "+")
+        item(view, L10n.tr("适应窗口"), #selector(MainWindowController.fitPreview(_:)), "0")
+        item(view, L10n.tr("实际像素"), #selector(MainWindowController.actualPixels(_:)), "1")
+        item(view, L10n.tr("放大"), #selector(MainWindowController.zoomIn(_:)), "+")
         // ⌘= reaches “放大” without Shift on layouts where + is shifted.
-        item(view, "放大", #selector(MainWindowController.zoomIn(_:)), "=")
+        item(view, L10n.tr("放大"), #selector(MainWindowController.zoomIn(_:)), "=")
         view.items.last?.isHidden = true; view.items.last?.allowsKeyEquivalentWhenHidden = true
-        item(view, "缩小", #selector(MainWindowController.zoomOut(_:)), "-")
-        let appearance = NSMenuItem(title: "外观", action: nil, keyEquivalent: ""); appearance.submenu = controller.appearanceMenu(); view.addItem(appearance)
+        item(view, L10n.tr("缩小"), #selector(MainWindowController.zoomOut(_:)), "-")
+        let appearance = NSMenuItem(title: L10n.tr("外观"), action: nil, keyEquivalent: ""); appearance.submenu = controller.appearanceMenu(); view.addItem(appearance)
 
-        let window = NSMenu(title: "窗口"); let windowItem = NSMenuItem(title: "窗口", action: nil, keyEquivalent: ""); windowItem.submenu = window; bar.addItem(windowItem)
-        window.addItem(withTitle: "最小化", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-        window.addItem(withTitle: "缩放", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        let window = NSMenu(title: L10n.tr("窗口")); let windowItem = NSMenuItem(title: L10n.tr("窗口"), action: nil, keyEquivalent: ""); windowItem.submenu = window; bar.addItem(windowItem)
+        window.addItem(withTitle: L10n.tr("最小化"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        window.addItem(withTitle: L10n.tr("缩放"), action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
         #if FRALO_DEV
         development.install(in: bar, mainWindow: controller.window)
         #endif
@@ -144,7 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func showAbout(_ sender: Any?) {
-        let credits = NSMutableAttributedString(string: "开发者：\(FraloInfo.developer)\n维护者：Ethan (@Peek-A-Booo)\nMIT 开源许可\n")
+        let credits = NSMutableAttributedString(string: L10n.tr("开发者：\(FraloInfo.developer)\n维护者：Ethan (@Peek-A-Booo)\nMIT 开源许可\n"))
         let organization = NSAttributedString(string: "Soaring Labs on GitHub", attributes: [.link: URL(string: FraloInfo.homepage)!])
         credits.append(organization)
         NSApp.orderFrontStandardAboutPanel(options: [

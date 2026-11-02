@@ -1,3 +1,5 @@
+import FraloLocalization
+import FraloLocalization
 import AppKit
 import XCTest
 @testable import FraloDesignSystem
@@ -11,7 +13,7 @@ final class HIGControlsTests: XCTestCase {
             XCTAssertFalse(row.valueField.commit())
             XCTAssertEqual(row.value, 74); XCTAssertTrue(edits.isEmpty)
             XCTAssertFalse(row.validationLabel.isHidden)
-            XCTAssertTrue(row.validationLabel.stringValue.contains("10–150"))
+            XCTAssertEqual(row.validationLabel.stringValue, L10n.tr("请输入 \("10")–\("150") 之间的数值。"))
             XCTAssertEqual(row.valueField.accessibilityHelp(), row.validationLabel.stringValue)
         }
         row.valueField.stringValue = "74.5"; XCTAssertTrue(row.valueField.commit())
@@ -22,7 +24,7 @@ final class HIGControlsTests: XCTestCase {
         XCTAssertTrue(row.valueField.commit()); XCTAssertEqual(row.value, 82.504, "Leaving rounded display must preserve slider precision")
     }
     @MainActor func testNumericInputUsesLocaleDecimalAndRejectsPartialParsing() async {
-        let field = ValueField(label: "缩放", value: 74.5, range: 10...150, locale: Locale(identifier: "de_DE"))
+        let field = ValueField(label: L10n.tr("缩放"), value: 74.5, range: 10...150, locale: Locale(identifier: "de_DE"))
         XCTAssertEqual(field.stringValue, "74,5")
         field.stringValue = "75,25"; XCTAssertTrue(field.commit()); XCTAssertEqual(field.value, 75.25)
         field.stringValue = "75.5"; XCTAssertFalse(field.commit()); XCTAssertEqual(field.value, 75.25)

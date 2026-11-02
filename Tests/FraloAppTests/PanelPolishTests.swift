@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import XCTest
 import FraloCore
@@ -28,12 +29,12 @@ final class PanelPolishTests: XCTestCase {
         XCTAssertEqual(Array(toolbar.items.prefix(4).map { $0.itemIdentifier }), [.init("add"), .init("sidebar"), .init("document"), .flexibleSpace])
         XCTAssertEqual(actions.map(\.action), [#selector(MainWindowController.copyCurrent(_:)), #selector(MainWindowController.exportCurrent(_:))])
         XCTAssertTrue(actions.allSatisfy { $0.target === controller && $0.isBordered })
-        XCTAssertEqual(actions.map(\.label), ["复制当前图片", "导出当前图片"])
+        XCTAssertEqual(actions.map(\.label), [L10n.tr("复制当前图片"), L10n.tr("导出当前图片")])
         XCTAssertFalse(actions[1].isEnabled)
         XCTAssertEqual(inspectorAction.action, #selector(MainWindowController.toggleInspector(_:)))
         XCTAssertFalse(try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "document" }).isBordered)
         XCTAssertEqual(Array(toolbar.items.suffix(6).map(\.itemIdentifier)), [.init("copyCurrent"), .init("exportCurrent"), .space, .init("inspector"), .space, .init("more")])
-        XCTAssertEqual(more.menu.items.filter { !$0.isSeparatorItem }.map(\.title), ["添加图片…", "导入文件夹…", "粘贴图片", "删除", "清空所有", "设置…"])
+        XCTAssertEqual(more.menu.items.filter { !$0.isSeparatorItem }.map(\.title), [L10n.tr("添加图片…"), L10n.tr("导入文件夹…"), L10n.tr("粘贴图片"), L10n.tr("删除"), L10n.tr("清空所有"), L10n.tr("设置…")])
         XCTAssertTrue(more.menu.items.filter { !$0.isSeparatorItem }.allSatisfy { $0.image?.isTemplate == true })
         if #available(macOS 27.0, *) { XCTAssertTrue(more.menu.items.filter { !$0.isSeparatorItem }.allSatisfy { $0.value(forKey: "preferredImageVisibility") as? Int == 1 }) }
         XCTAssertEqual(more.menu.items.filter { !$0.isSeparatorItem }.map(\.keyEquivalent), ["o", "o", "v", "\u{8}", "", ","])
@@ -46,7 +47,7 @@ final class PanelPolishTests: XCTestCase {
             XCTAssertEqual(root.right.bounds.width, WorkbenchView.inspectorWidth, accuracy: 0.1)
             XCTAssertGreaterThan(root.content.bounds.width, 300)
         }
-        XCTAssertEqual(inspectorAction.toolTip, "隐藏出图设置"); XCTAssertFalse(root.inspectorHidden); XCTAssertFalse(actions[0].isEnabled)
+        XCTAssertEqual(inspectorAction.toolTip, L10n.tr("隐藏出图设置")); XCTAssertFalse(root.inspectorHidden); XCTAssertFalse(actions[0].isEnabled)
         let context = try XCTUnwrap(CGContext(data: nil, width: 300, height: 600, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.setFillColor(CGColor(srgbRed: 0.1, green: 0.6, blue: 0.3, alpha: 1)); context.fill(CGRect(x: 0, y: 0, width: 300, height: 600))
         let input = directory.appendingPathComponent("input.png"); try FrameRenderer.pngData(XCTUnwrap(context.makeImage())).write(to: input)
@@ -76,7 +77,7 @@ final class PanelPolishTests: XCTestCase {
         toggleInspector()
         try await waitForInspector(root, hidden: true)
         XCTAssertTrue(root.inspectorHidden); XCTAssertTrue(root.right.isHidden)
-        XCTAssertEqual(inspectorAction.toolTip, "显示出图设置")
+        XCTAssertEqual(inspectorAction.toolTip, L10n.tr("显示出图设置"))
         XCTAssertTrue(window.firstResponder === canvas)
         XCTAssertEqual(root.content.bounds.width, previousWidth, "Floating inspector never changes the viewport width")
         let viewingWidth = root.content.bounds.width - root.viewingInsets.left - root.viewingInsets.right
@@ -104,13 +105,13 @@ final class PanelPolishTests: XCTestCase {
         XCTAssertNil(viewing.zoom.selectedItem, "A stepped zoom between presets must not keep the fit checkmark")
         controller.fitPreview(nil); XCTAssertEqual(viewing.zoom.indexOfSelectedItem, 0); XCTAssertTrue(viewing.zoomOut.isEnabled)
         controller.togglePreview(nil)
-        XCTAssertTrue(root.previewing); XCTAssertEqual(inspectorAction.toolTip, "显示出图设置")
+        XCTAssertTrue(root.previewing); XCTAssertEqual(inspectorAction.toolTip, L10n.tr("显示出图设置"))
         XCTAssertTrue(toolbar.items.contains { $0.itemIdentifier.rawValue == "add" }, "Previewing hides the list, so the toolbar offers “+”")
         toggleInspector()
         try await waitForInspector(root, hidden: false)
         try await waitForSidebar(root, collapsed: false)
         XCTAssertFalse(root.previewing); XCTAssertFalse(root.inspectorHidden); XCTAssertFalse(root.right.isHidden)
-        XCTAssertEqual(inspectorAction.toolTip, "隐藏出图设置")
+        XCTAssertEqual(inspectorAction.toolTip, L10n.tr("隐藏出图设置"))
         XCTAssertFalse(toolbar.items.contains { $0.itemIdentifier.rawValue == "add" }, "The list header owns “+” while the list is visible")
         XCTAssertNotNil(toolbar.items.first { $0 is NSTrackingSeparatorToolbarItem })
         XCTAssertEqual(root.right.bounds.width, WorkbenchView.inspectorWidth, accuracy: 0.1)
@@ -194,7 +195,7 @@ final class PanelPolishTests: XCTestCase {
         window.setContentSize(NSSize(width: 1400, height: 1000))
         let root = try XCTUnwrap(window.contentView as? WorkbenchView)
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
-        let shadow = try XCTUnwrap(descendants(root).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == "阴影" })
+        let shadow = try XCTUnwrap(descendants(root).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == L10n.tr("阴影") })
         let canvas = try XCTUnwrap(descendants(root).compactMap { $0 as? CanvasSurface }.first)
         let context = try XCTUnwrap(CGContext(data: nil, width: 400, height: 800, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.setFillColor(CGColor(srgbRed: 0.1, green: 0.4, blue: 0.3, alpha: 1)); context.fill(CGRect(x: 0, y: 0, width: 400, height: 800))
@@ -319,7 +320,7 @@ final class PanelPolishTests: XCTestCase {
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
         let root = try XCTUnwrap(controller.window?.contentView as? WorkbenchView)
         let list = try XCTUnwrap(root.left.body as? BatchList)
-        let choice = try XCTUnwrap(descendants(root.right.body).compactMap { $0 as? VisualChoiceGroup }.first { $0.accessibilityLabel() == "方向" })
+        let choice = try XCTUnwrap(descendants(root.right.body).compactMap { $0 as? VisualChoiceGroup }.first { $0.accessibilityLabel() == L10n.tr("方向") })
         let canvas = try XCTUnwrap(descendants(root.content).compactMap { $0 as? CanvasSurface }.first)
         for (name, red, green) in [("green.png", 0.1, 0.8), ("red.png", 0.9, 0.1)] {
             let context = try XCTUnwrap(CGContext(data: nil, width: 100, height: 200, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
@@ -346,14 +347,15 @@ final class PanelPolishTests: XCTestCase {
         XCTAssertFalse(canvas.image === first, "The real preview still follows the selected input")
         XCTAssertEqual(try illustration(), before, "The inspector demo must not follow the selected input")
         let inspector = try XCTUnwrap(root.right.body as? CompositionInspector)
-        for _ in 0..<150 where !inspector.outputSize.stringValue.hasPrefix("约 ") { try await Task.sleep(nanoseconds: 20_000_000) }
-        XCTAssertTrue(inspector.outputSize.stringValue.hasSuffix(" / 张"), "The per-image size is estimated automatically after each preview")
-        let compression = try XCTUnwrap(descendants(inspector).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == "文件大小" })
+        for _ in 0..<150 where inspector.outputSize.stringValue.isEmpty || inspector.outputSize.stringValue == "—" || inspector.outputSize.stringValue == L10n.tr("正在估算…") { try await Task.sleep(nanoseconds: 20_000_000) }
+        let wrapper = L10n.tr("约 \("__SIZE__") / 张").components(separatedBy: "__SIZE__")
+        XCTAssertTrue(inspector.outputSize.stringValue.hasPrefix(wrapper[0]) && inspector.outputSize.stringValue.hasSuffix(wrapper[1]), "The per-image size is estimated automatically after each preview")
+        let compression = try XCTUnwrap(descendants(inspector).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == L10n.tr("文件大小") })
         let previous = canvas.image; compression.choose(1)
         for _ in 0..<250 where canvas.image === previous { try await Task.sleep(nanoseconds: 20_000_000) }
         XCTAssertFalse(inspector.settings.pngLossless)
         XCTAssertFalse(canvas.image === previous)
-        XCTAssertTrue(inspector.outputSize.stringValue.hasPrefix("约 "), "Reuse PNG preview encoding to report bytes without another render")
+        XCTAssertTrue(inspector.outputSize.stringValue.hasPrefix(wrapper[0]), "Reuse PNG preview encoding to report bytes without another render")
     }
 
 }

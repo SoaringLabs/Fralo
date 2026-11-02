@@ -30,7 +30,32 @@ public final class VisualChoiceGroup: NSControl {
     public override var acceptsFirstResponder: Bool { isEnabled }
     public override var isEnabled: Bool { didSet { cards.forEach { $0.isEnabled = isEnabled } } }
     private var columns: Int {
-        switch arrangement { case .tiles(let count, _), .options(let count): return max(1, count); case .row: return 1 }
+        switch arrangement {
+        case .tiles(let count, _):
+            let available = bounds.width > 0 ? bounds.width : 280
+            let needed = cards.map { card in
+                let title = (card.item.title as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 12, weight: .semibold)]).width
+                let detail = (card.item.detail as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 10)]).width
+                return max(title, detail) + 16
+            }.max() ?? 0
+            var result = max(1, count)
+            while result > 1 && ((available - CGFloat(result - 1) * 8) / CGFloat(result) < needed ||
+                                  (result < count && cards.count % result != 0)) {
+                result -= 1
+            }
+            return result
+        case .options(let count):
+            let available = bounds.width > 0 ? bounds.width : 280
+            let font = NSFont.systemFont(ofSize: 12.5, weight: .semibold)
+            let labelWidth = cards.map { ($0.item.title as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+            // The symbol and selection mark need 76 pt in addition to the complete title.
+            var result = max(1, count)
+            while result > 1 && (available - CGFloat(result - 1) * 8) / CGFloat(result) < labelWidth + 76 {
+                result -= 1
+            }
+            return result
+        case .row: return 1
+        }
     }
     private var rowHeight: CGFloat {
         switch arrangement { case .tiles(_, let height): return height; case .options: return 44; case .row: return 72 }
@@ -60,6 +85,11 @@ public final class VisualChoiceGroup: NSControl {
     }
         public func setImages(_ images: [NSImage?]) {
         for (index, card) in cards.enumerated() where images.indices.contains(index) { card.artwork = images[index] }
+    }
+    public override func setFrameSize(_ newSize: NSSize) {
+        let previousColumns = columns
+        super.setFrameSize(newSize)
+        if previousColumns != columns { invalidateIntrinsicContentSize(); needsLayout = true }
     }
     public override func layout() {
         super.layout()

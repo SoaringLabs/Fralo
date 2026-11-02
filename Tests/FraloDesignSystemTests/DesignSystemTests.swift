@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import XCTest
 @testable import FraloDesignSystem
@@ -13,7 +14,7 @@ final class DesignSystemTests: XCTestCase {
         XCTAssertEqual(edits, [81.25]); XCTAssertEqual(field.value, 81.25)
         XCTAssertTrue(field.commit()); XCTAssertEqual(edits, [81.25])
         field.restore(100); XCTAssertEqual(field.stringValue, "100")
-        let widest = ValueField(label: "缩放", value: 399.9, range: 100...400)
+        let widest = ValueField(label: L10n.tr("缩放"), value: 399.9, range: 100...400)
         widest.frame = NSRect(x: 0, y: 0, width: 56, height: 24)
         let textWidth = (widest.stringValue as NSString).size(withAttributes: [.font: widest.font!]).width
         XCTAssertGreaterThanOrEqual(widest.cell!.drawingRect(forBounds: widest.bounds).width, textWidth)
@@ -98,24 +99,24 @@ final class DesignSystemTests: XCTestCase {
     @MainActor func testActionButtonBusyPreservesWidthAndRequestedAvailability() async {
         _ = NSApplication.shared
         var presses = 0
-        let button = ActionButton("导出全部", role: .primary, symbol: "square.and.arrow.up") { presses += 1 }
+        let button = ActionButton(L10n.tr("导出全部"), role: .primary, symbol: "square.and.arrow.up") { presses += 1 }
         let size = button.intrinsicContentSize
         button.performClick(nil); XCTAssertEqual(presses, 1)
         button.isBusy = true; button.performClick(nil)
         XCTAssertEqual(presses, 1); XCTAssertFalse(button.isEnabled)
         XCTAssertEqual(button.intrinsicContentSize, size)
-        XCTAssertEqual(button.accessibilityLabel(), "导出全部，正在处理")
+        XCTAssertEqual(button.accessibilityLabel(), L10n.tr("\(L10n.tr("导出全部"))，正在处理"))
         button.isEnabled = false; button.isBusy = false
         XCTAssertFalse(button.isEnabled)
         button.isEnabled = true; button.performClick(nil)
         XCTAssertEqual(presses, 2)
         XCTAssertEqual(button.accessibilityRole(), .button)
-        XCTAssertEqual(button.accessibilityLabel(), "导出全部")
+        XCTAssertEqual(button.accessibilityLabel(), L10n.tr("导出全部"))
     }
 
     @MainActor func testMomentaryClicksNeverLeaveAStaleOnState() {
         _ = NSApplication.shared
-        let button = IconButton("plus", label: "添加图片")
+        let button = IconButton("plus", label: L10n.tr("添加图片"))
         for _ in 0..<3 { button.performClick(nil) }
         XCTAssertEqual(button.state, .off, "A plain action must not look pressed after the click")
         button.state = .on; button.performClick(nil)
@@ -149,7 +150,7 @@ final class DesignSystemTests: XCTestCase {
         _ = NSApplication.shared
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 300), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false; window.autorecalculatesKeyViewLoop = false
-        let button = ActionButton("添加图片", symbol: "plus")
+        let button = ActionButton(L10n.tr("添加图片"), symbol: "plus")
         button.frame = NSRect(x: 0, y: 0, width: 120, height: 34)
         let field = NSTextField(frame: NSRect(x: 150, y: 0, width: 120, height: 24))
         window.contentView?.addSubview(button); window.contentView?.addSubview(field)
@@ -167,7 +168,7 @@ final class DesignSystemTests: XCTestCase {
     @MainActor func testPickerRestorationDoesNotEditAndKeyboardRespectsDisabledState() async {
         _ = NSApplication.shared
         var edits: [Int] = []
-        let picker = ValuePicker(["竖屏", "横屏"], label: "方向") { edits.append($0) }
+        let picker = ValuePicker([L10n.tr("竖屏"), L10n.tr("横屏")], label: L10n.tr("方向")) { edits.append($0) }
         picker.selectedIndex = 1
         picker.choose(1); picker.choose(9)
         XCTAssertTrue(edits.isEmpty)
@@ -226,7 +227,7 @@ final class DesignSystemTests: XCTestCase {
             list.select(40); list.moveSelection(by: 1); list.update(entries)
             XCTAssertEqual(list.selectedIndex, 41)
             let failed = ThumbnailRow(entry: entries[40], compact: compact)
-            XCTAssertTrue(failed.accessibilityLabel()?.contains("加载失败") == true)
+            XCTAssertTrue(failed.accessibilityLabel() == L10n.tr("\(entries[40].title)，加载失败"))
             XCTAssertTrue(failed.toolTip?.contains(name) == true)
             let normal = ThumbnailRow(entry: entries[0], compact: compact)
             if compact { XCTAssertNil(normal.textField, "The compact rail shows thumbnails only") }
@@ -309,12 +310,12 @@ final class DesignSystemTests: XCTestCase {
     }
 
     @MainActor func testBusyButtonRestoresRequestedAvailabilityAndCurrentTitle() async {
-        let button = ActionButton("导出")
-        button.title = "导出全部 · 3 张"; button.isBusy = true
+        let button = ActionButton(L10n.tr("导出"))
+        button.title = L10n.tr("导出全部 · \(3) 张"); button.isBusy = true
         XCTAssertFalse(button.isEnabled)
         button.isEnabled = false; button.isBusy = false
         XCTAssertFalse(button.isEnabled)
-        XCTAssertEqual(button.title, "导出全部 · 3 张")
+        XCTAssertEqual(button.title, L10n.tr("导出全部 · \(3) 张"))
         button.isEnabled = true; XCTAssertTrue(button.isEnabled)
     }
 
@@ -322,13 +323,13 @@ final class DesignSystemTests: XCTestCase {
         var all = 0, current = 0
         let action = ExportAction(count: 3)
         action.onExportAll = { all += 1 }; action.onExportCurrent = { current += 1 }
-        XCTAssertEqual(action.primary.accessibilityLabel(), "导出全部 · 3 张")
-        XCTAssertEqual(action.primary.toolTip, "导出全部 · 3 张")
+        XCTAssertEqual(action.primary.accessibilityLabel(), L10n.tr("导出全部 · \(3) 张"))
+        XCTAssertEqual(action.primary.toolTip, L10n.tr("导出全部 · \(3) 张"))
         action.exportCurrent(); action.primary.performClick(nil)
         XCTAssertEqual(current, 1); XCTAssertEqual(all, 1)
         action.count = 0; action.exportCurrent(); action.primary.performClick(nil)
-        XCTAssertEqual(action.primary.accessibilityLabel(), "导出全部")
-        XCTAssertEqual(action.primary.toolTip, "导出全部")
+        XCTAssertEqual(action.primary.accessibilityLabel(), L10n.tr("导出全部"))
+        XCTAssertEqual(action.primary.toolTip, L10n.tr("导出全部"))
         XCTAssertEqual(current, 1); XCTAssertEqual(all, 1)
         XCTAssertFalse(action.disclosure.isEnabled)
     }

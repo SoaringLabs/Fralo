@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import QuartzCore
 
@@ -174,11 +175,11 @@ public final class FloatingPanel: NSView {
 @MainActor
 public final class CollapsedRail: NSView {
     public let surface = MaterialSurface(.panel, radius: 18)
-    public let expand = IconButton("chevron.right", label: "展开图片列表")
+    public let expand = IconButton("chevron.right", label: L10n.tr("展开图片列表"))
     public let list = BatchList(compact: true)
-    public let add = IconButton("plus", label: "添加图片")
-    public let previous = IconButton("chevron.up", label: "上一张图片")
-    public let next = IconButton("chevron.down", label: "下一张图片")
+    public let add = IconButton("plus", label: L10n.tr("添加图片"))
+    public let previous = IconButton("chevron.up", label: L10n.tr("上一张图片"))
+    public let next = IconButton("chevron.down", label: L10n.tr("下一张图片"))
     public let position = FraloStyle.text("0/0", role: .caption, secondary: true)
     public init() {
         super.init(frame: .zero)
@@ -241,14 +242,14 @@ public final class ThumbnailRow: NSTableCellView {
         ]) }
         if !compact { layoutDetailed(entry, image: image, horizontalInset: horizontalInset, trailingInset: trailingInset ?? horizontalInset) }
         imageView = image
-        toolTip = entry.title + (entry.failed ? " · 无法读取" : "")
-        setAccessibilityLabel(entry.title + (entry.failed ? "，加载失败" : ""))
+        toolTip = entry.failed ? L10n.tr("\(entry.title) · 无法读取") : entry.title
+        setAccessibilityLabel(entry.failed ? L10n.tr("\(entry.title)，加载失败") : entry.title)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     /// Framed thumbnail, then file name and pixel size.
     private func layoutDetailed(_ entry: BatchEntry, image: NSImageView, horizontalInset: CGFloat, trailingInset: CGFloat) {
         let name = FraloStyle.text(entry.title); name.font = .systemFont(ofSize: 13, weight: .medium)
-        let detail = FraloStyle.text(entry.failed ? "无法读取" : entry.detail, role: .caption)
+        let detail = FraloStyle.text(entry.failed ? L10n.tr("无法读取") : entry.detail, role: .caption)
         detail.font = .monospacedDigitSystemFont(ofSize: 11.5, weight: .regular)
         detail.textColor = entry.failed ? .systemRed : .tertiaryLabelColor
         let text = FraloStyle.stack([name, detail], spacing: 3)
@@ -373,7 +374,7 @@ public final class BatchList: PanelScrollView, NSTableViewDataSource, NSTableVie
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.dataSource = self; table.delegate = self
         table.onDelete = { [weak self] in self?.onDelete?() }
-        table.setAccessibilityLabel("原始图片列表")
+        table.setAccessibilityLabel(L10n.tr("原始图片列表"))
         documentView = table; ScrollContent.configure(self)
         update(entries)
     }
@@ -435,7 +436,7 @@ public final class CanvasSurface: NSView {
     public var image: NSImage? {
         didSet {
             needsDisplay = true; luminanceMap = nil
-            setAccessibilityValue(image.map { "\(Int($0.size.width)) × \(Int($0.size.height))" } ?? "暂无成品")
+            setAccessibilityValue(image.map { "\(Int($0.size.width)) × \(Int($0.size.height))" } ?? L10n.tr("暂无成品"))
         }
     }
     public var zoom: CGFloat? { didSet { needsDisplay = true } }
@@ -555,8 +556,8 @@ public final class CanvasSurface: NSView {
     public var onEscape: (() -> Void)?
     public override init(frame: NSRect) {
         super.init(frame: frame)
-        setAccessibilityElement(true); setAccessibilityRole(.image); setAccessibilityLabel("成品画布")
-        setAccessibilityHelp("上下键切换图片，Tab 切换焦点，Esc 返回编辑。")
+        setAccessibilityElement(true); setAccessibilityRole(.image); setAccessibilityLabel(L10n.tr("成品画布"))
+        setAccessibilityHelp(L10n.tr("上下键切换图片，Tab 切换焦点，Esc 返回编辑。"))
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     public var imageRect: NSRect {
@@ -689,12 +690,12 @@ public final class ViewToolbar: NSView {
     /// Centred near 0.4 encoded luma, where dark symbols on the lightened glass start to out-contrast white.
     public static let lightBackdropThreshold: CGFloat = 0.45, darkBackdropThreshold: CGFloat = 0.35
     public let surface = MaterialSurface(.panel, radius: ViewToolbar.height / 2)
-    public let zoom = ChoiceMenu(["适应窗口", "100%", "50%"], label: "缩放比例")
-    public let zoomOut = SymbolButton("minus", label: "缩小")
-    public let zoomIn = SymbolButton("plus", label: "放大")
+    public let zoom = ChoiceMenu([L10n.tr("适应窗口"), "100%", "50%"], label: L10n.tr("缩放比例"))
+    public let zoomOut = SymbolButton("minus", label: L10n.tr("缩小"))
+    public let zoomIn = SymbolButton("plus", label: L10n.tr("放大"))
     /// Status shown in the zoom readout: the current percentage or brief feedback such as “已复制”.
     public let dimensions = FraloStyle.text("—", role: .detail, secondary: true)
-    public let composition = ChoiceMenu(["4:3"], label: "画布比例")
+    public let composition = ChoiceMenu(["4:3"], label: L10n.tr("画布比例"))
     private let progress = NSProgressIndicator()
     private var row: NSStackView!
     public private(set) var isCompact = false
@@ -716,7 +717,7 @@ public final class ViewToolbar: NSView {
         zoom.font = .monospacedDigitSystemFont(ofSize: 13, weight: .regular)
         zoom.widthAnchor.constraint(greaterThanOrEqualToConstant: 72).isActive = true
         progress.style = .spinning; progress.controlSize = .small; progress.isDisplayedWhenStopped = false
-        progress.setAccessibilityLabel("正在更新预览"); progress.translatesAutoresizingMaskIntoConstraints = false
+        progress.setAccessibilityLabel(L10n.tr("正在更新预览")); progress.translatesAutoresizingMaskIntoConstraints = false
         row = FraloStyle.stack([zoomOut, zoom, zoomIn, composition], axis: .horizontal, spacing: 2)
         row.setCustomSpacing(8, after: zoomIn)
         row.translatesAutoresizingMaskIntoConstraints = false; surface.contentView.addSubview(row)
@@ -763,7 +764,7 @@ public final class ViewToolbar: NSView {
     /// Shows `text` in the zoom readout; `detail` becomes its tooltip (e.g. the output pixel size).
     public func showStatus(_ text: String, detail: String? = nil) {
         dimensions.stringValue = text
-        if let detail { dimensions.toolTip = detail; zoom.toolTip = "缩放比例 · " + detail }
+        if let detail { dimensions.toolTip = detail; zoom.toolTip = L10n.tr("缩放比例 · \(detail)") }
         zoom.displayTitle = isUpdatingPreview ? "" : text
     }
     public func fitControls(to availableWidth: CGFloat) {
@@ -804,7 +805,7 @@ public final class StateView: NSView {
     public init(_ state: State, title: String, detail: String, action: (() -> Void)? = nil) {
         titleLabel = FraloStyle.text(title, role: .heading)
         detailLabel = FraloStyle.paragraph(detail)
-        actionButton = ActionButton(state == .failure ? "重试" : state == .progress ? "取消" : "添加图片", onPress: action)
+        actionButton = ActionButton(state == .failure ? L10n.tr("重试") : state == .progress ? L10n.tr("取消") : L10n.tr("添加图片"), onPress: action)
         super.init(frame: .zero)
         let iconName = state == .failure ? "exclamationmark.triangle" : "photo.badge.plus"
         let icon = NSImageView(image: NSImage(systemSymbolName: iconName, accessibilityDescription: nil)!)

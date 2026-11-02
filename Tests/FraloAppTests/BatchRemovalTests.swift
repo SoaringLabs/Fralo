@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import XCTest
 import FraloCore
@@ -27,7 +28,7 @@ final class BatchRemovalTests: XCTestCase {
         controller.importURLs(inputs); list.select(1)
         let ids = list.entries.map(\.id)
         let menu = try XCTUnwrap(list.documentView?.menu)
-        XCTAssertEqual(menu.items.map(\.title), ["删除", "清空所有"])
+        XCTAssertEqual(menu.items.map(\.title), [L10n.tr("删除"), L10n.tr("清空所有")])
         menu.performActionForItem(at: 0)
         XCTAssertEqual(list.entries.map(\.id), [ids[0], ids[2]])
         XCTAssertEqual(list.selectedIndex, 1, "Deleting the selected middle image chooses the next image")

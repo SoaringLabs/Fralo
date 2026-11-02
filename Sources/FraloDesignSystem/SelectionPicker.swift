@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 
 /// Native capsule artwork with separate content-navigation and parameter-selection semantics.
@@ -46,7 +47,7 @@ public final class ValuePicker: NSSegmentedControl {
             setToolTip(title, forSegment: index)
         }
         trackingMode = .selectOne; isContinuous = false
-        segmentStyle = .automatic; segmentDistribution = .fillEqually
+        segmentStyle = .automatic; segmentDistribution = .fillProportionally
         controlSize = size
         if #available(macOS 26.0, *) { borderShape = .capsule }
         #if compiler(>=6.4)
@@ -243,7 +244,7 @@ public final class InspectorTabs: NSTabView, NSTabViewDelegate {
         }
         if style == .floating {
             tabViewType = .noTabsNoBorder; drawsBackground = false
-            let bar = ValuePicker(pages.map(\.0), label: "设置页面", purpose: .tabs, size: .large)
+            let bar = ValuePicker(pages.map(\.0), label: L10n.tr("设置页面"), purpose: .tabs, size: .large)
             bar.onChange = { [weak self] in self?.selectTabViewItem(at: $0) }
             navigation = bar; addSubview(bar)
         }

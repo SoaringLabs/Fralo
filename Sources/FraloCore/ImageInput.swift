@@ -1,3 +1,4 @@
+import FraloLocalization
 import Foundation
 import CoreGraphics
 import ImageIO
@@ -21,9 +22,9 @@ public struct ImageInput: Identifiable, Sendable {
         if let url { source = CGImageSourceCreateWithURL(url as CFURL, nil) }
         else if let data { source = CGImageSourceCreateWithData(data as CFData, nil) }
         else { source = nil }
-        guard let source else { throw FraloError.message("无法读取图片：\(name)") }
+        guard let source else { throw FraloError.message(L10n.tr("无法读取图片：\(name)")) }
         guard let type = CGImageSourceGetType(source) as String?, [UTType.png.identifier, UTType.jpeg.identifier].contains(type) else {
-            throw FraloError.message("图片损坏或不是有效的 PNG / JPEG：\(name)")
+            throw FraloError.message(L10n.tr("图片损坏或不是有效的 PNG / JPEG：\(name)"))
         }
         return source
     }
@@ -33,7 +34,7 @@ public struct ImageInput: Identifiable, Sendable {
               let w = p[kCGImagePropertyPixelWidth] as? NSNumber,
               let h = p[kCGImagePropertyPixelHeight] as? NSNumber,
               w.intValue > 0, h.intValue > 0 else {
-            throw FraloError.message("图片损坏或没有有效像素：\(name)")
+            throw FraloError.message(L10n.tr("图片损坏或没有有效像素：\(name)"))
         }
         let o = (p[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
         return o >= 5 && o <= 8 ? CGSize(width: h.doubleValue, height: w.doubleValue) : CGSize(width: w.doubleValue, height: h.doubleValue)
@@ -49,7 +50,7 @@ public struct ImageInput: Identifiable, Sendable {
             kCGImageSourceShouldCacheImmediately: true
         ]
         guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
-            throw FraloError.message("图片解码失败：\(name)")
+            throw FraloError.message(L10n.tr("图片解码失败：\(name)"))
         }
         return image
     }

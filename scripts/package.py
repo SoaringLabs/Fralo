@@ -67,6 +67,7 @@ def main():
         shutil.copy2(binary_dir / "fralo", executables / "fralo")
         shutil.copytree(binary_dir / "Fralo_FraloCore.bundle", resources / "Fralo_FraloCore.bundle")
         shutil.copytree(binary_dir / "Fralo_FraloApp.bundle", resources / "Fralo_FraloApp.bundle")
+        shutil.copytree(binary_dir / "Fralo_FraloLocalization.bundle", resources / "Fralo_FraloLocalization.bundle")
         frameworks = list((ROOT / ".build/artifacts").rglob("Sparkle.framework"))
         if len(frameworks) != 1:
             raise RuntimeError("Expected one resolved Sparkle.framework in .build/artifacts")
@@ -93,8 +94,8 @@ def main():
             "NSHighResolutionCapable": True,
             "NSPrincipalClass": "NSApplication",
             "NSHumanReadableCopyright": identity("copyright"),
-            "CFBundleDevelopmentRegion": "zh_CN",
-            "CFBundleLocalizations": ["zh_CN"],
+            "CFBundleDevelopmentRegion": "en",
+            "CFBundleLocalizations": ["en", "zh-Hans", "zh-Hant", "ja"],
             "SUFeedURL": identity("updateFeed"),
             "SUPublicEDKey": identity("updatePublicKey"),
             "SUEnableAutomaticChecks": True,

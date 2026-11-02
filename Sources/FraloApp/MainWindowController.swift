@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import UniformTypeIdentifiers
 import FraloCore
@@ -24,8 +25,8 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private let viewing = ViewToolbar()
     private let exportAction = ExportAction(count: 0)
     private let batchCount = FraloStyle.text("0", role: .body)
-    private let sidebarGuidance = FraloStyle.text("↑ ↓ 切换图片", role: .caption, secondary: true)
-    private let addButton = SymbolButton("plus", label: "添加图片")
+    private let sidebarGuidance = FraloStyle.text(L10n.tr("↑ ↓ 切换图片"), role: .caption, secondary: true)
+    private let addButton = SymbolButton("plus", label: L10n.tr("添加图片"))
     private let filename = FraloStyle.text("", role: .heading), position = FraloStyle.text("", role: .caption, secondary: true)
     private let previewScroll = PreviewScrollView()
     private let canvas = CanvasSurface(frame: .zero)
@@ -40,11 +41,11 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private var dragSettingsStart: CompositionSettings?
     let operationFeedback = OperationFeedback()
     private var feedbackTop: NSLayoutConstraint?
-    private let emptyAction = ActionButton("添加图片", role: .primary, symbol: "plus")
+    private let emptyAction = ActionButton(L10n.tr("添加图片"), role: .primary, symbol: "plus")
     private let footer = CanvasControlsOverlay()
     private var footerTrailing: NSLayoutConstraint?
     private var fitMenu: NSPopUpButton { viewing.zoom }
-    private let dimensions = FraloStyle.text("尚无成品", role: .detail, secondary: true)
+    private let dimensions = FraloStyle.text(L10n.tr("尚无成品"), role: .detail, secondary: true)
     private let splitController = NSSplitViewController()
     private var header: WorkbenchHeader!
     private var rendered: RenderedComposition?
@@ -105,7 +106,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         dropRouter.onChange = { [weak self] summary in self?.showDragFeedback(summary) }
         dropRouter.onDrop = { [weak self] in self?.importURLs($0) }
         (center.view as? DropContainer)?.router = dropRouter
-        let title = FraloStyle.text("图片"); title.font = .systemFont(ofSize: 13, weight: .semibold)
+        let title = FraloStyle.text(L10n.tr("图片")); title.font = .systemFont(ofSize: 13, weight: .semibold)
         batchCount.font = .monospacedDigitSystemFont(ofSize: 13, weight: .medium); batchCount.textColor = .labelColor
         addButton.onPress = { [weak self] in self?.addImages(nil) }
         let heading = FraloStyle.stack([title, batchCount, NSView(), addButton], axis: .horizontal, spacing: 6)
@@ -118,7 +119,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             return color
         }
         sidebarGuidance.identifier = .init("batch-keyboard-guidance")
-        sidebarGuidance.setAccessibilityLabel("使用向上和向下方向键切换图片")
+        sidebarGuidance.setAccessibilityLabel(L10n.tr("使用向上和向下方向键切换图片"))
         let guidanceFooter = FraloStyle.stack([sidebarGuidance], spacing: 0, fillWidth: true)
         guidanceFooter.detachesHiddenViews = true
         let left = DockedSidebar(header: heading, body: list, footer: guidanceFooter)
@@ -131,7 +132,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         exportAction.onExportCurrent = { [weak self] in self?.exportCurrent(nil) }
         let inspectorBody = buildInspector()
         dimensions.alignment = .center
-        inspectorUI.mode.setAccessibilityLabel("成品背景")
+        inspectorUI.mode.setAccessibilityLabel(L10n.tr("成品背景"))
         let right = FloatingPanel(header: FraloStyle.stack([inspectorUI.mode], spacing: 8, fillWidth: true),
                                   body: inspectorBody, footer: inspectorUI.makeFooter(action: exportAction), bodySpacing: 16,
                                   useNativeGlass: inspectorUsesNativeGlass)
@@ -165,7 +166,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         previewScroll.onScroll = { [weak self] in self?.updateCanvasOverlays() }
         center.view.addSubview(previewScroll)
         footer.translatesAutoresizingMaskIntoConstraints = false; center.view.addSubview(footer)
-        fitMenu.removeAllItems(); fitMenu.addItems(withTitles: ["适应窗口", "25%", "50%", "100%", "200%"])
+        fitMenu.removeAllItems(); fitMenu.addItems(withTitles: [L10n.tr("适应窗口"), "25%", "50%", "100%", "200%"])
         fitMenu.target = self; fitMenu.action = #selector(zoomMenuChanged(_:))
         viewing.composition.removeAllItems(); viewing.composition.addItems(withTitles: CanvasRatio.allCases.map(\.rawValue))
         viewing.composition.onChange = { [weak self] index in self?.inspectorUI.chooseCanvas(CanvasRatio.allCases[index]) }
@@ -203,11 +204,11 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         inspectorUI = CompositionInspector(settings: settings)
         inspectorUI.onChange = { [weak self] value in
             guard let self, !self.isExporting, value != self.settings else { return }
-            if self.continuousSettingsStart == nil { self.registerSettingsUndo(self.settings, name: "调整出图设置") }
+            if self.continuousSettingsStart == nil { self.registerSettingsUndo(self.settings, name: L10n.tr("调整出图设置")) }
             let framing = Self.framing(self.settings) != Self.framing(value)
             self.settings = value
             if framing { self.scheduleThumbnails() }
-            do { try self.store.save(value) } catch { self.showError(error.localizedDescription, title: "无法保存设置") }
+            do { try self.store.save(value) } catch { self.showError(error.localizedDescription, title: L10n.tr("无法保存设置")) }
             self.requestPreview()
         }
         inspectorUI.onContinuousEditing = { [weak self] active in
@@ -215,7 +216,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             if active { self.continuousSettingsStart = self.settings }
             else if let initial = self.continuousSettingsStart {
                 self.continuousSettingsStart = nil
-                if initial != self.settings { self.registerSettingsUndo(initial, name: "调整出图设置") }
+                if initial != self.settings { self.registerSettingsUndo(initial, name: L10n.tr("调整出图设置")) }
             }
         }
         canvas.onDragStart = { [weak self] point in self?.beginArtworkDrag(at: point) }
@@ -264,10 +265,10 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         let movedBackground = dragsBackground; dragsBackground = false
         guard artworkDragChanged else { return }; artworkDragChanged = false
         if let initial = dragSettingsStart, initial != settings {
-            registerSettingsUndo(initial, name: movedBackground ? "移动背景" : "移动设备")
+            registerSettingsUndo(initial, name: movedBackground ? L10n.tr("移动背景") : L10n.tr("移动设备"))
         }
         dragSettingsStart = nil
-        do { try store.save(settings) } catch { showError(error.localizedDescription, title: "无法保存设置") }
+        do { try store.save(settings) } catch { showError(error.localizedDescription, title: L10n.tr("无法保存设置")) }
         requestPreview(preservePositioning: true)
     }
 
@@ -284,7 +285,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             let framingChanged = Self.framing(target.settings) != Self.framing(snapshot)
             target.settings = snapshot; target.inspectorUI.restore(snapshot)
             if framingChanged { target.scheduleThumbnails() }
-            do { try target.store.save(snapshot) } catch { target.showError(error.localizedDescription, title: "无法保存设置") }
+            do { try target.store.save(snapshot) } catch { target.showError(error.localizedDescription, title: L10n.tr("无法保存设置")) }
             target.requestPreview()
         }
     }
@@ -316,27 +317,33 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private func updateCanvasInteraction() {
         let enabled = settings.mode == .background && selectedIndex != nil && positioningLayers != nil && !isExporting
         canvas.allowsPositioning = enabled
-        let background = Self.pansBackground(settings) ? "，拖动空白处调整背景" : ""
-        let help = enabled ? "拖动设备调整位置" + background + "；按 ⌥ 和方向键微调设备。上下键切换图片，Esc 返回编辑。" : "上下键切换图片，Tab 切换焦点，Esc 返回编辑。"
+        let help: String
+        if enabled && Self.pansBackground(settings) {
+            help = L10n.tr("拖动设备调整位置，拖动空白处调整背景；按 ⌥ 和方向键微调设备。上下键切换图片，Esc 返回编辑。")
+        } else if enabled {
+            help = L10n.tr("拖动设备调整位置；按 ⌥ 和方向键微调设备。上下键切换图片，Esc 返回编辑。")
+        } else {
+            help = L10n.tr("上下键切换图片，Tab 切换焦点，Esc 返回编辑。")
+        }
         canvas.toolTip = help; canvas.setAccessibilityHelp(help)
     }
 
     private func moreMenu() -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(actionItem("添加图片…", #selector(addImages(_:)), symbol: "photo.badge.plus", key: "o"))
-        menu.addItem(actionItem("导入文件夹…", #selector(addFolder(_:)), symbol: "folder.badge.plus", key: "o", modifiers: [.command, .shift]))
-        menu.addItem(actionItem("粘贴图片", #selector(pasteImage(_:)), symbol: "doc.on.clipboard", key: "v"))
+        menu.addItem(actionItem(L10n.tr("添加图片…"), #selector(addImages(_:)), symbol: "photo.badge.plus", key: "o"))
+        menu.addItem(actionItem(L10n.tr("导入文件夹…"), #selector(addFolder(_:)), symbol: "folder.badge.plus", key: "o", modifiers: [.command, .shift]))
+        menu.addItem(actionItem(L10n.tr("粘贴图片"), #selector(pasteImage(_:)), symbol: "doc.on.clipboard", key: "v"))
         menu.addItem(.separator())
         batchItemsMenu().items.forEach { $0.menu?.removeItem($0); menu.addItem($0) }
         menu.addItem(.separator())
-        menu.addItem(actionItem("设置…", #selector(showSettings(_:)), symbol: "gearshape", key: ","))
+        menu.addItem(actionItem(L10n.tr("设置…"), #selector(showSettings(_:)), symbol: "gearshape", key: ","))
         return menu
     }
     /// Shared by the more menu, the list's context menu and the batch button so their wording, icons and shortcuts agree.
     private func batchItemsMenu() -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(actionItem("删除", #selector(removeSelected(_:)), symbol: "trash", key: "\u{8}", modifiers: []))
-        menu.addItem(actionItem("清空所有", #selector(newBatch(_:)), symbol: "xmark.bin"))
+        menu.addItem(actionItem(L10n.tr("删除"), #selector(removeSelected(_:)), symbol: "trash", key: "\u{8}", modifiers: []))
+        menu.addItem(actionItem(L10n.tr("清空所有"), #selector(newBatch(_:)), symbol: "xmark.bin"))
         return menu
     }
     private func updatePanelControls() {
@@ -376,7 +383,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         if persist { preferences.set(value, forKey: "workbenchAppearance") }
     }
     func appearanceMenu() -> NSMenu {
-        let menu = NSMenu(title: "外观")
+        let menu = NSMenu(title: L10n.tr("外观"))
         for choice in AppAppearance.allCases {
             let item = actionItem(choice.title, #selector(changeAppearance(_:))); item.representedObject = choice.rawValue
             item.state = appearanceChoice == choice ? .on : .off; menu.addItem(item)
@@ -437,13 +444,13 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     @objc func addImages(_ sender: Any?) {
         guard !isExporting else { return }
         let panel = NSOpenPanel(); panel.allowedContentTypes = [.png, .jpeg]; panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false; panel.message = "选择要套框的截图"
+        panel.canChooseDirectories = false; panel.message = L10n.tr("选择要套框的截图")
         panel.beginSheetModal(for: window!) { [weak self] response in if response == .OK { self?.importURLs(panel.urls) } }
     }
     @objc func addFolder(_ sender: Any?) {
         guard !isExporting else { return }
         let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.allowsMultipleSelection = false
-        panel.message = "导入文件夹当前层的 PNG / JPEG 图片"
+        panel.message = L10n.tr("导入文件夹当前层的 PNG / JPEG 图片")
         panel.beginSheetModal(for: window!) { [weak self] response in if response == .OK { self?.importURLs(panel.urls) } }
     }
     func importURLs(_ urls: [URL]) {
@@ -453,7 +460,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             let existing = Set(items.map { $0.input.id })
             let accepted = inputs.filter { !existing.contains($0.id) }
             guard !accepted.isEmpty else { return }
-            rememberBatch("添加图片")
+            rememberBatch(L10n.tr("添加图片"))
             items += accepted.map { Item(input: $0) }
             refreshList(); updateActions()
             if selectedIndex == nil { list.select(0) }
@@ -469,16 +476,16 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         if let png = pasteboard.data(forType: .png) { data = png }
         else if let image = NSImage(pasteboard: pasteboard), let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff) { data = bitmap.representation(using: .png, properties: [:]) }
         else { data = nil }
-        guard let data else { showError("剪贴板中没有可导入的图片。"); return }
-        rememberBatch("粘贴图片")
+        guard let data else { showError(L10n.tr("剪贴板中没有可导入的图片。")); return }
+        rememberBatch(L10n.tr("粘贴图片"))
         pastedCount += 1
-        items.append(Item(input: ImageInput(data: data, name: String(format: "粘贴图片-%03d.png", pastedCount))))
+        items.append(Item(input: ImageInput(data: data, name: String(format: L10n.tr("粘贴图片-%03d.png"), pastedCount))))
         refreshList(); list.select(items.count - 1)
         updateActions(); scheduleThumbnails(); requestPreview()
     }
     @objc func removeSelected(_ sender: Any?) {
         guard !isExporting, let selectedIndex else { return }
-        rememberBatch("删除图片")
+        rememberBatch(L10n.tr("删除图片"))
         items.remove(at: selectedIndex); refreshList()
         if !items.isEmpty { list.select(min(selectedIndex, items.count - 1)) }
         updateActions(); scheduleThumbnails(); requestPreview()
@@ -486,7 +493,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     }
     @objc func newBatch(_ sender: Any?) {
         guard !isExporting else { return }
-        if !items.isEmpty { rememberBatch("清空所有") }
+        if !items.isEmpty { rememberBatch(L10n.tr("清空所有")) }
         items.removeAll(); previewRequest += 1; thumbnails.cancel(); rendered = nil; renderedID = nil
         refreshList(); updateActions(); requestPreview()
         window?.makeFirstResponder(emptyAction)
@@ -528,7 +535,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         guard let index = selectedIndex else {
             canvas.image = nil; showEmptyGuidance(); emptyStage.isHidden = false
             previewScroll.isHidden = true; footer.isHidden = true; filename.stringValue = ""; position.stringValue = ""
-            window?.title = "Fralo"; dimensions.stringValue = "尚无成品"; inspectorUI.outputInfo.stringValue = "添加截图后显示尺寸"; viewing.finishPreviewUpdate(); updateActions(); return
+            window?.title = "Fralo"; dimensions.stringValue = L10n.tr("尚无成品"); inspectorUI.outputInfo.stringValue = L10n.tr("添加截图后显示尺寸"); viewing.finishPreviewUpdate(); updateActions(); return
         }
         let input = items[index].input, snapshot = settings, generation = previewRequest
         window?.title = input.name; filename.stringValue = input.name; position.stringValue = "\(index + 1) / \(items.count)"
@@ -554,7 +561,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
                     case .success(let (frame, display, sourceSize, backgroundSize, byteCount)):
                         self.backgroundImageSize = backgroundSize
                         if let row = self.items.firstIndex(where: { $0.input.id == input.id }), self.items[row].error != nil { self.items[row].error = nil; self.refreshList() }
-                        self.dimensions.toolTip = "原始图片：\(input.name) · \(Int(sourceSize.width)) × \(Int(sourceSize.height))"
+                        self.dimensions.toolTip = L10n.tr("原始图片：\(input.name) · \(Int(sourceSize.width)) × \(Int(sourceSize.height))")
                         self.inspectorUI.outputInfo.stringValue = "\(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height)) px"
                         self.inspectorUI.showOutputSize(byteCount)
                         self.positioningLayers = frame.previewLayers
@@ -564,7 +571,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
                                 backgroundOpacity: layers.backgroundOpacity, canvasSize: layers.canvasSize)
                         }
                         self.rendered = frame; self.renderedID = input.id; self.canvas.image = NSImage(cgImage: display, size: frame.pixelSize)
-                        self.canvas.setAccessibilityLabel("成品画布，" + input.name)
+                        self.canvas.setAccessibilityLabel(L10n.tr("成品画布，\(input.name)"))
                         self.canvas.showsElevation = snapshot.mode == .background
                         self.applyCanvasBacking()
                         self.dimensions.stringValue = "\(snapshot.outputFormat == .png ? "PNG" : "JPEG") · \(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height))"
@@ -573,11 +580,11 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
                     case .failure(let error):
                         self.positioningLayers = nil; self.canvas.finishPositioningArtwork(discard: true)
                         self.canvas.image = nil; self.emptyStage.isHidden = false
-                        self.emptyAction.title = "重试预览"; self.emptyAction.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: nil)
-                        self.emptyAction.setAccessibilityLabel("重试预览")
+                        self.emptyAction.title = L10n.tr("重试预览"); self.emptyAction.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: nil)
+                        self.emptyAction.setAccessibilityLabel(L10n.tr("重试预览"))
                         self.emptyAction.onPress = { [weak self] in self?.scheduleThumbnails(); self?.requestPreview() }
                         self.emptyStage.showError(error.localizedDescription)
-                        self.previewScroll.isHidden = true; self.footer.isHidden = true; self.dimensions.stringValue = "无法确定"
+                        self.previewScroll.isHidden = true; self.footer.isHidden = true; self.dimensions.stringValue = L10n.tr("无法确定")
                         if let i = self.items.firstIndex(where: { $0.input.id == input.id }) { self.items[i].error = error.localizedDescription; self.refreshList() }
                     }
                     self.updateActions()
@@ -691,20 +698,20 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         do {
             let data = settings.outputFormat == .png ? try CompositionRenderer.data(rendered.image, settings: settings) : try FrameRenderer.pngData(rendered.image)
             guard imageClipboard.writePNG(data) else {
-                operationFeedback.show(.failure, title: "复制失败", detail: "无法写入剪贴板，请重试")
+                operationFeedback.show(.failure, title: L10n.tr("复制失败"), detail: L10n.tr("无法写入剪贴板，请重试"))
                 return
             }
-            operationFeedback.show(.success, title: "已复制到剪贴板")
+            operationFeedback.show(.success, title: L10n.tr("已复制到剪贴板"))
         } catch {
-            operationFeedback.show(.failure, title: "复制失败", detail: error.localizedDescription)
+            operationFeedback.show(.failure, title: L10n.tr("复制失败"), detail: error.localizedDescription)
         }
     }
     @objc func exportAll(_ sender: Any?) {
         guard !items.isEmpty, !isExporting else { return }
         window?.makeFirstResponder(nil)
         let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.canCreateDirectories = true
-        panel.prompt = "导出"; panel.message = "选择输出文件夹"
-        let overwrite = NSButton(checkboxWithTitle: "覆盖已有同名输出文件", target: nil, action: nil); panel.accessoryView = overwrite
+        panel.prompt = L10n.tr("导出"); panel.message = L10n.tr("选择输出文件夹")
+        let overwrite = NSButton(checkboxWithTitle: L10n.tr("覆盖已有同名输出文件"), target: nil, action: nil); panel.accessoryView = overwrite
         panel.beginSheetModal(for: window!) { [weak self] response in
             guard response == .OK, let directory = panel.url, let self else { return }
             self.startExport(self.items.map(\.input), directory: directory, overwrite: overwrite.state == .on)
@@ -728,21 +735,21 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         cancellation = token; updateActions()
         let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 470, height: 240), styleMask: [.titled], backing: .buffered, defer: false)
         panel.titleVisibility = .hidden
-        let count = label("已完成 0 / \(inputs.count)")
-        let current = label("正在准备…", size: 12, secondary: true); current.lineBreakMode = .byTruncatingMiddle
+        let count = label(L10n.tr("已完成 0 / \(inputs.count)"))
+        let current = label(L10n.tr("正在准备…"), size: 12, secondary: true); current.lineBreakMode = .byTruncatingMiddle
         let bar = NSProgressIndicator(); bar.isIndeterminate = false; bar.minValue = 0; bar.maxValue = Double(inputs.count); bar.style = .bar
         bar.widthAnchor.constraint(equalToConstant: 414).isActive = true
-        let cancel = ActionButton("取消")
+        let cancel = ActionButton(L10n.tr("取消"))
         cancel.target = self; cancel.action = #selector(cancelExportAction(_:)); cancel.keyEquivalent = "\u{1b}"
         let notice = label("", size: 12, secondary: true); updateNotice = notice
-        let content = stack([label("正在导出图片", size: 16, weight: .semibold), count, bar, current, notice, cancel], spacing: 12)
+        let content = stack([label(L10n.tr("正在导出图片"), size: 16, weight: .semibold), count, bar, current, notice, cancel], spacing: 12)
         content.alignment = .centerX; content.translatesAutoresizingMaskIntoConstraints = false; panel.contentView?.addSubview(content)
         NSLayoutConstraint.activate([content.centerXAnchor.constraint(equalTo: panel.contentView!.centerXAnchor), content.centerYAnchor.constraint(equalTo: panel.contentView!.centerYAnchor)])
         progressPanel = panel; window?.beginSheet(panel)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let result = Result {
                 try BatchExporter.run(inputs: inputs, settings: RenderSettings(model: snapshot.phoneModel, orientation: snapshot.orientation), directory: directory, overwrite: overwrite, cancellation: token, outputNames: names, composition: snapshot, backgroundData: backdrop) { progress in
-                    DispatchQueue.main.async { count.stringValue = "已完成 \(progress.completed) / \(progress.total)"; current.stringValue = "正在处理：\(progress.currentName)"; bar.doubleValue = Double(progress.completed) }
+                    DispatchQueue.main.async { count.stringValue = L10n.tr("已完成 \(progress.completed) / \(progress.total)"); current.stringValue = L10n.tr("正在处理：\(progress.currentName)"); bar.doubleValue = Double(progress.completed) }
                 }
             }
             DispatchQueue.main.async {
@@ -762,15 +769,15 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             }
         }
     }
-    @objc private func cancelExportAction(_ sender: NSButton) { cancelExport(); sender.isEnabled = false; sender.title = "正在停止…" }
+    @objc private func cancelExportAction(_ sender: NSButton) { cancelExport(); sender.isEnabled = false; sender.title = L10n.tr("正在停止…") }
     func cancelExport() { cancellation?.cancel() }
     func requestQuitAfterExport() { quitAfterExport = true; cancelExport() }
-    func showPendingUpdate() { updateNotice?.stringValue = "导出结束后将安装更新并重启 Fralo" }
+    func showPendingUpdate() { updateNotice?.stringValue = L10n.tr("导出结束后将安装更新并重启 Fralo") }
     func clearPendingUpdate() { updateNotice?.stringValue = "" }
     private func showReport(_ report: ExportReport, directory: URL) {
-        let alert = NSAlert(); alert.messageText = report.cancelled ? "导出已取消" : "导出完成"
-        alert.informativeText = "成功 \(report.succeeded) 张 · 跳过 \(report.skipped) 张 · 失败 \(report.failed) 张\n未处理 \(report.unprocessed) 张 · 用时 \(String(format: "%.2f", report.durationSeconds)) 秒"
-        alert.addButton(withTitle: "完成"); alert.addButton(withTitle: "打开输出文件夹")
+        let alert = NSAlert(); alert.messageText = report.cancelled ? L10n.tr("导出已取消") : L10n.tr("导出完成")
+        alert.informativeText = L10n.tr("成功 \(report.succeeded) 张 · 跳过 \(report.skipped) 张 · 失败 \(report.failed) 张\n未处理 \(report.unprocessed) 张 · 用时 \(String(format: "%.2f", report.durationSeconds)) 秒")
+        alert.addButton(withTitle: L10n.tr("完成")); alert.addButton(withTitle: L10n.tr("打开输出文件夹"))
         let issues = report.entries.filter { $0.status != .success }
         if !issues.isEmpty {
             let text = NSTextView(frame: NSRect(x: 0, y: 0, width: 430, height: 140)); text.isEditable = false; text.isSelectable = true; text.font = .systemFont(ofSize: 12)
@@ -816,18 +823,18 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         switch menuItem.action {
         case #selector(undoChange(_:)):
             let manager = commandUndoManager
-            menuItem.title = manager.canUndo ? "撤销「" + manager.undoActionName + "」" : "撤销"
+            menuItem.title = manager.canUndo ? L10n.tr("撤销「\(manager.undoActionName)」") : L10n.tr("撤销")
             return !isExporting && manager.canUndo
         case #selector(redoChange(_:)):
             let manager = commandUndoManager
-            menuItem.title = manager.canRedo ? "重做「" + manager.redoActionName + "」" : "重做"
+            menuItem.title = manager.canRedo ? L10n.tr("重做「\(manager.redoActionName)」") : L10n.tr("重做")
             return !isExporting && manager.canRedo
         case #selector(toggleSidebar(_:)):
-            menuItem.title = workbench.collapsed || workbench.previewing ? "显示图片列表" : "隐藏图片列表"; return true
+            menuItem.title = workbench.collapsed || workbench.previewing ? L10n.tr("显示图片列表") : L10n.tr("隐藏图片列表"); return true
         case #selector(toggleInspector(_:)):
-            menuItem.title = workbench.inspectorHidden || workbench.previewing ? "显示出图设置" : "隐藏出图设置"; return true
+            menuItem.title = workbench.inspectorHidden || workbench.previewing ? L10n.tr("显示出图设置") : L10n.tr("隐藏出图设置"); return true
         case #selector(togglePreview(_:)):
-            menuItem.title = workbench.previewing ? "返回编辑" : "成品预览"; return !items.isEmpty
+            menuItem.title = workbench.previewing ? L10n.tr("返回编辑") : L10n.tr("成品预览"); return !items.isEmpty
         case #selector(previousImage(_:)): return !isExporting && (selectedIndex ?? 0) > 0
         case #selector(nextImage(_:)): return !isExporting && selectedIndex.map { $0 + 1 < items.count } == true
         case #selector(nudgeArtwork(_:)): return canvas.allowsPositioning && !editingText
@@ -836,8 +843,8 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         if menuItem.action == #selector(showSettings(_:)) { return true }
         if menuItem.action == #selector(changeAppearance(_:)) { menuItem.state = (menuItem.representedObject as? String) == appearanceChoice.rawValue ? .on : .off; return true }
         guard !isExporting else { return false }
-        if menuItem.action == #selector(copyCurrent(_:)) { menuItem.title = editingText ? "复制" : "复制当前图片"; return rendered != nil || editingText }
-        if menuItem.action == #selector(pasteImage(_:)) { menuItem.title = editingText ? "粘贴" : "粘贴图片"; return true }
+        if menuItem.action == #selector(copyCurrent(_:)) { menuItem.title = editingText ? L10n.tr("复制") : L10n.tr("复制当前图片"); return rendered != nil || editingText }
+        if menuItem.action == #selector(pasteImage(_:)) { menuItem.title = editingText ? L10n.tr("粘贴") : L10n.tr("粘贴图片"); return true }
         if menuItem.action == #selector(removeSelected(_:)) { return selectedIndex != nil && !editingText }
         if menuItem.action == #selector(exportCurrent(_:)) { return selectedIndex != nil }
         if menuItem.action == #selector(exportAll(_:)) || menuItem.action == #selector(newBatch(_:)) { return !items.isEmpty }
@@ -850,8 +857,8 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private var headerSubtitle: String {
         guard let index = selectedIndex else {
             // Empty: what the first import will be framed as, instead of repeating the stage's prompt.
-            guard items.isEmpty else { return "\(items.count) 张图片" }
-            let output = settings.mode == .transparent ? "透明 PNG" : "带背景 · " + (settings.outputFormat == .png ? "PNG" : "JPEG")
+            guard items.isEmpty else { return L10n.tr("\(items.count) 张图片") }
+            let output = settings.mode == .transparent ? L10n.tr("透明 PNG") : L10n.tr("带背景 · \(settings.outputFormat == .png ? "PNG" : "JPEG")")
             return deviceDescription + " · " + output
         }
         return "\(index + 1) / \(items.count) · " + deviceDescription
@@ -870,9 +877,9 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         canvas.showsStageShadow = !background && settings.shadow == .none
     }
     private func showEmptyGuidance() {
-        emptyAction.title = "添加图片…"; emptyAction.image = NSImage(systemSymbolName: "plus", accessibilityDescription: nil)
-        emptyAction.setAccessibilityLabel("添加图片"); emptyAction.onPress = { [weak self] in self?.addImages(nil) }
-        emptyStage.showEmpty(title: "拖入截图", detail: "PNG / JPEG · 可多选或拖入文件夹")
+        emptyAction.title = L10n.tr("添加图片…"); emptyAction.image = NSImage(systemSymbolName: "plus", accessibilityDescription: nil)
+        emptyAction.setAccessibilityLabel(L10n.tr("添加图片")); emptyAction.onPress = { [weak self] in self?.addImages(nil) }
+        emptyStage.showEmpty(title: L10n.tr("拖入截图"), detail: L10n.tr("PNG / JPEG · 可多选或拖入文件夹"))
         refreshEmptyFrame()
     }
     /// Renders the selected device without a screenshot. Viewing only; cached per frame silhouette.
@@ -921,7 +928,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             emptyStage.showDrag(summary.canDrop ? .accepting : .rejecting, title: message.title, detail: message.detail)
         }
     }
-    private func showError(_ message: String, title: String = "无法完成操作") {
+    private func showError(_ message: String, title: String = L10n.tr("无法完成操作")) {
         let alert = NSAlert(); alert.alertStyle = .warning; alert.messageText = title; alert.informativeText = message
         if let window, window.attachedSheet == nil { alert.beginSheetModal(for: window) } else { alert.runModal() }
     }

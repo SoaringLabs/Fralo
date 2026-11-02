@@ -1,3 +1,4 @@
+import FraloLocalization
 import CoreGraphics
 import Foundation
 import ImageIO
@@ -19,7 +20,7 @@ public enum FrameRenderer {
         guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!,
                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue) else {
-            throw FraloError.message("无法分配图片内存。")
+            throw FraloError.message(L10n.tr("无法分配图片内存。"))
         }
         context.clear(CGRect(x: 0, y: 0, width: width, height: height))
         context.translateBy(x: 0, y: CGFloat(height)); context.scaleBy(x: reduction, y: -reduction)
@@ -46,17 +47,17 @@ public enum FrameRenderer {
         orient(context, geometry: geometry, direction: settings.orientation)
         drawIsland(in: context, geometry: geometry)
         context.restoreGState()
-        guard let image = context.makeImage() else { throw FraloError.message("合成图片失败。") }
+        guard let image = context.makeImage() else { throw FraloError.message(L10n.tr("合成图片失败。")) }
         return RenderedFrame(image: image, plan: plan)
     }
 
     public static func pngData(_ image: CGImage) throws -> Data {
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else {
-            throw FraloError.message("无法创建 PNG。")
+            throw FraloError.message(L10n.tr("无法创建 PNG。"))
         }
         CGImageDestinationAddImage(destination, image, nil)
-        guard CGImageDestinationFinalize(destination) else { throw FraloError.message("PNG 编码失败。") }
+        guard CGImageDestinationFinalize(destination) else { throw FraloError.message(L10n.tr("PNG 编码失败。")) }
         return data as Data
     }
 

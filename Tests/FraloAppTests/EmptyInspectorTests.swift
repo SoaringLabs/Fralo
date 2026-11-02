@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import XCTest
 import FraloCore
@@ -56,7 +57,7 @@ final class EmptyInspectorTests: XCTestCase {
         XCTAssertFalse(root.collapsed, "Repeated empty updates must not undo an explicit Show List command")
         controller.importURLs([fixture]); XCTAssertTrue(placeholder.isHidden); XCTAssertFalse(root.left.body.isHidden)
         controller.newBatch(nil); XCTAssertTrue(root.collapsed); XCTAssertFalse(placeholder.isHidden)
-        XCTAssertEqual(window.subtitle, "iPhone 18 Pro Max · 竖屏 · 透明 PNG", "The empty subtitle names what the first import will be framed as")
+        XCTAssertEqual(window.subtitle, "iPhone 18 Pro Max · " + L10n.tr("竖屏") + " · " + L10n.tr("透明 PNG"), "The empty subtitle names what the first import will be framed as")
     }
 
     @MainActor func testDropSummaryCountsFolderImagesAndDeclinesUnsupportedOrDuplicateFiles() throws {
@@ -68,16 +69,16 @@ final class EmptyInspectorTests: XCTestCase {
         for url in [image, other, pdf] { try Data([0]).write(to: url) }
         let folder = DropSummary(urls: [directory])
         XCTAssertEqual(folder.images, 2); XCTAssertEqual(folder.accepted, [directory]); XCTAssertTrue(folder.canDrop)
-        XCTAssertEqual(folder.message(appending: false, device: "iPhone 18 Pro · 竖屏").title, "松开以添加 2 张图片")
+        XCTAssertEqual(folder.message(appending: false, device: "iPhone 18 Pro · 竖屏").title, L10n.tr("松开以添加 \(2) 张图片"))
         let mixed = DropSummary(urls: [image, pdf])
-        XCTAssertEqual(mixed.accepted, [image]); XCTAssertEqual(mixed.message(appending: true, device: "").detail, "将添加 1 张 · 忽略 1 个文件")
-        XCTAssertEqual(mixed.message(appending: true, device: "").title, "松开以追加 1 张图片到批次")
+        XCTAssertEqual(mixed.accepted, [image]); XCTAssertEqual(mixed.message(appending: true, device: "").detail, L10n.tr("将添加 \(1) 张 · 忽略 \(1) 个文件"))
+        XCTAssertEqual(mixed.message(appending: true, device: "").title, L10n.tr("松开以追加 \(1) 张图片到批次"))
         let unsupported = DropSummary(urls: [pdf])
         XCTAssertFalse(unsupported.canDrop)
-        XCTAssertEqual(unsupported.message(appending: false, device: "").title, "无法添加这个文件")
-        XCTAssertEqual(unsupported.message(appending: false, device: "").detail, "仅支持 PNG / JPEG 图片")
+        XCTAssertEqual(unsupported.message(appending: false, device: "").title, L10n.tr("无法添加这个文件"))
+        XCTAssertEqual(unsupported.message(appending: false, device: "").detail, L10n.tr("仅支持 PNG / JPEG 图片"))
         let duplicate = DropSummary(urls: [image], existing: [ImageInput(url: image).id])
-        XCTAssertFalse(duplicate.canDrop); XCTAssertEqual(duplicate.message(appending: true, device: "").title, "这些图片已在批次中")
+        XCTAssertFalse(duplicate.canDrop); XCTAssertEqual(duplicate.message(appending: true, device: "").title, L10n.tr("这些图片已在批次中"))
     }
 
     @MainActor func testEmptyStageDrawsTheSelectedFrameAndPlacesTheTargetOnItsScreen() async throws {

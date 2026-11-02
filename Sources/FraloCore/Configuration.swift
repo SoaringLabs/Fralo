@@ -1,8 +1,9 @@
+import FraloLocalization
 import Foundation
 
 public enum Orientation: String, Codable, CaseIterable, Sendable {
     case portrait, landscape
-    public var title: String { self == .portrait ? "竖屏" : "横屏" }
+    public var title: String { self == .portrait ? L10n.tr("竖屏") : L10n.tr("横屏") }
 }
 
 public enum DeviceModel: String, Codable, CaseIterable, Sendable {
@@ -36,7 +37,7 @@ public struct RenderSettings: Codable, Equatable, Sendable {
         self.model = model; self.orientation = orientation
     }
     public func validated() throws -> Self {
-        guard schemaVersion == 1 else { throw FraloError.message("配置版本不受支持：\(schemaVersion)") }
+        guard schemaVersion == 1 else { throw FraloError.message(L10n.tr("配置版本不受支持：\(schemaVersion)")) }
         return self
     }
 }
@@ -60,7 +61,7 @@ public struct SettingsStore: Sendable {
     public func load() throws -> RenderSettings {
         guard FileManager.default.fileExists(atPath: url.path) else { return RenderSettings() }
         do { return try JSONDecoder().decode(RenderSettings.self, from: Data(contentsOf: url)).validated() }
-        catch { throw FraloError.message("无法读取配置 \(url.path)：\(error.localizedDescription)") }
+        catch { throw FraloError.message(L10n.tr("无法读取配置 \(url.path)：\(error.localizedDescription)")) }
     }
     public func save(_ settings: RenderSettings) throws {
         let settings = try settings.validated()

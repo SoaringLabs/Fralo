@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import XCTest
 import FraloCore
@@ -39,7 +40,7 @@ final class HIGWorkbenchTests: XCTestCase {
         controller.undoChange(nil); XCTAssertEqual(inspector.devicePicker.selectedIndex, 0)
         XCTAssertEqual(try CompositionStore(legacy: store).load().display, .phone)
         controller.redoChange(nil); XCTAssertEqual(inspector.devicePicker.selectedIndex, 1)
-        let opacity = try XCTUnwrap(descendants(inspector).compactMap { $0 as? CompactSliderField }.first { $0.slider.accessibilityLabel() == "不透明度" })
+        let opacity = try XCTUnwrap(descendants(inspector).compactMap { $0 as? CompactSliderField }.first { $0.slider.accessibilityLabel() == L10n.tr("不透明度") })
         opacity.onEditingChanged?(true)
         for value in [90.0, 80, 60] { opacity.slider.doubleValue = value; opacity.slider.sendAction(opacity.slider.action, to: opacity.slider.target) }
         opacity.onEditingChanged?(false)
@@ -80,18 +81,21 @@ final class HIGWorkbenchTests: XCTestCase {
         let title = try XCTUnwrap(window.toolbar?.items.first { $0.itemIdentifier.rawValue == "document" }?.view)
         for text in descendants(title).compactMap({ $0 as? NSTextField }) { text.stringValue = String(repeating: "长文件名称", count: 30) }
         window.contentView?.layoutSubtreeIfNeeded()
-        XCTAssertLessThanOrEqual(title.bounds.width, 220)
+        // Localized subtitles may expand the header; long filenames must stay within its 360 pt cap.
+        // Check the requested size too: offscreen toolbar layout can leave bounds at the initial 220 pt.
+        XCTAssertLessThanOrEqual(title.intrinsicContentSize.width, 360)
+        XCTAssertLessThanOrEqual(title.bounds.width, 360)
         let sidebar = NSMenuItem(title: "", action: #selector(MainWindowController.toggleSidebar(_:)), keyEquivalent: "")
         let inspector = NSMenuItem(title: "", action: #selector(MainWindowController.toggleInspector(_:)), keyEquivalent: "")
         let root = try XCTUnwrap(window.contentView as? WorkbenchView)
         controller.togglePreview()
-        XCTAssertTrue(controller.validateMenuItem(sidebar)); XCTAssertEqual(sidebar.title, "显示图片列表")
+        XCTAssertTrue(controller.validateMenuItem(sidebar)); XCTAssertEqual(sidebar.title, L10n.tr("显示图片列表"))
         controller.toggleSidebar(nil); XCTAssertFalse(root.previewing); XCTAssertFalse(root.collapsed)
         controller.toggleInspector(nil)
-        XCTAssertTrue(controller.validateMenuItem(inspector)); XCTAssertEqual(inspector.title, "显示出图设置")
+        XCTAssertTrue(controller.validateMenuItem(inspector)); XCTAssertEqual(inspector.title, L10n.tr("显示出图设置"))
         controller.toggleInspector(nil); XCTAssertFalse(root.inspectorHidden)
         let undo = NSMenuItem(title: "", action: #selector(MainWindowController.undoChange(_:)), keyEquivalent: "z")
-        XCTAssertFalse(controller.validateMenuItem(undo)); XCTAssertEqual(undo.title, "撤销")
+        XCTAssertFalse(controller.validateMenuItem(undo)); XCTAssertEqual(undo.title, L10n.tr("撤销"))
     }
     @MainActor func testTextEditingUsesNativeUndoWithoutUndoingTheComposition() async throws {
         _ = NSApplication.shared

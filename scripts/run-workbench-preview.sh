@@ -28,13 +28,15 @@ shutil.copytree(frameworks[0], app / 'Contents/Frameworks/Sparkle.framework', sy
 shutil.copytree(root / 'Sources/FraloApp/Development/Fixtures', resources / 'DesignLabFixtures')
 shutil.copytree(binary / 'Fralo_FraloCore.bundle', resources / 'Fralo_FraloCore.bundle')
 shutil.copytree(binary / 'Fralo_FraloApp.bundle', resources / 'Fralo_FraloApp.bundle')
+shutil.copytree(binary / 'Fralo_FraloLocalization.bundle', resources / 'Fralo_FraloLocalization.bundle')
 info = {
     'CFBundleName': 'Fralo Workbench Preview', 'CFBundleDisplayName': 'Fralo Workbench Preview',
     'CFBundleIdentifier': 'app.fralo.workbench.local', 'CFBundleExecutable': 'FraloApp',
     'CFBundlePackageType': 'APPL', 'NSPrincipalClass': 'NSApplication',
     'NSHighResolutionCapable': True, 'LSMinimumSystemVersion': '14.0',
     'CFBundleVersion': '1', 'CFBundleShortVersionString': '0.1',
-    'CFBundleDevelopmentRegion': 'zh_CN',
+    'CFBundleDevelopmentRegion': 'en',
+    'CFBundleLocalizations': ['en', 'zh-Hans', 'zh-Hant', 'ja'],
 }
 # Match the production layered icon and older-macOS .icns fallback.
 icon_info = session / 'icon-info.plist'

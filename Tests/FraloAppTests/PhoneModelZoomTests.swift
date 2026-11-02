@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import XCTest
 import FraloCore
@@ -30,7 +31,7 @@ final class PhoneModelZoomTests: XCTestCase {
         controller.importURLs([url])
 
         func choose(_ index: Int) async throws {
-            let picker = try XCTUnwrap(descendants(inspector).compactMap { $0 as? VisualChoiceGroup }.first { $0.accessibilityLabel() == "机型" })
+            let picker = try XCTUnwrap(descendants(inspector).compactMap { $0 as? VisualChoiceGroup }.first { $0.accessibilityLabel() == L10n.tr("机型") })
             let previous = canvas.image
             let changed = picker.selectedIndex != index
             picker.choose(index)

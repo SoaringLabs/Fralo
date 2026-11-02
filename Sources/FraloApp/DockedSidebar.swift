@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import FraloDesignSystem
 
@@ -62,7 +63,7 @@ final class DockedSidebar: NSView {
             }
         }
         setAccessibilityElement(false)
-        setAccessibilityLabel("图片列表")
+        setAccessibilityLabel(L10n.tr("图片列表"))
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
 

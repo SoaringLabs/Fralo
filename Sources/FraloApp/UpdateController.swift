@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import Sparkle
 
@@ -39,12 +40,12 @@ final class UpdateController: NSObject, SPUUpdaterDelegate, NSMenuItemValidation
         self.mainController = mainController
         super.init()
         guard Bundle.main.bundleURL.pathExtension == "app" else {
-            unavailableReason = "请打开完整的 Fralo.app 后检查更新。直接运行构建目录中的可执行文件不支持安装更新。"
+            unavailableReason = L10n.tr("请打开完整的 Fralo.app 后检查更新。直接运行构建目录中的可执行文件不支持安装更新。")
             return
         }
         controller = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: self, userDriverDelegate: nil)
         do { try controller.updater.start() }
-        catch { unavailableReason = "更新服务未能启动：\(error.localizedDescription)" }
+        catch { unavailableReason = L10n.tr("更新服务未能启动：\(error.localizedDescription)") }
         mainController.onExportFinished = { [weak self] in
             guard let self else { return false }
             let pending = self.installation.isWaiting
@@ -66,9 +67,9 @@ final class UpdateController: NSObject, SPUUpdaterDelegate, NSMenuItemValidation
     @objc func checkForUpdates(_ sender: Any?) {
         if let reason = unavailableReason {
             let alert = NSAlert()
-            alert.messageText = "暂时无法检查更新"
+            alert.messageText = L10n.tr("暂时无法检查更新")
             alert.informativeText = reason
-            alert.addButton(withTitle: "好")
+            alert.addButton(withTitle: L10n.tr("好"))
             alert.runModal()
             return
         }

@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import XCTest
 import FraloCore
@@ -24,7 +25,7 @@ final class WorkbenchTests: XCTestCase {
         let device = inspector.devicePicker
         XCTAssertTrue(descendants(inspector).compactMap { $0 as? InspectorTabs }.isEmpty)
         func backgroundHeading() throws -> NSTextField {
-            try XCTUnwrap(descendants(inspector).compactMap { $0 as? NSTextField }.first { $0.stringValue == "背景" })
+            try XCTUnwrap(descendants(inspector).compactMap { $0 as? NSTextField }.first { $0.stringValue == L10n.tr("背景") })
         }
         XCTAssertTrue(try backgroundHeading().isHiddenOrHasHiddenAncestor)
         inspector.mode.choose(1)
@@ -229,7 +230,7 @@ final class WorkbenchTests: XCTestCase {
         context.setFillColor(CGColor(gray: 0.8, alpha: 1)); context.fill(CGRect(x: 0, y: 0, width: 400, height: 100))
         try FrameRenderer.pngData(XCTUnwrap(context.makeImage())).write(to: source)
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
-        let retry = try XCTUnwrap(descendants(workbench).compactMap { $0 as? ActionButton }.first { $0.title == "重试预览" })
+        let retry = try XCTUnwrap(descendants(workbench).compactMap { $0 as? ActionButton }.first { $0.title == L10n.tr("重试预览") })
         retry.performClick(nil)
         let canvas = try XCTUnwrap(descendants(workbench).compactMap { $0 as? CanvasSurface }.first)
         for _ in 0..<150 where canvas.image == nil { try await Task.sleep(nanoseconds: 20_000_000) }
