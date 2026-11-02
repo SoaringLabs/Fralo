@@ -203,6 +203,22 @@ open dist/Fralo.app
 本地构建采用 ad-hoc 签名，未经公证。维护者的签名与发布流程见
 [docs/signing.md](docs/signing.md) 和 [docs/updates.md](docs/updates.md)。
 
+手动检测依赖和开发工具更新（Python 3.10+，不需要额外安装依赖）：
+
+```bash
+python3 -B scripts/check_updates.py
+python3 -B scripts/check_updates.py --json
+```
+
+脚本只读比较锁定的 Swift 包、DMG 打包工具、GitHub Actions、本机 Swift／Xcode／macOS SDK
+及 CI 配置的 Xcode 与上游稳定版，附上游发布信息链接，并明确报告查询失败。
+语言模式、包工具要求和最低 macOS 目标仅作背景信息。Apple Swift 与上游 Swift 版本可能不同，
+版本差异本身不能证明兼容性或迁移必要性。脚本不修改文件、依赖、安装环境或定时任务。
+退出码 `0` 表示所有比较完成（仍可能有新版），`2` 表示有查询失败或需要人工核对的项目。
+`--repo` 可指定其他 checkout，`--timeout` 设置单次 HTTP 请求超时（默认 15 秒）。
+GitHub 使用公开查询；遇到限流时可设置 `GITHUB_TOKEN` 或 `GH_TOKEN`。
+离线验证脚本：`python3 -B scripts/test_check_updates.py`。
+
 <details>
 <summary><b>目录结构</b></summary>
 

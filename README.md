@@ -216,6 +216,25 @@ open dist/Fralo.app
 Local builds are ad-hoc signed and not notarized. The maintainer signing and release process
 is described in [docs/signing.md](docs/signing.md) and [docs/updates.md](docs/updates.md).
 
+To check for dependency and toolchain updates on demand (Python 3.10+, no extra packages):
+
+```bash
+python3 -B scripts/check_updates.py
+python3 -B scripts/check_updates.py --json
+```
+
+The read-only check compares locked Swift packages, pinned DMG tools and GitHub Actions,
+local Swift/Xcode/macOS SDK versions, and Xcode versions declared in CI with upstream
+stable releases. It links to upstream release information and reports query failures explicitly.
+Swift language mode, the package tools requirement and the minimum macOS target are shown
+as context. Apple Swift and upstream Swift versions may differ; a version difference alone
+does not establish compatibility or require migration. No files, dependencies, installations,
+or schedules are changed. Exit code `0` means all comparisons completed (updates may exist);
+`2` means at least one check failed or needs review. `--repo` selects another checkout;
+`--timeout` sets each HTTP request's timeout (default 15 seconds). GitHub queries are public;
+optionally set `GITHUB_TOKEN` or `GH_TOKEN` if rate-limited. Offline checks for the script:
+`python3 -B scripts/test_check_updates.py`.
+
 <details>
 <summary><b>Project layout</b></summary>
 
