@@ -16,7 +16,12 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private let imageClipboard: any ImageClipboard
     private let inspectorUsesNativeGlass: Bool
     private(set) var appearanceChoice = AppAppearance.system
-    private(set) var settingsController: AppearanceSettingsWindowController?
+    private(set) var settingsController: SettingsWindowController?
+    /// Set by the app delegate once Sparkle starts; nil in tests and previews, which Settings explains as unavailable.
+    weak var updatePreferences: UpdatePreferences? { didSet { settingsController?.updates = updatePreferences } }
+    let language: LanguagePreference
+    /// Applies a language immediately (the app delegate rebuilds this window); false when it cannot right now.
+    var onLanguageChange: ((String) -> Bool)?
     private var workbench: WorkbenchView!
     private var batchHadImages: Bool?
     private var sidebarCollapsedForEmptyBatch = false
@@ -78,8 +83,9 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private var selectedIndex: Int? { list.selectedIndex }
 
     init(store: SettingsStore = SettingsStore(), preferences: UserDefaults = .standard, pasteboard: NSPasteboard = .general, restoreWindow: Bool = true,
-         inspectorUsesNativeGlass: Bool = false, imageClipboard: (any ImageClipboard)? = nil) {
+         inspectorUsesNativeGlass: Bool = false, imageClipboard: (any ImageClipboard)? = nil, language: LanguagePreference = LanguagePreference()) {
         self.store = CompositionStore(legacy: store); self.preferences = preferences; self.pasteboard = pasteboard
+        self.language = language
         self.imageClipboard = imageClipboard ?? pasteboard
         self.inspectorUsesNativeGlass = inspectorUsesNativeGlass
         do { settings = try self.store.load() } catch { settings = CompositionSettings(); initialWarning = error.localizedDescription }
@@ -382,22 +388,32 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         settingsController?.set(choice)
         if persist { preferences.set(value, forKey: "workbenchAppearance") }
     }
-    func appearanceMenu() -> NSMenu {
-        let menu = NSMenu(title: L10n.tr("外观"))
-        for choice in AppAppearance.allCases {
-            let item = actionItem(choice.title, #selector(changeAppearance(_:))); item.representedObject = choice.rawValue
-            item.state = appearanceChoice == choice ? .on : .off; menu.addItem(item)
-        }
-        return menu
-    }
-    @objc private func changeAppearance(_ sender: NSMenuItem) { if let value = sender.representedObject as? String { selectAppearance(value) } }
+    /// Settings is the only place to edit app-level preferences; there is no duplicate View menu entry.
     @objc func showSettings(_ sender: Any?) {
         if settingsController == nil {
-            settingsController = AppearanceSettingsWindowController(selection: appearanceChoice) { [weak self] value in
-                self?.selectAppearance(value.rawValue)
-            }
+            settingsController = SettingsWindowController(selection: appearanceChoice, updates: updatePreferences, preferences: preferences,
+                                                          language: language) { _ in }
+            bindSettings()
         }
         settingsController?.set(appearanceChoice); settingsController?.present()
+    }
+    var batchCountForTesting: Int { items.count }
+    private func bindSettings() {
+        settingsController?.onAppearanceChange = { [weak self] value in self?.selectAppearance(value.rawValue) }
+        settingsController?.onLanguageChange = { [weak self] language in self?.onLanguageChange?(language) ?? false }
+    }
+    /// Takes over the batch, selection and Settings window from the window being replaced after a language change.
+    /// Undo history stays with the old window: its actions refer to that window's views.
+    func adopt(from old: MainWindowController) {
+        updatePreferences = old.updatePreferences
+        pastedCount = old.pastedCount; zoom = old.zoom
+        items = old.items; refreshList()
+        if let selected = old.selectedIndex, items.indices.contains(selected) { list.select(selected) }
+        else if !items.isEmpty { list.select(0) }
+        settingsController = old.settingsController; old.settingsController = nil
+        settingsController?.updates = updatePreferences
+        bindSettings()
+        updateActions(); requestPreview()
     }
     @objc func toggleSidebar(_ sender: Any?) {
         if workbench.previewing {
@@ -841,7 +857,6 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         default: break
         }
         if menuItem.action == #selector(showSettings(_:)) { return true }
-        if menuItem.action == #selector(changeAppearance(_:)) { menuItem.state = (menuItem.representedObject as? String) == appearanceChoice.rawValue ? .on : .off; return true }
         guard !isExporting else { return false }
         if menuItem.action == #selector(copyCurrent(_:)) { menuItem.title = editingText ? L10n.tr("复制") : L10n.tr("复制当前图片"); return rendered != nil || editingText }
         if menuItem.action == #selector(pasteImage(_:)) { menuItem.title = editingText ? L10n.tr("粘贴") : L10n.tr("粘贴图片"); return true }

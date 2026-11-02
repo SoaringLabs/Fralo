@@ -12,6 +12,12 @@ final class LocalizationTests: XCTestCase {
         }
     }
 
+    func testSearchTermsIncludeEnglish() {
+        let original = L10n.language; defer { L10n.setLanguage(original) }
+        L10n.setLanguage("ja")
+        XCTAssertEqual(L10n.tr("添加图片", alsoIn: ["en"]), ["画像を追加", "Add Images"])
+    }
+
     func testAllLanguagesLoadRealBundleResources() {
         let expected = ["en": "Add Images", "zh-Hans": "添加图片", "zh-Hant": "加入圖片", "ja": "画像を追加"]
         for (language, title) in expected {

@@ -7,6 +7,20 @@ releases may include breaking changes; they are marked **Breaking** below.
 
 ## Unreleased
 
+### Changed
+
+- Settings (⌘,) is now a System Settings–style window with Appearance and Updates
+  categories. Choose the App appearance from thumbnails, and turn daily update checks
+  on or off next to the current version, the last check time, and Check Now.
+- Choose Fralo's interface language in Settings › Appearance; Fralo switches
+  immediately and keeps your batch. It is the same setting as Fralo's language in
+  System Settings › General › Language & Region.
+- Search Settings from the sidebar (⌘F): matching categories stay listed and matching
+  settings are highlighted, in your language or in English.
+- The View › Appearance submenu and the Fralo › Check for Updates Automatically
+  (Daily) menu item moved into Settings, so each preference has one place to change
+  it. Existing choices carry over.
+
 ## 0.2.0 — 2026-11-01
 
 A rebuilt native workbench with new compositions: frame screenshots as a phone,

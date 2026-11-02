@@ -2,11 +2,31 @@ import Foundation
 
 private final class LocalizationBundleToken: NSObject {}
 
-/// Shared by the app, core errors, and design system. Language is selected once at launch,
-/// using macOS language preferences (including the system's per-app language setting).
+/// Shared by the app, core errors, and design system. Language is selected at launch from macOS
+/// language preferences (including the system's per-app language setting) and can change at runtime
+/// from Fralo's Settings; interfaces rebuild on `languageDidChange`.
 public enum L10n {
     public static let supportedLanguages = ["en", "zh-Hans", "zh-Hant", "ja"]
-    public static let language: String = {
+    /// Posted on the main thread after `setLanguage` changes the current language.
+    public static let languageDidChange = Notification.Name("FraloLanguageDidChange")
+    private static let languageLock = NSLock()
+    nonisolated(unsafe) private static var current = launchLanguage
+    /// Read from any thread: core errors may be formatted off the main thread.
+    public static var language: String { languageLock.lock(); defer { languageLock.unlock() }; return current }
+
+    /// Takes effect for text produced from now on. Returns false when the language is already current.
+    @discardableResult
+    public static func setLanguage(_ language: String) -> Bool {
+        let resolved = resolveLanguage([language])
+        languageLock.lock()
+        let changed = resolved != current
+        current = resolved
+        languageLock.unlock()
+        if changed { NotificationCenter.default.post(name: languageDidChange, object: nil) }
+        return changed
+    }
+
+    static let launchLanguage: String = {
         #if DEBUG
         // Isolated preview override: never writes to the user's macOS language preferences.
         if CommandLine.arguments.contains("--workbench-preview"),
@@ -50,6 +70,11 @@ public enum L10n {
     }()
 
     public static func tr(_ text: Text) -> String { translate(text, language: language) }
+    /// The text in the current language followed by the same text in each of `languages`, for search terms
+    /// that should also match a name people may know from another language.
+    public static func tr(_ text: Text, alsoIn languages: [String]) -> [String] {
+        [tr(text)] + languages.map { translate(text, language: $0) }
+    }
 
     /// Explicit language keeps tests deterministic without mutating process-wide preferences.
     public static func translate(_ text: Text, language: String) -> String {
