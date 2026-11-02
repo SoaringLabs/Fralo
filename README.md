@@ -23,7 +23,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/workbench-en-dark.png">
-  <img src="docs/assets/workbench-en-light.png" width="1200" alt="The English Fralo workbench with three generated Field Notes screenshots, an iPhone 18 Pro Max frame, and a warm background">
+  <img src="docs/assets/workbench-en-light.png" width="1200" alt="The complete English Fralo workbench with native window shadow, three generated Field Notes screenshots, an iPhone 18 Pro Max frame, and a warm background">
 </picture>
 
 Fralo is a native macOS app and command-line tool that puts your screenshots inside
