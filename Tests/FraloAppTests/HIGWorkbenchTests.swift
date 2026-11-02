@@ -81,7 +81,10 @@ final class HIGWorkbenchTests: XCTestCase {
         let title = try XCTUnwrap(window.toolbar?.items.first { $0.itemIdentifier.rawValue == "document" }?.view)
         for text in descendants(title).compactMap({ $0 as? NSTextField }) { text.stringValue = String(repeating: "长文件名称", count: 30) }
         window.contentView?.layoutSubtreeIfNeeded()
-        XCTAssertLessThanOrEqual(title.bounds.width, 220)
+        // Localized subtitles may expand the header; long filenames must stay within its 360 pt cap.
+        // Check the requested size too: offscreen toolbar layout can leave bounds at the initial 220 pt.
+        XCTAssertLessThanOrEqual(title.intrinsicContentSize.width, 360)
+        XCTAssertLessThanOrEqual(title.bounds.width, 360)
         let sidebar = NSMenuItem(title: "", action: #selector(MainWindowController.toggleSidebar(_:)), keyEquivalent: "")
         let inspector = NSMenuItem(title: "", action: #selector(MainWindowController.toggleInspector(_:)), keyEquivalent: "")
         let root = try XCTUnwrap(window.contentView as? WorkbenchView)
