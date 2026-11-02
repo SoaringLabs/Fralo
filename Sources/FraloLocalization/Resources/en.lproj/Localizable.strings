@@ -187,7 +187,6 @@
 "图片拖放区域" = "Image Drop Area";
 "还没有图片" = "No Images Yet";
 "导入的截图会按顺序排在这里\n也可以直接拖到这一栏" = "Imported screenshots appear here in order\nYou can also drop them into this list";
-"界面外观" = "Interface Appearance";
 "Fralo 设置" = "Fralo Settings";
 "选择浅色、深色，或随系统自动切换。" = "Choose Light, Dark, or match your system.";
 "更改会自动保存，并即时应用到 Fralo 的所有窗口。" = "Changes are saved automatically and apply to all Fralo windows immediately.";
@@ -198,7 +197,6 @@
 "停止并退出" = "Stop and Quit";
 "关于 Fralo" = "About Fralo";
 "检查更新…" = "Check for Updates…";
-"自动检查更新（每天）" = "Check for Updates Automatically (Daily)";
 "隐藏 Fralo" = "Hide Fralo";
 "退出 Fralo" = "Quit Fralo";
 "文件" = "File";
@@ -253,3 +251,26 @@
 "导出全部" = "Export All";
 "更多导出操作" = "More Export Actions";
 "导出全部 · {0} 张" = "Export All · {0}";
+/* FRALO-22 Settings window */
+"更新" = "Updates";
+"设置分类" = "Settings Categories";
+"界面" = "Interface";
+"立即检查…" = "Check Now…";
+"每天自动检查更新" = "Check for updates daily";
+"发现新版本时会先询问你，不会自动下载或安装。" = "Fralo asks before downloading or installing a new version.";
+"提示" = "Warning";
+"此构建无法检查更新" = "This build can’t check for updates";
+"自动更新" = "Automatic Updates";
+"版本" = "Version";
+"当前版本" = "Current Version";
+"上次检查" = "Last Checked";
+"从未检查" = "Never";
+"语言" = "Language";
+"界面语言" = "Interface Language";
+"暂时无法切换语言" = "Can’t Change the Language Right Now";
+"请在导出完成并关闭对话框后再切换语言。" = "Change the language after the export finishes and any dialogs are closed.";
+"搜索" = "Search";
+"搜索设置" = "Search Settings";
+"无结果" = "No Results";
+"结果：{0}" = "Results: {0}";
+"与搜索匹配" = "Matches search";

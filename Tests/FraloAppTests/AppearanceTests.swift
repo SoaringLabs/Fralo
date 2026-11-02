@@ -33,8 +33,10 @@ final class AppearanceTests: XCTestCase {
         let settings = try XCTUnwrap(controller.settingsController)
         XCTAssertEqual(settings.selection, .dark)
         XCTAssertTrue(settings.window?.isVisible == true)
+        settings.select(.appearance)
+        let picker = try XCTUnwrap(settings.picker)
         for (index, value, name): (Int, AppAppearance, NSAppearance.Name?) in [(1, .light, .aqua), (2, .dark, .darkAqua), (0, .system, nil)] {
-            settings.choices.choose(index)
+            picker.buttons[index].performClick(nil)
             XCTAssertEqual(controller.appearanceChoice, value)
             XCTAssertEqual(settings.selection, value)
             XCTAssertEqual(NSApp.appearance?.name, name)
@@ -48,12 +50,11 @@ final class AppearanceTests: XCTestCase {
                 }
             }
             XCTAssertEqual(defaults.string(forKey: "workbenchAppearance"), value.rawValue)
-            let menu = controller.appearanceMenu()
-            XCTAssertEqual(menu.items.filter { $0.state == .on }.count, 1)
-            XCTAssertEqual(menu.items.first { $0.state == .on }?.representedObject as? String, value.rawValue)
+            XCTAssertEqual(picker.buttons.filter { $0.state == .on }.count, 1)
+            XCTAssertEqual(picker.buttons[index].state, .on)
         }
         controller.selectAppearance("light")
-        XCTAssertEqual(settings.choices.selectedIndex, 1, "Quick appearance selection must update an open settings window")
+        XCTAssertEqual(picker.selection, .light, "An appearance change made elsewhere must update an open settings window")
         settings.window?.close(); controller.showSettings(nil)
         XCTAssertTrue(controller.settingsController === settings)
         XCTAssertTrue(settings.window?.isVisible == true)

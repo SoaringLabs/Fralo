@@ -31,6 +31,36 @@ final class DevelopmentEntry: NSObject {
         }
         if let content = window.contentView { apply(content) }
     }
+    /// `--preview-settings=appearance|updates` opens the real Settings window in Workbench Preview.
+    /// `--preview-updates=available` substitutes a fake Sparkle so the enabled state can be reviewed without a signed app.
+    private var previewUpdates: PreviewUpdatePreferences?
+    func showSettingsPreviewIfRequested(_ controller: MainWindowController) {
+        guard CommandLine.arguments.contains("--workbench-preview"),
+              let argument = CommandLine.arguments.first(where: { $0.hasPrefix("--preview-settings=") }),
+              let pane = SettingsWindowController.Pane(rawValue: String(argument.dropFirst("--preview-settings=".count))) else { return }
+        if CommandLine.arguments.contains("--preview-updates=available") {
+            let fake = PreviewUpdatePreferences(); previewUpdates = fake; controller.updatePreferences = fake
+        }
+        controller.showSettings(nil); controller.settingsController?.select(pane)
+        // `--preview-settings-minimum` checks the smallest window, where long translations must wrap rather than clip.
+        if CommandLine.arguments.contains("--preview-settings-minimum"), let window = controller.settingsController?.window {
+            // After AppKit restores the autosaved frame, which would otherwise win over this preview size.
+            DispatchQueue.main.async { window.setContentSize(window.contentMinSize) }
+        }
+        // `--preview-settings-search=text` types a query into Settings' search field.
+        if let argument = CommandLine.arguments.first(where: { $0.hasPrefix("--preview-settings-search=") }), let settings = controller.settingsController {
+            settings.focusSearch(); settings.searchField.stringValue = String(argument.dropFirst("--preview-settings-search=".count)); settings.updateSearch()
+        }
+        // `--preview-switch-language=en` picks that language in Settings' pop-up after launch, exercising the live switch.
+        if let argument = CommandLine.arguments.first(where: { $0.hasPrefix("--preview-switch-language=") }) {
+            let code = String(argument.dropFirst("--preview-switch-language=".count))
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak controller] in
+                guard let popup = controller?.settingsController?.languagePopup,
+                      let index = popup.itemArray.firstIndex(where: { $0.representedObject as? String == code }) else { return }
+                popup.selectItem(at: index); _ = popup.target?.perform(popup.action, with: popup)
+            }
+        }
+    }
     static var labOnly: Bool { CommandLine.arguments.contains("--design-lab-only") }
     private(set) var controller: DesignLabController?
     private var productMenu: NSMenu?
@@ -59,6 +89,8 @@ final class DevelopmentEntry: NSObject {
         windows.addItem(withTitle: "最小化", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
         let windowItem = NSMenuItem(title: "窗口", action: nil, keyEquivalent: ""); windowItem.submenu = windows; lab.addItem(windowItem)
         labMenu = lab
+        // Menus are rebuilt after a language change; keep a single observer.
+        if let observer { NotificationCenter.default.removeObserver(observer) }
         observer = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { [weak self] notification in
             MainActor.assumeIsolated {
                 guard let self, let window = notification.object as? NSWindow else { return }
@@ -103,5 +135,14 @@ final class DevelopmentEntry: NSObject {
             LabProbe.run(controller: controller, output: URL(fileURLWithPath: path))
         }
     }
+}
+/// Debug-only stand-in for Sparkle; never persists or contacts the update feed.
+@MainActor
+final class PreviewUpdatePreferences: UpdatePreferences {
+    var unavailableReason: String? { nil }
+    var automaticallyChecksForUpdates = true
+    var lastUpdateCheckDate: Date? = Date().addingTimeInterval(-3_600)
+    var canCheckForUpdates: Bool { true }
+    func checkForUpdates(_ sender: Any?) {}
 }
 #endif

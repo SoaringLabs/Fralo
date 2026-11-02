@@ -4,7 +4,7 @@ import FraloCore
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var mainController: MainWindowController?
+    private(set) var mainController: MainWindowController?
     private var updateController: UpdateController?
     private var pendingURLs: [URL] = []
     #if FRALO_DEV
@@ -12,17 +12,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     #endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        #if FRALO_DEV
-        let controller = MainWindowController(inspectorUsesNativeGlass: CommandLine.arguments.contains("--panel-render-check"))
-        #else
-        let controller = MainWindowController()
-        #endif
+        let controller = makeMainController()
         mainController = controller
         #if FRALO_DEV
         if !DevelopmentEntry.labOnly && !CommandLine.arguments.contains("--workbench-preview") { updateController = UpdateController(mainController: controller) }
         #else
         updateController = UpdateController(mainController: controller)
         #endif
+        controller.updatePreferences = updateController
+        controller.onLanguageChange = { [weak self] in self?.applyLanguage($0) ?? false }
         installMenus(controller)
         #if FRALO_DEV
         if DevelopmentEntry.labOnly {
@@ -45,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #if FRALO_DEV
         if CommandLine.arguments.contains("--design-lab") { development.showLab() }
         development.showRenderingProbesIfRequested(behind: controller.window)
+        development.showSettingsPreviewIfRequested(controller)
         #endif
     }
     func application(_ sender: NSApplication, openFiles filenames: [String]) {
@@ -64,11 +63,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         return .terminateNow
     }
+
+    /// Tests install a workbench without running the launch sequence.
+    func adoptForTesting(_ controller: MainWindowController) {
+        mainController = controller
+        controller.onLanguageChange = { [weak self] in self?.applyLanguage($0) ?? false }
+        installMenus(controller)
+    }
+
+    private func makeMainController() -> MainWindowController {
+        #if FRALO_DEV
+        return MainWindowController(inspectorUsesNativeGlass: CommandLine.arguments.contains("--panel-render-check"))
+        #else
+        return MainWindowController()
+        #endif
+    }
+
+    /// Switches Fralo's own interface immediately: the workbench is rebuilt in the new language and takes over the
+    /// batch, selection and Settings window, then the menu bar is rebuilt. Refused while exporting or showing a sheet,
+    /// so no running operation or open dialog is torn down. Returns whether the language is now in effect.
+    @discardableResult
+    func applyLanguage(_ language: String) -> Bool {
+        guard let old = mainController else { L10n.setLanguage(language); return true }
+        guard L10n.resolveLanguage([language]) != L10n.language else { return true }
+        guard !old.isExporting, old.window?.attachedSheet == nil else { return false }
+        // Only one window may own the autosave name; hand it to the replacement.
+        old.window?.setFrameAutosaveName("")
+        L10n.setLanguage(language)
+        let replacement = makeMainController()
+        replacement.adopt(from: old)
+        replacement.onLanguageChange = { [weak self] in self?.applyLanguage($0) ?? false }
+        mainController = replacement
+        updateController?.bind(to: replacement)
+        installMenus(replacement)
+        if let frame = old.window?.frame, old.window?.isVisible == true {
+            replacement.window?.setFrame(frame, display: false)
+            // Behind whatever is in front (normally Settings), in the old window's place, before the old one goes.
+            if let number = old.window?.windowNumber { replacement.window?.order(.above, relativeTo: number) }
+        }
+        old.window?.close()
+        replacement.settingsController?.reloadLocalizedContent()
+        return true
+    }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         mainController?.showWindow(nil); return true
     }
 
-    private func installMenus(_ controller: MainWindowController) {
+    func installMenus(_ controller: MainWindowController) {
         let bar = NSMenu()
         let app = NSMenu(); let appItem = NSMenuItem(); appItem.submenu = app; bar.addItem(appItem)
         let about = app.addItem(withTitle: L10n.tr("关于 Fralo"), action: #selector(showAbout(_:)), keyEquivalent: "")
@@ -78,8 +119,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         app.addItem(.separator())
         let check = app.addItem(withTitle: L10n.tr("检查更新…"), action: #selector(UpdateController.checkForUpdates(_:)), keyEquivalent: "")
         check.target = updateController
-        let automatic = app.addItem(withTitle: L10n.tr("自动检查更新（每天）"), action: #selector(UpdateController.toggleAutomaticChecks(_:)), keyEquivalent: "")
-        automatic.target = updateController
         app.addItem(.separator())
         app.addItem(withTitle: L10n.tr("隐藏 Fralo"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         app.addItem(.separator())
@@ -133,7 +172,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item(view, L10n.tr("放大"), #selector(MainWindowController.zoomIn(_:)), "=")
         view.items.last?.isHidden = true; view.items.last?.allowsKeyEquivalentWhenHidden = true
         item(view, L10n.tr("缩小"), #selector(MainWindowController.zoomOut(_:)), "-")
-        let appearance = NSMenuItem(title: L10n.tr("外观"), action: nil, keyEquivalent: ""); appearance.submenu = controller.appearanceMenu(); view.addItem(appearance)
 
         let window = NSMenu(title: L10n.tr("窗口")); let windowItem = NSMenuItem(title: L10n.tr("窗口"), action: nil, keyEquivalent: ""); windowItem.submenu = window; bar.addItem(windowItem)
         window.addItem(withTitle: L10n.tr("最小化"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")

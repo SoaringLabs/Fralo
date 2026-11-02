@@ -250,7 +250,8 @@ final class CompositionInspector: NSView {
         settings.pngLossless ? 0 : settings.pngQuality >= 0.6 ? 1 : 2
     }
     /// Ratios read as shapes, so the menu says what each one is for.
-    private static let canvasTitles: [CanvasRatio: String] = [.square: L10n.tr("1:1 方形"), .landscape: L10n.tr("4:3 横向"), .wide: L10n.tr("16:9 宽屏"), .portrait: L10n.tr("3:4 竖向"), .story: L10n.tr("9:16 手机全屏")]
+    // Computed so a language change made in Settings is picked up by the rebuilt inspector.
+    private static var canvasTitles: [CanvasRatio: String] { [.square: L10n.tr("1:1 方形"), .landscape: L10n.tr("4:3 横向"), .wide: L10n.tr("16:9 宽屏"), .portrait: L10n.tr("3:4 竖向"), .story: L10n.tr("9:16 手机全屏")] }
 
     // MARK: Groups
 
