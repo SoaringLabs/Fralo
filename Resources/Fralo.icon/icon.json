@@ -37,6 +37,13 @@
       "shadow": {
         "kind": "neutral",
         "opacity": 0.03
+      },
+      "position": {
+        "scale": 0.9,
+        "translation-in-points": [
+          -1.35,
+          24.75
+        ]
       }
     },
     {
@@ -69,6 +76,13 @@
       "shadow": {
         "kind": "neutral",
         "opacity": 0.03
+      },
+      "position": {
+        "scale": 0.9,
+        "translation-in-points": [
+          -1.35,
+          24.75
+        ]
       }
     },
     {
@@ -101,6 +115,13 @@
       "shadow": {
         "kind": "neutral",
         "opacity": 0.03
+      },
+      "position": {
+        "scale": 0.9,
+        "translation-in-points": [
+          -1.35,
+          24.75
+        ]
       }
     },
     {
@@ -127,6 +148,13 @@
       "shadow": {
         "kind": "neutral",
         "opacity": 0.0
+      },
+      "position": {
+        "scale": 0.9,
+        "translation-in-points": [
+          -1.35,
+          24.75
+        ]
       }
     }
   ],
