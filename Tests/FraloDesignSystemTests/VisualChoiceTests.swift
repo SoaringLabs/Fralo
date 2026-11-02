@@ -1,13 +1,43 @@
+import FraloLocalization
 import AppKit
 import XCTest
 @testable import FraloDesignSystem
 
 final class VisualChoiceTests: XCTestCase {
+    @MainActor func testLongTileCaptionsReflowWithoutChangingSelection() async {
+        let items = ["Warm Gray", "Mist Blue", "Sage", "Custom"].map { VisualChoiceItem($0) }
+        let group = VisualChoiceGroup(items, label: "Background", selected: 1, layout: .tiles(columns: 4, height: 80))
+        group.frame = NSRect(x: 0, y: 0, width: 276, height: 168); group.layoutSubtreeIfNeeded()
+        XCTAssertEqual(group.subviews[0].frame.minY, group.subviews[1].frame.minY)
+        XCTAssertGreaterThan(group.subviews[2].frame.minY, group.subviews[0].frame.minY)
+        XCTAssertEqual(group.intrinsicContentSize.height, 168)
+        XCTAssertEqual(group.selectedIndex, 1)
+        group.setFrameSize(NSSize(width: 500, height: 80)); group.layoutSubtreeIfNeeded()
+        XCTAssertEqual(group.intrinsicContentSize.height, 80)
+        XCTAssertEqual(group.selectedIndex, 1)
+    }
+
+    @MainActor func testLongOptionLabelsReflowAndKeepKeyboardNavigation() async throws {
+        _ = NSApplication.shared
+        let group = VisualChoiceGroup([.init("Portrait", symbol: "iphone"), .init("Landscape", symbol: "iphone.landscape")],
+                                      label: "Orientation", layout: .options(columns: 2))
+        group.frame = NSRect(x: 0, y: 0, width: 276, height: 96)
+        group.layoutSubtreeIfNeeded()
+        XCTAssertGreaterThan(group.subviews[1].frame.minY, group.subviews[0].frame.minY)
+        XCTAssertEqual(group.intrinsicContentSize.height, 96)
+        group.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: 0, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: 125)!)
+        XCTAssertEqual(group.selectedIndex, 1)
+        group.setFrameSize(NSSize(width: 400, height: 44)); group.layoutSubtreeIfNeeded()
+        XCTAssertEqual(group.subviews[1].frame.minY, group.subviews[0].frame.minY)
+        XCTAssertEqual(group.intrinsicContentSize.height, 44)
+    }
+
     @MainActor func testPointerSelectionDoesNotLeaveAKeyboardHaloOnThePreviousCard() async throws {
         _ = NSApplication.shared
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false; defer { window.close() }
-        let group = VisualChoiceGroup([.init("竖屏"), .init("横屏")], label: "方向", selected: 1, captionsBelow: true)
+        let group = VisualChoiceGroup([.init(L10n.tr("竖屏")), .init(L10n.tr("横屏"))], label: L10n.tr("方向"), selected: 1, captionsBelow: true)
         group.frame = NSRect(x: 0, y: 0, width: 300, height: 112); window.contentView?.addSubview(group)
         window.makeFirstResponder(group); group.layoutSubtreeIfNeeded()
         try XCTUnwrap(group.subviews.first as? NSButton).performClick(nil)
@@ -62,7 +92,7 @@ final class VisualChoiceTests: XCTestCase {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 360), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false; window.autorecalculatesKeyViewLoop = false
         defer { window.close() }
-        let group = VisualChoiceGroup((0..<4).map { VisualChoiceItem("\($0)") }, label: "方向")
+        let group = VisualChoiceGroup((0..<4).map { VisualChoiceItem("\($0)") }, label: L10n.tr("方向"))
         group.frame = NSRect(x: 0, y: 40, width: 300, height: 240)
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 100, height: 24))
         window.contentView?.addSubview(group); window.contentView?.addSubview(field)

@@ -1,3 +1,4 @@
+import FraloLocalization
 import CoreGraphics
 import CoreText
 import Foundation
@@ -60,12 +61,12 @@ public enum CompositionRenderer {
         case .mist: name = "mist-blue"
         case .sage: name = "sage-gray"
         case .local:
-            guard let path = settings.localBackgroundPath else { throw FraloError.message("请先选择本地背景图片。") }
+            guard let path = settings.localBackgroundPath else { throw FraloError.message(L10n.tr("请先选择本地背景图片。")) }
             return try Data(contentsOf: URL(fileURLWithPath: path))
         default: return nil
         }
         guard let url = resourceBundle().url(forResource: name, withExtension: "png", subdirectory: "Resources/Backgrounds") else {
-            throw FraloError.message("找不到内置背景素材：\(name)")
+            throw FraloError.message(L10n.tr("找不到内置背景素材：\(name)"))
         }
         return try Data(contentsOf: url)
     }
@@ -101,7 +102,7 @@ public enum CompositionRenderer {
                 context.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: size.width, y: size.height), options: [])
             default:
                 let bytes = try backgroundData ?? Self.backgroundData(settings)
-                guard let bytes else { throw FraloError.message("背景图片不可用。") }
+                guard let bytes else { throw FraloError.message(L10n.tr("背景图片不可用。")) }
                 let image = try ImageInput(data: bytes, name: "background.png").decode(maxDimension: 4800)
                 let scale = max(size.width / CGFloat(image.width), size.height / CGFloat(image.height)) * settings.backgroundScale
                 let imageSize = CGSize(width: CGFloat(image.width) * scale, height: CGFloat(image.height) * scale)
@@ -123,7 +124,7 @@ public enum CompositionRenderer {
         context.saveGState(); context.setAlpha(settings.outputDeviceOpacity)
         if blur > 0 { context.setShadow(offset: CGSize(width: 0, height: shadowOffset), blur: blur, color: CGColor(srgbRed: 0, green: 0, blue: 0, alpha: settings.shadow == .strong ? 0.4 : 0.23)) }
         draw(device, in: rect, context: context); context.restoreGState()
-        guard let image = context.makeImage() else { throw FraloError.message("无法合成成品。") }
+        guard let image = context.makeImage() else { throw FraloError.message(L10n.tr("无法合成成品。")) }
         let maximumMargin = ceil(strongestShadowBlur * 3 + shadowOffsetY)
         var reference = settings.mode == .background ? size : CGSize(width: nativeSize.width + maximumMargin * 2, height: nativeSize.height + maximumMargin * 2)
         if settings.mode == .transparent, settings.display == .phone {
@@ -144,7 +145,7 @@ public enum CompositionRenderer {
             sprite.setAlpha(settings.outputDeviceOpacity)
             if blur > 0 { sprite.setShadow(offset: CGSize(width: 0, height: shadowOffset), blur: blur, color: CGColor(srgbRed: 0, green: 0, blue: 0, alpha: settings.shadow == .strong ? 0.4 : 0.23)) }
             draw(device, in: CGRect(x: margin, y: margin, width: rect.width, height: rect.height), context: sprite)
-            guard let spriteImage = sprite.makeImage() else { throw FraloError.message("无法创建拖动预览。") }
+            guard let spriteImage = sprite.makeImage() else { throw FraloError.message(L10n.tr("无法创建拖动预览。")) }
             result.previewLayers = CompositionPreviewLayers(background: background, device: spriteImage,
                 backgroundOpacity: previewBackgroundOpacity, canvasSize: size,
                 deviceRect: CGRect(origin: CGPoint(x: rect.minX - margin, y: rect.minY - margin), size: spriteSize),
@@ -174,16 +175,16 @@ public enum CompositionRenderer {
         }
         let flattened = try Self.flattened(image, color: settings.jpegFill)
         let bytes = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(bytes, UTType.jpeg.identifier as CFString, 1, nil) else { throw FraloError.message("无法创建 JPEG。") }
+        guard let destination = CGImageDestinationCreateWithData(bytes, UTType.jpeg.identifier as CFString, 1, nil) else { throw FraloError.message(L10n.tr("无法创建 JPEG。")) }
         CGImageDestinationAddImage(destination, flattened, [kCGImageDestinationLossyCompressionQuality: settings.jpegQuality] as CFDictionary)
-        guard CGImageDestinationFinalize(destination) else { throw FraloError.message("JPEG 编码失败。") }
+        guard CGImageDestinationFinalize(destination) else { throw FraloError.message(L10n.tr("JPEG 编码失败。")) }
         return bytes as Data
     }
     static func bitmap(_ size: CGSize) throws -> CGContext {
         guard size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0, size.width * size.height <= 100_000_000,
               let context = CGContext(data: nil, width: Int(size.width), height: Int(size.height), bitsPerComponent: 8, bytesPerRow: 0,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue) else {
-            throw FraloError.message("成品尺寸过大，无法分配图片内存。")
+            throw FraloError.message(L10n.tr("成品尺寸过大，无法分配图片内存。"))
         }
         context.translateBy(x: 0, y: size.height); context.scaleBy(x: 1, y: -1)
         return context

@@ -1,3 +1,4 @@
+import FraloLocalization
 import Foundation
 import Darwin
 
@@ -59,7 +60,7 @@ public enum BatchExporter {
         let suffixName = format == .png ? "png" : "jpg"
         var used = Set<String>()
         return inputs.map { input in
-            let stem = input.stem.isEmpty ? "图片" : input.stem
+            let stem = input.stem.isEmpty ? L10n.tr("图片") : input.stem
             var candidate = "\(stem)-fralo.\(suffixName)", suffix = 2
             while !used.insert(candidate.lowercased()).inserted {
                 candidate = "\(stem)-fralo-\(suffix).\(suffixName)"; suffix += 1
@@ -75,10 +76,10 @@ public enum BatchExporter {
         let settings = try settings.validated()
         let composition = try composition?.validated()
         let backdrop = try backgroundData ?? composition.flatMap { try CompositionRenderer.backgroundData($0) }
-        guard !inputs.isEmpty else { throw FraloError.message("没有可导出的图片。") }
+        guard !inputs.isEmpty else { throw FraloError.message(L10n.tr("没有可导出的图片。")) }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let names = explicitNames ?? outputNames(for: inputs, format: composition?.outputFormat ?? .png)
-        guard names.count == inputs.count else { throw FraloError.message("导出文件名数量不匹配。") }
+        guard names.count == inputs.count else { throw FraloError.message(L10n.tr("导出文件名数量不匹配。")) }
         let started = Date()
         var entries: [ExportEntry] = []
         let inputPaths = Set(inputs.compactMap { $0.url?.standardizedFileURL.resolvingSymlinksInPath().path })
@@ -86,17 +87,17 @@ public enum BatchExporter {
             if cancellation.isCancelled { break }
             let name = names[index]
             guard !name.isEmpty, (name as NSString).lastPathComponent == name, name != ".", name != ".." else {
-                throw FraloError.message("输出文件名必须是文件名，不可包含目录。")
+                throw FraloError.message(L10n.tr("输出文件名必须是文件名，不可包含目录。"))
             }
             let output = directory.appendingPathComponent(name)
             progress(ExportProgress(completed: entries.count, total: inputs.count, currentName: input.name))
             let entry: ExportEntry = autoreleasepool {
                 do {
                     guard !inputPaths.contains(output.standardizedFileURL.resolvingSymlinksInPath().path) else {
-                        throw FraloError.message("不能覆盖任何原始截图。")
+                        throw FraloError.message(L10n.tr("不能覆盖任何原始截图。"))
                     }
                     if !overwrite && FileManager.default.fileExists(atPath: output.path) {
-                        return ExportEntry(input: input.name, output: output.path, status: .skipped, reason: "已有同名文件")
+                        return ExportEntry(input: input.name, output: output.path, status: .skipped, reason: L10n.tr("已有同名文件"))
                     }
                     let data: Data
                     if let composition {
@@ -107,7 +108,7 @@ public enum BatchExporter {
                         data = try FrameRenderer.pngData(frame.image)
                     }
                     let written = try write(data, to: output, overwrite: overwrite)
-                    return ExportEntry(input: input.name, output: output.path, status: written ? .success : .skipped, reason: written ? nil : "已有同名文件")
+                    return ExportEntry(input: input.name, output: output.path, status: written ? .success : .skipped, reason: written ? nil : L10n.tr("已有同名文件"))
                 } catch {
                     return ExportEntry(input: input.name, output: output.path, status: .failed, reason: error.localizedDescription)
                 }

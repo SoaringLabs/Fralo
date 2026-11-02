@@ -19,3 +19,9 @@
 
 - [Designing for macOS](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos)
 - [Layout](https://developer.apple.com/design/human-interface-guidelines/layout), [Sidebars](https://developer.apple.com/design/human-interface-guidelines/sidebars), [Accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility)
+
+## 多语言文案
+
+- 新增或修改生产界面、菜单、提示、错误、工具提示和辅助功能文案时，使用 `FraloLocalization.L10n.tr`，并同步维护 English、简体中文、繁体中文、日语四套 `Localizable.strings`；具体写法见 [多语言开发说明](docs/localization.md)。
+- 将带动态值的完整句子放入翻译调用，保留各语言一致的编号占位符；用户文件名、持久化键和设备标识保持原值。
+- 交付前运行 `python3 -B scripts/check_localizations.py` 与相关测试，并检查英文、日文长文案在最小窗口中的布局。

@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import FraloDesignSystem
 
@@ -11,21 +12,21 @@ final class AppearanceSettingsWindowController: NSWindowController {
         self.selection = selection; self.onChange = onChange
         choices = VisualChoiceGroup(AppAppearance.allCases.map {
             VisualChoiceItem($0.title, symbol: "circle.lefthalf.filled", image: Self.thumbnail($0))
-        }, label: "界面外观", selected: AppAppearance.allCases.firstIndex(of: selection), layout: .tiles(columns: 3, height: 146))
+        }, label: L10n.tr("界面外观"), selected: AppAppearance.allCases.firstIndex(of: selection), layout: .tiles(columns: 3, height: 146))
         choices.focusRingType = .none
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 324),
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
         super.init(window: window)
-        window.title = "Fralo 设置"; window.isReleasedWhenClosed = false
+        window.title = L10n.tr("Fralo 设置"); window.isReleasedWhenClosed = false
         window.titlebarAppearsTransparent = true
         let root = NeutralSurface(); window.contentView = root
         let icon = NSImageView(image: NSImage(systemSymbolName: "circle.lefthalf.filled", accessibilityDescription: nil)!)
         icon.contentTintColor = .controlAccentColor; icon.imageScaling = .scaleProportionallyUpOrDown
         icon.widthAnchor.constraint(equalToConstant: 32).isActive = true; icon.heightAnchor.constraint(equalToConstant: 32).isActive = true
-        let heading = FraloStyle.stack([FraloStyle.text("外观", role: .title),
-            FraloStyle.paragraph("选择浅色、深色，或随系统自动切换。")], spacing: 6)
+        let heading = FraloStyle.stack([FraloStyle.text(L10n.tr("外观"), role: .title),
+            FraloStyle.paragraph(L10n.tr("选择浅色、深色，或随系统自动切换。"))], spacing: 6)
         let title = FraloStyle.stack([icon, heading], axis: .horizontal, spacing: 14)
-        let note = FraloStyle.paragraph("更改会自动保存，并即时应用到 Fralo 的所有窗口。")
+        let note = FraloStyle.paragraph(L10n.tr("更改会自动保存，并即时应用到 Fralo 的所有窗口。"))
         let column = FraloStyle.stack([title, choices, note], spacing: 22, fillWidth: true)
         column.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(column)
         NSLayoutConstraint.activate([column.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 28),

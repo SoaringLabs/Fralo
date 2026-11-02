@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import UniformTypeIdentifiers
 import FraloCore
@@ -109,11 +110,11 @@ final class CompositionInspector: NSView {
 
     init(settings: CompositionSettings) {
         self.settings = settings
-        mode = ValuePicker(["透明", "带背景"], label: "成品背景", selected: settings.mode == .transparent ? 0 : 1, purpose: .tabs, size: .large)
-        devicePicker = ValuePicker(["手机", "平板", "浏览器"], label: "设备类型", selected: DisplayKind.allCases.firstIndex(of: settings.display)!, purpose: .tabs, size: .large)
-        formatPicker = ValuePicker(["PNG", "JPEG"], label: "文件格式", selected: settings.format == .png ? 0 : 1)
-        backgroundType = ValuePicker(["纯色", "渐变", "图片"], label: "背景类型")
-        pngCompression = ValuePicker(["原画质", "适中", "最小"], label: "文件大小", selected: Self.pngPreset(settings))
+        mode = ValuePicker([L10n.tr("透明"), L10n.tr("带背景")], label: L10n.tr("成品背景"), selected: settings.mode == .transparent ? 0 : 1, purpose: .tabs, size: .large)
+        devicePicker = ValuePicker([L10n.tr("手机"), L10n.tr("平板"), L10n.tr("浏览器")], label: L10n.tr("设备类型"), selected: DisplayKind.allCases.firstIndex(of: settings.display)!, purpose: .tabs, size: .large)
+        formatPicker = ValuePicker(["PNG", "JPEG"], label: L10n.tr("文件格式"), selected: settings.format == .png ? 0 : 1)
+        backgroundType = ValuePicker([L10n.tr("纯色"), L10n.tr("渐变"), L10n.tr("图片")], label: L10n.tr("背景类型"))
+        pngCompression = ValuePicker([L10n.tr("原画质"), L10n.tr("适中"), L10n.tr("最小")], label: L10n.tr("文件大小"), selected: Self.pngPreset(settings))
         // Value choices use the native regular size (24 pt): easier to hit than small, still a step below the large category tabs.
         super.init(frame: NSRect(x: 0, y: 0, width: 276, height: 500))
         mode.onChange = { [weak self] index in
@@ -134,11 +135,11 @@ final class CompositionInspector: NSView {
             self?.edit { $0.pngLossless = index == 0; if index > 0 { $0.pngQuality = Self.pngPresets[index - 1] } }
         }
         // Group titles carry no value summary: the window subtitle names the device and the footer the output.
-        let deviceSection = section("设备", views: [devicePicker, deviceDetails])
-        let appearanceSection = section("外观", views: [appearanceDetails])
-        configure(compositionSection, views: [header("构图"), compositionDetails])
-        configure(backgroundSection, views: [header("背景"), backgroundType, backgroundDetails])
-        configure(exportSettings, views: [header("导出"), formatField, exportDetails])
+        let deviceSection = section(L10n.tr("设备"), views: [devicePicker, deviceDetails])
+        let appearanceSection = section(L10n.tr("外观"), views: [appearanceDetails])
+        configure(compositionSection, views: [header(L10n.tr("构图")), compositionDetails])
+        configure(backgroundSection, views: [header(L10n.tr("背景")), backgroundType, backgroundDetails])
+        configure(exportSettings, views: [header(L10n.tr("导出")), formatField, exportDetails])
         let body = FraloStyle.stack([deviceSection, FraloStyle.divider(), appearanceSection, compositionDivider, compositionSection,
                                      backgroundDivider, backgroundSection, FraloStyle.divider(), exportSettings],
                                     spacing: 16, fillWidth: true)
@@ -159,7 +160,7 @@ final class CompositionInspector: NSView {
         return column
     }
     func showOutputSize(_ count: Int?, busy: Bool = false) {
-        outputSize.stringValue = count.map { "约 " + ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) + " / 张" } ?? (busy ? "正在估算…" : "—")
+        outputSize.stringValue = count.map { L10n.tr("约 \(ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file)) / 张") } ?? (busy ? L10n.tr("正在估算…") : "—")
     }
     func set(_ value: CompositionSettings) {
         // Artwork dragging updates positions only; selection controls keep their identity and focus.
@@ -201,9 +202,10 @@ final class CompositionInspector: NSView {
     private func section(_ title: String, views: [NSView]) -> NSStackView {
         let stack = NSStackView(); configure(stack, views: [header(title)] + views); return stack
     }
-    /// A one-line secondary note under the row it explains.
+    /// Supporting notes wrap when a translation needs more than one line.
     private func hint(_ text: String) -> NSTextField {
-        let label = FraloStyle.text(text, role: .caption, secondary: true); label.textColor = .tertiaryLabelColor; return label
+        let label = FraloStyle.paragraph(text); label.font = FraloStyle.TextRole.caption.font
+        label.textColor = .tertiaryLabelColor; return label
     }
     /// Label on the leading edge, a fixed-width control on the trailing edge.
     private func field(_ title: String, _ control: NSView, width: CGFloat? = nil) -> NSView {
@@ -248,7 +250,7 @@ final class CompositionInspector: NSView {
         settings.pngLossless ? 0 : settings.pngQuality >= 0.6 ? 1 : 2
     }
     /// Ratios read as shapes, so the menu says what each one is for.
-    private static let canvasTitles: [CanvasRatio: String] = [.square: "1:1 方形", .landscape: "4:3 横向", .wide: "16:9 宽屏", .portrait: "3:4 竖向", .story: "9:16 手机全屏"]
+    private static let canvasTitles: [CanvasRatio: String] = [.square: L10n.tr("1:1 方形"), .landscape: L10n.tr("4:3 横向"), .wide: L10n.tr("16:9 宽屏"), .portrait: L10n.tr("3:4 竖向"), .story: L10n.tr("9:16 手机全屏")]
 
     // MARK: Groups
 
@@ -257,24 +259,24 @@ final class CompositionInspector: NSView {
         var views: [NSView] = []
         switch settings.display {
         case .browser:
-            let cards = VisualChoiceGroup([.init("Safari", symbol: "safari"), .init("Chrome", symbol: "globe")], label: "浏览器外观", selected: settings.browser == .safari ? 0 : 1, captionsBelow: true) { [weak self] index in self?.edit { $0.browser = index == 0 ? .safari : .chrome } }
+            let cards = VisualChoiceGroup([.init("Safari", symbol: "safari"), .init("Chrome", symbol: "globe")], label: L10n.tr("浏览器外观"), selected: settings.browser == .safari ? 0 : 1, captionsBelow: true) { [weak self] index in self?.edit { $0.browser = index == 0 ? .safari : .chrome } }
             modelCards = cards; views.append(cards)
-            views.append(field("窗口比例", ChoiceMenu(WindowRatio.allCases.map(\.rawValue), label: "浏览器窗口比例", selected: WindowRatio.allCases.firstIndex(of: settings.windowRatio)!) { [weak self] index in self?.edit { $0.windowRatio = WindowRatio.allCases[index] } }))
+            views.append(field(L10n.tr("窗口比例"), ChoiceMenu(WindowRatio.allCases.map(\.rawValue), label: L10n.tr("浏览器窗口比例"), selected: WindowRatio.allCases.firstIndex(of: settings.windowRatio)!) { [weak self] index in self?.edit { $0.windowRatio = WindowRatio.allCases[index] } }))
         case .phone, .tablet:
             let phone = settings.display == .phone
             if phone {
                 let models = CompositionSettings.phoneModels
                 var items: [VisualChoiceItem] = models.map { .init($0.title.replacingOccurrences(of: "iPhone ", with: ""), detail: $0.isMax ? "6.9″" : "6.3″", symbol: "iphone") }
                 // Folding form factor: listed so the lineup reads as planned, not selectable yet.
-                items.append(.init("Duo", detail: "即将支持", image: Self.foldingArtwork, available: false))
-                let cards = VisualChoiceGroup(items, label: "机型", selected: models.firstIndex(of: settings.phoneModel)) { [weak self] index in
+                items.append(.init("Duo", detail: L10n.tr("即将支持"), image: Self.foldingArtwork, available: false))
+                let cards = VisualChoiceGroup(items, label: L10n.tr("机型"), selected: models.firstIndex(of: settings.phoneModel)) { [weak self] index in
                     guard models.indices.contains(index) else { return }
                     self?.edit { $0.phoneModel = models[index] }
                 }
                 phoneModelCards = cards; views.append(cards)
             }
             let symbols = phone ? ["iphone", "iphone.landscape"] : ["ipad", "ipad.landscape"]
-            let orientation = VisualChoiceGroup([.init("竖屏", symbol: symbols[0]), .init("横屏", symbol: symbols[1])], label: "方向",
+            let orientation = VisualChoiceGroup([.init(L10n.tr("竖屏"), symbol: symbols[0]), .init(L10n.tr("横屏"), symbol: symbols[1])], label: L10n.tr("方向"),
                                                 selected: settings.orientation == .portrait ? 0 : 1, layout: .options(columns: 2)) { [weak self] index in
                 self?.edit { $0.orientation = index == 0 ? .portrait : .landscape }
             }
@@ -285,19 +287,19 @@ final class CompositionInspector: NSView {
     private func rebuildAppearance() {
         var views: [NSView] = []
         if settings.display == .browser {
-            let appearance = ValuePicker(["浅色", "深色"], label: "配色", selected: settings.browserAppearance == .light ? 0 : 1) { [weak self] index in
+            let appearance = ValuePicker([L10n.tr("浅色"), L10n.tr("深色")], label: L10n.tr("配色"), selected: settings.browserAppearance == .light ? 0 : 1) { [weak self] index in
                 self?.edit { $0.browserAppearance = index == 0 ? .light : .dark }
             }
-            appearance.toolTip = "仅改变浏览器外壳，不改变截图或 Fralo 界面外观"
-            views.append(field("配色", appearance, width: 172))
+            appearance.toolTip = L10n.tr("仅改变浏览器外壳，不改变截图或 Fralo 界面外观")
+            views.append(field(L10n.tr("配色"), appearance, width: 172))
         }
-        let shadow = ValuePicker(["无", "浅", "深"], label: "阴影", selected: ShadowStyle.allCases.firstIndex(of: settings.shadow)!) { [weak self] index in
+        let shadow = ValuePicker([L10n.tr("无"), L10n.tr("浅"), L10n.tr("深")], label: L10n.tr("阴影"), selected: ShadowStyle.allCases.firstIndex(of: settings.shadow)!) { [weak self] index in
             self?.edit { if $0.mode == .transparent { $0.transparentShadow = ShadowStyle.allCases[index] } else { $0.backgroundShadow = ShadowStyle.allCases[index] } }
         }
-        views.append(field("阴影", shadow, width: 172))
+        views.append(field(L10n.tr("阴影"), shadow, width: 172))
         // A see-through device only makes sense over a backdrop; transparent output is always opaque.
         if settings.mode == .background {
-            views.append(slider("不透明度", range: 0...100, value: settings.deviceOpacity * 100) { [weak self] v in self?.edit { $0.deviceOpacity = v / 100 } })
+            views.append(slider(L10n.tr("不透明度"), range: 0...100, value: settings.deviceOpacity * 100) { [weak self] v in self?.edit { $0.deviceOpacity = v / 100 } })
         }
         install(views, in: appearanceDetails, spacing: 6)
     }
@@ -306,19 +308,19 @@ final class CompositionInspector: NSView {
         compositionSection.isHidden = !visible; compositionDivider.isHidden = !visible
         guard visible else { install([], in: compositionDetails); return }
         let ratios = CanvasRatio.allCases
-        let canvas = ChoiceMenu(ratios.map { Self.canvasTitles[$0] ?? $0.rawValue }, label: "画布比例", selected: ratios.firstIndex(of: settings.canvas)!) { [weak self] index in
+        let canvas = ChoiceMenu(ratios.map { Self.canvasTitles[$0] ?? $0.rawValue }, label: L10n.tr("画布比例"), selected: ratios.firstIndex(of: settings.canvas)!) { [weak self] index in
             self?.edit { $0.canvas = ratios[index] }
         }
-        let center = ActionButton("重新居中", role: .secondary, size: .compact, symbol: "arrow.up.and.down.and.arrow.left.and.right") { [weak self] in self?.edit { $0.deviceX = 0; $0.deviceY = 0 } }
-        center.setAccessibilityLabel("设备重新居中")
+        let center = ActionButton(L10n.tr("重新居中"), role: .secondary, size: .compact, symbol: "arrow.up.and.down.and.arrow.left.and.right") { [weak self] in self?.edit { $0.deviceX = 0; $0.deviceY = 0 } }
+        center.setAccessibilityLabel(L10n.tr("设备重新居中"))
         // 100% means the device's long side just reaches the canvas edge; past it the device is cropped.
-        let overflow = hint("超出画布的部分会被裁掉"); overflow.isHidden = settings.deviceScale <= 1
-        let size = slider("设备大小", range: 10...150, value: settings.deviceScale * 100) { [weak self] v in
+        let overflow = hint(L10n.tr("超出画布的部分会被裁掉")); overflow.isHidden = settings.deviceScale <= 1
+        let size = slider(L10n.tr("设备大小"), range: 10...150, value: settings.deviceScale * 100) { [weak self] v in
             overflow.isHidden = v <= 100; self?.edit { $0.deviceScale = v / 100 }
         }
-        size.slider.markValue = 100; size.snapDistance = 4; size.accessibilityValuePrefix = "占画布 "
-        size.slider.toolTip = "设备长边占画布的比例，100% 为刚好放满"
-        install([field("画布比例", canvas), size, overflow, field("位置", center), hint("也可以在预览中直接拖动设备")], in: compositionDetails, spacing: 6)
+        size.slider.markValue = 100; size.snapDistance = 4; size.accessibilityValuePrefix = L10n.tr("占画布 ")
+        size.slider.toolTip = L10n.tr("设备长边占画布的比例，100% 为刚好放满")
+        install([field(L10n.tr("画布比例"), canvas), size, overflow, field(L10n.tr("位置"), center), hint(L10n.tr("也可以在预览中直接拖动设备"))], in: compositionDetails, spacing: 6)
     }
     private func rebuildBackground() {
         backgroundSection.isHidden = settings.mode != .background; backgroundDivider.isHidden = backgroundSection.isHidden
@@ -331,58 +333,60 @@ final class CompositionInspector: NSView {
             })
         }
         if settings.background == .solid {
-            views.append(color("颜色", settings.backgroundColor) { $0.backgroundColor = $1 })
+            views.append(color(L10n.tr("颜色"), settings.backgroundColor) { $0.backgroundColor = $1 })
         } else if settings.background == .gradient {
-            views.append(color("起点颜色", settings.backgroundColor) { $0.backgroundColor = $1 })
-            views.append(color("终点颜色", settings.backgroundEndColor) { $0.backgroundEndColor = $1 })
+            views.append(color(L10n.tr("起点颜色"), settings.backgroundColor) { $0.backgroundColor = $1 })
+            views.append(color(L10n.tr("终点颜色"), settings.backgroundEndColor) { $0.backgroundEndColor = $1 })
         } else {
             // The custom image is a fourth choice, so it shows as selected and stays one click away after trying a preset.
             let presets: [BackgroundKind] = [.warm, .mist, .sage, .local]
             let path = settings.localBackgroundPath
             customThumbnail = path.flatMap { Self.thumbnail(atPath: $0) }
             let missing = path != nil && customThumbnail == nil
-            let custom = VisualChoiceItem("自定义", symbol: path == nil ? "plus" : "exclamationmark.triangle", image: customThumbnail)
-            let backgrounds = VisualChoiceGroup([.init("暖灰"), .init("雾蓝"), .init("灰绿"), custom], label: "背景图片", selected: presets.firstIndex(of: settings.background), layout: .tiles(columns: 4, height: 80)) { [weak self] index in
+            let custom = VisualChoiceItem(L10n.tr("自定义"), symbol: path == nil ? "plus" : "exclamationmark.triangle", image: customThumbnail)
+            let backgrounds = VisualChoiceGroup([.init(L10n.tr("暖灰")), .init(L10n.tr("雾蓝")), .init(L10n.tr("灰绿")), custom], label: L10n.tr("背景图片"), selected: presets.firstIndex(of: settings.background), layout: .tiles(columns: 4, height: 80)) { [weak self] index in
                 guard let self else { return }
                 if presets[index] == .local && (path == nil || missing) { self.rebuildBackground(); self.chooseBackground(); return }
                 self.edit { $0.background = presets[index]; $0.backgroundScale = 1; $0.backgroundX = 0; $0.backgroundY = 0 }; self.rebuildBackground()
             }
-            backgrounds.setCardToolTip(path == nil ? "添加自定义图片…" : missing ? "找不到图片，点按重新选择" : URL(fileURLWithPath: path!).lastPathComponent, at: 3)
+            backgrounds.setCardToolTip(path == nil ? L10n.tr("添加自定义图片…") : missing ? L10n.tr("找不到图片，点按重新选择") : URL(fileURLWithPath: path!).lastPathComponent, at: 3)
             backgroundCards = backgrounds; views.append(backgrounds)
             if settings.background == .local, let path {
-                let change = ActionButton("更换…", role: .secondary, size: .compact, symbol: "folder") { [weak self] in self?.chooseBackground() }
-                change.setAccessibilityLabel("更换自定义图片")
-                let name = FraloStyle.text(missing ? "找不到图片" : URL(fileURLWithPath: path).lastPathComponent, role: .detail, secondary: true)
+                let change = ActionButton(L10n.tr("更换…"), role: .secondary, size: .compact, symbol: "folder") { [weak self] in self?.chooseBackground() }
+                change.setAccessibilityLabel(L10n.tr("更换自定义图片"))
+                let name = FraloStyle.text(missing ? L10n.tr("找不到图片") : URL(fileURLWithPath: path).lastPathComponent, role: .detail, secondary: true)
                 name.lineBreakMode = .byTruncatingMiddle; name.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
                 views.append(FraloStyle.stack([name, NSView(), change], axis: .horizontal, spacing: 8))
             }
-            views.append(slider("图片大小", range: 100...400, value: settings.backgroundScale * 100) { [weak self] value in self?.edit { $0.backgroundScale = value / 100 } })
-            let reset = ActionButton("还原", role: .quiet, size: .compact) { [weak self] in
+            views.append(slider(L10n.tr("图片大小"), range: 100...400, value: settings.backgroundScale * 100) { [weak self] value in self?.edit { $0.backgroundScale = value / 100 } })
+            let reset = ActionButton(L10n.tr("还原"), role: .quiet, size: .compact) { [weak self] in
                 self?.edit { $0.backgroundX = 0; $0.backgroundY = 0; $0.backgroundScale = 1 }; self?.rebuildBackground()
             }
-            reset.setAccessibilityLabel("还原背景位置与大小")
-            views.append(FraloStyle.stack([hint("在预览中拖动空白处调整背景"), NSView(), reset], axis: .horizontal, spacing: 8))
+            reset.setAccessibilityLabel(L10n.tr("还原背景位置与大小"))
+            views.append(FraloStyle.stack([hint(L10n.tr("在预览中拖动空白处调整背景")), NSView(), reset], axis: .horizontal, spacing: 8))
         }
-        views.append(slider("不透明度", range: 0...100, value: settings.backgroundOpacity * 100) { [weak self] value in self?.edit { $0.backgroundOpacity = value / 100 } })
+        views.append(slider(L10n.tr("不透明度"), range: 0...100, value: settings.backgroundOpacity * 100) { [weak self] value in self?.edit { $0.backgroundOpacity = value / 100 } })
         install(views, in: backgroundDetails, spacing: 6); refreshArtwork()
     }
     private func rebuildExport() {
         // Transparent output is always PNG; the stored JPEG choice comes back with a background.
         let format: NSView
         if settings.mode == .transparent {
-            let value = FraloStyle.text("PNG（保留透明）", role: .detail, secondary: true); value.font = .systemFont(ofSize: 12.5)
-            format = field("格式", value)
+            let value = FraloStyle.text(L10n.tr("PNG（保留透明）"), role: .detail, secondary: true); value.font = .systemFont(ofSize: 12.5)
+            format = field(L10n.tr("格式"), value)
         } else {
             formatPicker.selectedIndex = settings.format == .png ? 0 : 1
-            format = field("格式", formatPicker, width: 172)
+            format = field(L10n.tr("格式"), formatPicker, width: 172)
         }
         install([format], in: formatField)
         var views: [NSView] = []
         if settings.outputFormat == .jpeg {
-            views.append(slider("画质", range: 10...100, value: settings.jpegQuality * 100) { [weak self] v in self?.edit { $0.jpegQuality = v / 100 } })
+            views.append(slider(L10n.tr("画质"), range: 10...100, value: settings.jpegQuality * 100) { [weak self] v in self?.edit { $0.jpegQuality = v / 100 } })
         } else {
             pngCompression.selectedIndex = Self.pngPreset(settings)
-            views.append(field("文件大小", pngCompression, width: 172))
+            // Three translated choices need the full inspector width rather than a 172 pt value slot.
+            let label = FraloStyle.text(L10n.tr("文件大小"), role: .detail, secondary: true)
+            views.append(FraloStyle.stack([label, pngCompression], spacing: 6, fillWidth: true))
         }
         install(views, in: exportDetails, spacing: 6)
     }

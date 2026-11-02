@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import FraloCore
 import FraloDesignSystem
@@ -28,12 +29,12 @@ struct DropSummary: Equatable {
     /// The headline and supporting line shown while the drag is over the window.
     func message(appending: Bool, device: String) -> (title: String, detail: String) {
         guard canDrop else {
-            if unsupported == 0 && duplicates > 0 { return ("这些图片已在批次中", "同一文件不会重复导入") }
-            return (unsupported + duplicates > 1 ? "无法添加这些文件" : "无法添加这个文件", "仅支持 PNG / JPEG 图片")
+            if unsupported == 0 && duplicates > 0 { return (L10n.tr("这些图片已在批次中"), L10n.tr("同一文件不会重复导入")) }
+            return (unsupported + duplicates > 1 ? L10n.tr("无法添加这些文件") : L10n.tr("无法添加这个文件"), L10n.tr("仅支持 PNG / JPEG 图片"))
         }
-        let title = appending ? "松开以追加 \(images) 张图片到批次" : "松开以添加 \(images) 张图片"
+        let title = appending ? L10n.tr("松开以追加 \(images) 张图片到批次") : L10n.tr("松开以添加 \(images) 张图片")
         let skipped = unsupported + duplicates
-        return (title, skipped > 0 ? "将添加 \(images) 张 · 忽略 \(skipped) 个文件" : "将按 \(device) 套框")
+        return (title, skipped > 0 ? L10n.tr("将添加 \(images) 张 · 忽略 \(skipped) 个文件") : L10n.tr("将按 \(device) 套框"))
     }
 }
 
@@ -120,13 +121,13 @@ final class EmptyStageView: NSView {
 
     func showEmpty(title: String, detail: String) {
         isShowingError = false
-        zone.show(icon: "photo.badge.plus", title: title, detail: detail, hint: "或按 ⌘V 粘贴")
+        zone.show(icon: "photo.badge.plus", title: title, detail: detail, hint: L10n.tr("或按 ⌘V 粘贴"))
         zone.apply(.idle, animated: false); setFeedback(.idle, animated: false)
         needsLayout = true; needsDisplay = true; refreshZoneAppearance()
     }
     func showError(_ message: String) {
         isShowingError = true
-        zone.show(icon: "exclamationmark.triangle", title: "无法生成成品", detail: message, hint: nil)
+        zone.show(icon: "exclamationmark.triangle", title: L10n.tr("无法生成成品"), detail: message, hint: nil)
         zone.apply(.error, animated: false); setFeedback(.idle, animated: false)
         needsLayout = true; needsDisplay = true; refreshZoneAppearance()
     }
@@ -240,6 +241,7 @@ final class DropZoneView: NSView {
         icon.unregisterDraggedTypes()
         icon.widthAnchor.constraint(equalToConstant: 46).isActive = true; icon.heightAnchor.constraint(equalToConstant: 46).isActive = true
         title.font = .systemFont(ofSize: 19, weight: .semibold); title.alignment = .center
+        title.usesSingleLineMode = false; title.maximumNumberOfLines = 3; title.lineBreakMode = .byWordWrapping
         detail.font = .systemFont(ofSize: 12.5); detail.alignment = .center
         detail.lineBreakMode = .byWordWrapping; detail.maximumNumberOfLines = 3; detail.usesSingleLineMode = false
         hint.font = .systemFont(ofSize: 12.5); hint.alignment = .center; hint.textColor = .secondaryLabelColor
@@ -254,9 +256,9 @@ final class DropZoneView: NSView {
             content.centerXAnchor.constraint(equalTo: centerXAnchor), content.centerYAnchor.constraint(equalTo: centerYAnchor),
             content.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, constant: -24),
             detail.widthAnchor.constraint(lessThanOrEqualToConstant: 280),
-            title.widthAnchor.constraint(lessThanOrEqualTo: content.widthAnchor), detail.widthAnchor.constraint(lessThanOrEqualTo: content.widthAnchor)
+            title.widthAnchor.constraint(equalTo: content.widthAnchor), detail.widthAnchor.constraint(lessThanOrEqualTo: content.widthAnchor)
         ])
-        setAccessibilityElement(true); setAccessibilityRole(.group); setAccessibilityLabel("图片拖放区域")
+        setAccessibilityElement(true); setAccessibilityRole(.group); setAccessibilityLabel(L10n.tr("图片拖放区域"))
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
 
@@ -405,15 +407,15 @@ final class AppendDropOverlay: NSView {
 /// then what will appear here and how to add it.
 @MainActor
 final class SidebarEmptyPlaceholder: NSView {
-    let addButton = ActionButton("添加图片…", role: .secondary, size: .compact, symbol: "plus")
+    let addButton = ActionButton(L10n.tr("添加图片…"), role: .secondary, size: .compact, symbol: "plus")
     private let slots = SidebarSlots()
     override var isFlipped: Bool { true }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        let heading = FraloStyle.text("还没有图片", role: .body, secondary: true)
+        let heading = FraloStyle.text(L10n.tr("还没有图片"), role: .body, secondary: true)
         heading.font = .systemFont(ofSize: 12.5, weight: .semibold); heading.alignment = .center
-        let detail = FraloStyle.text("导入的截图会按顺序排在这里\n也可以直接拖到这一栏", role: .caption, secondary: true)
+        let detail = FraloStyle.text(L10n.tr("导入的截图会按顺序排在这里\n也可以直接拖到这一栏"), role: .caption, secondary: true)
         detail.textColor = .tertiaryLabelColor; detail.alignment = .center
         detail.maximumNumberOfLines = 3; detail.lineBreakMode = .byWordWrapping; detail.usesSingleLineMode = false
         let caption = NSStackView(views: [heading, detail, addButton])

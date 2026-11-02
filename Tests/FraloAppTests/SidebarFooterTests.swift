@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import XCTest
 import FraloDesignSystem
@@ -8,7 +9,7 @@ final class SidebarFooterTests: XCTestCase {
         guard #available(macOS 26.0, *) else { throw XCTSkip("Native split accessories require macOS26") }
         _ = NSApplication.shared
         let list = BatchList(entries: (0..<30).map { BatchEntry(id: String($0), title: "image-\($0).png") })
-        let caption = NSTextField(labelWithString: "↑ ↓ 切换图片"); caption.font = .systemFont(ofSize: 11)
+        let caption = NSTextField(labelWithString: L10n.tr("↑ ↓ 切换图片")); caption.font = .systemFont(ofSize: 11)
         let heading = NSTextField(labelWithString: "图片30")
         let sidebar = DockedSidebar(header: heading, body: list, footer: caption)
         let split = NSSplitViewController(), sideController = NSViewController(), main = NSViewController()
@@ -46,7 +47,7 @@ final class SidebarFooterTests: XCTestCase {
     @MainActor func testCompatibilityFooterUsesOneInsetAndLeavesLastRowUncovered() async throws {
         _ = NSApplication.shared
         let list = BatchList(entries: (0..<30).map { BatchEntry(id: String($0), title: "image-\($0).png") })
-        let caption = NSTextField(labelWithString: "↑ ↓ 切换图片"); caption.font = .systemFont(ofSize: 11)
+        let caption = NSTextField(labelWithString: L10n.tr("↑ ↓ 切换图片")); caption.font = .systemFont(ofSize: 11)
         let sidebar = DockedSidebar(header: NSTextField(labelWithString: "图片30"), body: list, footer: caption, usesNativeHeader: false)
         sidebar.showsFooter = true
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 280, height: 640), styleMask: [.titled], backing: .buffered, defer: false)

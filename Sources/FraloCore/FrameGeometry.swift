@@ -1,3 +1,4 @@
+import FraloLocalization
 import CoreGraphics
 import Foundation
 
@@ -55,7 +56,7 @@ public struct RenderPlan {
         let screenRatio = screen.width / screen.height
         let cropFraction = 1 - min(sourceRatio, screenRatio) / max(sourceRatio, screenRatio)
         guard containSource || cropFraction <= 0.03 else {
-            throw FraloError.message("截图比例与所选设备不匹配，裁切将超过 3%。请调整原图或设备设置。")
+            throw FraloError.message(L10n.tr("截图比例与所选设备不匹配，裁切将超过 3%。请调整原图或设备设置。"))
         }
         let size = geometry.orientedSize(settings.orientation)
         if let canvasSize {
@@ -70,7 +71,7 @@ public struct RenderPlan {
         }
         guard scale.isFinite, scale > 0, pixelSize.width.isFinite, pixelSize.height.isFinite,
               pixelSize.width > 0, pixelSize.height > 0, pixelSize.width * pixelSize.height <= 100_000_000 else {
-            throw FraloError.message("输出图片过大，请检查截图与所选设备方向。")
+            throw FraloError.message(L10n.tr("输出图片过大，请检查截图与所选设备方向。"))
         }
     }
 }

@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 
 @MainActor
@@ -8,7 +9,7 @@ public class NativeActionButton: NSButton {
     private var normalTitle: String
     public var isBusy = false {
         willSet { if newValue && !isBusy { normalTitle = title } }
-        didSet { title = isBusy ? "处理中…" : normalTitle; super.isEnabled = available && !isBusy }
+        didSet { title = isBusy ? L10n.tr("处理中…") : normalTitle; super.isEnabled = available && !isBusy }
     }
     public override var isEnabled: Bool {
         get { super.isEnabled }
@@ -232,7 +233,7 @@ public final class SliderRow: NSStackView {
         precondition(range.lowerBound.isFinite && range.upperBound.isFinite)
         slider = TrackingSlider(value: range.lowerBound, minValue: range.lowerBound, maxValue: range.upperBound, target: nil, action: nil)
         self.onChange = onChange
-        valueField = ValueField(label: title + "百分比", value: value, range: range)
+        valueField = ValueField(label: L10n.tr("\(title)百分比"), value: value, range: range)
         super.init(frame: .zero)
         valueField.onCommit = { [weak self] in self?.setValue($0, notify: true) }
         (slider as? TrackingSlider)?.onEditingChanged = { [weak self] in self?.onEditingChanged?($0) }
@@ -278,7 +279,7 @@ public final class ValueField: NSTextField, NSTextFieldDelegate {
         self.range = range; self.value = min(range.upperBound, max(range.lowerBound, value)); self.onCommit = onCommit
         numbers = NumberFormatter(); numbers.locale = locale; numbers.numberStyle = .decimal
         numbers.usesGroupingSeparator = false; numbers.minimumFractionDigits = 0; numbers.maximumFractionDigits = 1
-        rangeHelp = "请输入 " + (numbers.string(from: NSNumber(value: range.lowerBound)) ?? "") + "–" + (numbers.string(from: NSNumber(value: range.upperBound)) ?? "") + " 之间的数值。"
+        rangeHelp = L10n.tr("请输入 \(numbers.string(from: NSNumber(value: range.lowerBound)) ?? "")–\(numbers.string(from: NSNumber(value: range.upperBound)) ?? "") 之间的数值。")
         super.init(frame: .zero)
         stringValue = display(self.value); delegate = self; setAccessibilityLabel(label)
         toolTip = rangeHelp; setAccessibilityHelp(rangeHelp)
@@ -353,7 +354,7 @@ public final class SwatchPicker: NSStackView {
         buttons = choices.map { BackgroundSwatch($0.0, image: $0.1) }
         super.init(frame: .zero)
         orientation = .horizontal; alignment = .centerY; spacing = 12
-        setAccessibilityElement(true); setAccessibilityRole(.radioGroup); setAccessibilityLabel("背景选择")
+        setAccessibilityElement(true); setAccessibilityRole(.radioGroup); setAccessibilityLabel(L10n.tr("背景选择"))
         for (index, button) in buttons.enumerated() {
             addArrangedSubview(button)
             button.widthAnchor.constraint(equalToConstant: 100).isActive = true
@@ -386,13 +387,13 @@ public final class ToggleControl: NSButton {
 
 @MainActor
 public final class ExportAction: NSStackView {
-    public let primary = ActionButton("导出全部 · 0 张", role: .primary, symbol: "square.and.arrow.up")
-    public let disclosure = ActionButton("", role: .primary, symbol: "chevron.down", label: "更多导出操作")
+    public let primary = ActionButton(L10n.tr("导出全部"), role: .primary, symbol: "square.and.arrow.up")
+    public let disclosure = ActionButton("", role: .primary, symbol: "chevron.down", label: L10n.tr("更多导出操作"))
     public var onExportAll: (() -> Void)?
     public var onExportCurrent: (() -> Void)?
     public var count = 0 { didSet { primary.title = Self.title(count); refresh() } }
     /// An empty batch has nothing to count; the disabled action keeps only its name.
-    private static func title(_ count: Int) -> String { count > 0 ? "导出全部 · \(count) 张" : "导出全部" }
+    private static func title(_ count: Int) -> String { count > 0 ? L10n.tr("导出全部 · \(count) 张") : L10n.tr("导出全部") }
     public var isEnabled = true { didSet { refresh() } }
     private let divider = NSView()
     public init(count: Int) {
@@ -432,7 +433,7 @@ public final class ExportAction: NSStackView {
     public func exportCurrent() { if isEnabled && count > 0 { onExportCurrent?() } }
     private func showMenu() {
         let menu = NSMenu()
-        let current = NSMenuItem(title: "导出当前图片…", action: #selector(current(_:)), keyEquivalent: "")
+        let current = NSMenuItem(title: L10n.tr("导出当前图片…"), action: #selector(current(_:)), keyEquivalent: "")
         current.target = self; menu.addItem(current)
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: disclosure.bounds.minY), in: disclosure)
     }

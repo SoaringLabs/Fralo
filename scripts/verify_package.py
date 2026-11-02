@@ -74,6 +74,11 @@ def main():
         assert (volume / "Applications").is_symlink()
         assert (volume / "Applications").readlink() == Path("/Applications")
         info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
+        assert info["CFBundleLocalizations"] == ["en", "zh-Hans", "zh-Hant", "ja"]
+        assert info["CFBundleDevelopmentRegion"] == "en"
+        localization = app / "Contents/Resources/Fralo_FraloLocalization.bundle"
+        for language in info["CFBundleLocalizations"]:
+            assert (localization / (language.lower() + ".lproj") / "Localizable.strings").stat().st_size > 0
         assert info["CFBundleShortVersionString"] == version
         assert info["CFBundleVersion"] == identity["build"]
         assert info["SUFeedURL"] == identity["updateFeed"]

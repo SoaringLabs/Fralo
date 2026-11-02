@@ -1,3 +1,4 @@
+import FraloLocalization
 import Foundation
 import CoreGraphics
 
@@ -120,7 +121,7 @@ public struct CompositionSettings: Codable, Equatable, Sendable {
             (deviceOpacity, 0...1), (backgroundScale, 1...4), (backgroundX, -1...1), (backgroundY, -1...1),
             (backgroundOpacity, 0...1), (jpegQuality, 0.1...1), (pngQuality, 0.1...1)]
         guard schemaVersion == 1, values.allSatisfy({ $0.0.isFinite && $0.1.contains($0.0) }), backgroundColor.isValid, backgroundEndColor.isValid, jpegFill.isValid, Self.phoneModels.contains(phoneModel) else {
-            throw FraloError.message("成图配置包含不支持的版本或无效数值。")
+            throw FraloError.message(L10n.tr("成图配置包含不支持的版本或无效数值。"))
         }
         return self
     }

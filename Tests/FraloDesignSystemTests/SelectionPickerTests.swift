@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import XCTest
 @testable import FraloDesignSystem
@@ -11,7 +12,7 @@ final class SelectionPickerTests: XCTestCase {
     @MainActor func testNativeCommitPreservesTargetActionAndEmitsOneBusinessEdit() async {
         _ = NSApplication.shared
         var edits: [Int] = []
-        let picker = ValuePicker(["PNG", "JPEG"], label: "格式") { edits.append($0) }
+        let picker = ValuePicker(["PNG", "JPEG"], label: L10n.tr("格式")) { edits.append($0) }
         let receiver = Receiver()
         picker.target = receiver; picker.action = #selector(Receiver.changed(_:))
         // Exercise the same sendAction boundary as the native cell and accessibility segments.
@@ -29,7 +30,7 @@ final class SelectionPickerTests: XCTestCase {
     @MainActor func testRestoreInvalidAndDisabledSelectionsStaySilent() async {
         _ = NSApplication.shared
         var edits: [Int] = []
-        let picker = ValuePicker(["无损", "均衡", "最小"], label: "体积") { edits.append($0) }
+        let picker = ValuePicker(["无损", "均衡", L10n.tr("最小")], label: "体积") { edits.append($0) }
         picker.selectedIndex = 1
         picker.selectedIndex = -1; picker.selectedIndex = 9
         picker.choose(-1); picker.choose(9)
@@ -49,8 +50,8 @@ final class SelectionPickerTests: XCTestCase {
 
     @MainActor func testNativeRolesAndSizesKeepContentDistinctFromParameters() async {
         _ = NSApplication.shared
-        let navigation = ValuePicker(["设备", "背景", "导出"], label: "设置页面", purpose: .tabs, size: .large)
-        let parameter = ValuePicker(["无", "柔和", "明显"], label: "阴影", size: .small)
+        let navigation = ValuePicker([L10n.tr("设备"), L10n.tr("背景"), L10n.tr("导出")], label: L10n.tr("设置页面"), purpose: .tabs, size: .large)
+        let parameter = ValuePicker([L10n.tr("无"), "柔和", "明显"], label: L10n.tr("阴影"), size: .small)
         XCTAssertEqual(navigation.trackingMode, .selectOne)
         XCTAssertFalse(navigation.isContinuous)
         XCTAssertEqual(navigation.accessibilityRole(), .tabGroup)
@@ -76,7 +77,7 @@ final class SelectionPickerTests: XCTestCase {
     @MainActor func testParameterTreeHasStableRadioElementsAndSilentRestoration() async throws {
         _ = NSApplication.shared
         var edits: [Int] = []
-        let picker = ValuePicker(["无", "柔和", "明显"], label: "阴影") { edits.append($0) }
+        let picker = ValuePicker([L10n.tr("无"), "柔和", "明显"], label: L10n.tr("阴影")) { edits.append($0) }
         let options = try XCTUnwrap(picker.accessibilityChildren() as? [NSAccessibilityElement])
         XCTAssertEqual(picker.accessibilityRole(), .radioGroup)
         XCTAssertEqual(picker.accessibilityRoleDescription(), NSAccessibility.Role.radioGroup.description(with: nil))
@@ -85,7 +86,7 @@ final class SelectionPickerTests: XCTestCase {
         XCTAssertEqual(options.map { $0.accessibilityRole() }, [.radioButton, .radioButton, .radioButton])
         XCTAssertTrue(options.allSatisfy { $0.accessibilitySubrole() == nil })
         XCTAssertTrue(options.allSatisfy { $0.accessibilityRoleDescription() == NSAccessibility.Role.radioButton.description(with: nil) })
-        XCTAssertEqual(options.map { $0.accessibilityLabel() }, ["无", "柔和", "明显"])
+        XCTAssertEqual(options.map { $0.accessibilityLabel() }, [L10n.tr("无"), "柔和", "明显"])
         XCTAssertTrue(options.allSatisfy { ($0.accessibilityParent() as? ValuePicker) === picker })
         XCTAssertTrue(options[2].accessibilityPerformPress())
         XCTAssertEqual(edits, [2]); XCTAssertEqual(picker.selectedIndex, 2)
@@ -110,7 +111,7 @@ final class SelectionPickerTests: XCTestCase {
         let before = NSTextField(frame: NSRect(x: 10, y: 80, width: 90, height: 24))
         let after = NSTextField(frame: NSRect(x: 450, y: 80, width: 90, height: 24))
         var edits: [Int] = []
-        let picker = ValuePicker(["无", "柔和", "明显"], label: "阴影") { edits.append($0) }
+        let picker = ValuePicker([L10n.tr("无"), "柔和", "明显"], label: L10n.tr("阴影")) { edits.append($0) }
         picker.frame = NSRect(x: 120, y: 75, width: 300, height: 32)
         for view in [before, picker, after] { window.contentView?.addSubview(view) }
         before.nextKeyView = picker; picker.nextKeyView = after; after.nextKeyView = before
@@ -144,7 +145,7 @@ final class SelectionPickerTests: XCTestCase {
         window.isReleasedWhenClosed = false; defer { window.close() }
         let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 500, height: 220))
         let document = NSView(frame: NSRect(x: 0, y: 0, width: 500, height: 1000))
-        let picker = ValuePicker(["无", "柔和", "明显"], label: "阴影")
+        let picker = ValuePicker([L10n.tr("无"), "柔和", "明显"], label: L10n.tr("阴影"))
         picker.frame = NSRect(x: 20, y: 750, width: 300, height: 32)
         document.addSubview(picker); scroll.documentView = document; window.contentView = scroll
         scroll.contentView.scroll(to: NSPoint(x: 0, y: 700))
@@ -170,9 +171,9 @@ final class SelectionPickerTests: XCTestCase {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 200), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false; defer { window.close() }
         let before = NSTextField(frame: NSRect(x: 10, y: 120, width: 90, height: 24))
-        let parameter = ValuePicker(["PNG", "JPEG"], label: "格式")
+        let parameter = ValuePicker(["PNG", "JPEG"], label: L10n.tr("格式"))
         parameter.frame = NSRect(x: 120, y: 120, width: 180, height: 32)
-        let tabs = ValuePicker(["设备", "背景"], label: "页面", purpose: .tabs)
+        let tabs = ValuePicker([L10n.tr("设备"), L10n.tr("背景")], label: "页面", purpose: .tabs)
         tabs.frame = NSRect(x: 320, y: 120, width: 180, height: 32)
         for view in [before, parameter, tabs] { window.contentView?.addSubview(view) }
         window.recalculateKeyViewLoop()

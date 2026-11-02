@@ -1,3 +1,4 @@
+import FraloLocalization
 import AppKit
 import XCTest
 import FraloCore
@@ -7,7 +8,7 @@ import FraloDesignSystem
 final class BrowserAppearanceTests: XCTestCase {
     @MainActor private func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
     @MainActor private func picker(_ inspector: CompositionInspector) -> ValuePicker? {
-        descendants(inspector).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == "配色" }
+        descendants(inspector).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == L10n.tr("配色") }
     }
 
     @MainActor func testBrowserPickerKeyboardAndDisabledStatePreserveSelectionAcrossDevices() throws {
