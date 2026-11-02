@@ -144,7 +144,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         edit.addItem(.separator())
         edit.addItem(withTitle: L10n.tr("剪切"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
         item(edit, L10n.tr("复制当前图片"), #selector(MainWindowController.copyCurrent(_:)), "c")
-        item(edit, L10n.tr("粘贴图片"), #selector(MainWindowController.pasteImage(_:)), "v")
+        // Let the focused text editor handle standard paste before the workbench.
+        edit.addItem(withTitle: L10n.tr("粘贴"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         edit.addItem(withTitle: L10n.tr("全选"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         edit.addItem(.separator())
         item(edit, L10n.tr("删除"), #selector(MainWindowController.removeSelected(_:)), "\u{8}", modifiers: [])

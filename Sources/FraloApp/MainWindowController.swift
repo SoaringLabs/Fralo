@@ -483,6 +483,15 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             scheduleThumbnails(); requestPreview()
         } catch { showError(error.localizedDescription) }
     }
+    /// AppKit can fall back from the key window to the main window's responders.
+    /// Only a focused, unobstructed workbench may interpret standard paste as an image import.
+    private var acceptsImagePaste: Bool {
+        window?.isKeyWindow == true && window?.attachedSheet == nil && !isExporting
+    }
+    @objc func paste(_ sender: Any?) {
+        guard acceptsImagePaste else { return }
+        pasteImage(sender)
+    }
     @objc func pasteImage(_ sender: Any?) {
         if let editor = window?.firstResponder as? NSTextView, editor.isEditable { editor.paste(sender); return }
         guard !isExporting else { return }
@@ -837,6 +846,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         let editingText = (window?.firstResponder as? NSTextView)?.isEditable == true
         switch menuItem.action {
+        case #selector(paste(_:)): return acceptsImagePaste
         case #selector(undoChange(_:)):
             let manager = commandUndoManager
             menuItem.title = manager.canUndo ? L10n.tr("撤销「\(manager.undoActionName)」") : L10n.tr("撤销")
