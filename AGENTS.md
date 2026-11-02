@@ -25,3 +25,8 @@
 - 新增或修改生产界面、菜单、提示、错误、工具提示和辅助功能文案时，使用 `FraloLocalization.L10n.tr`，并同步维护 English、简体中文、繁体中文、日语四套 `Localizable.strings`；具体写法见 [多语言开发说明](docs/localization.md)。
 - 将带动态值的完整句子放入翻译调用，保留各语言一致的编号占位符；用户文件名、持久化键和设备标识保持原值。
 - 交付前运行 `python3 -B scripts/check_localizations.py` 与相关测试，并检查英文、日文长文案在最小窗口中的布局。
+
+## 发版更新说明
+
+- 准备版本、生成 appcast 或创建 GitHub Release 前，必须阅读并执行 [四语更新说明流程](docs/updates.md#四语更新说明)。从同一份版本化变更清单生成 English、简体中文、繁体中文、日语四份 Markdown，校对后记录当前内容摘要，通过 `python3 -B scripts/release_notes.py check-all` 才可继续。
+- GitHub Release 使用生成的四语正文，与四份说明、同一个安装包及 appcast 一起发布。内容变更后重新生成、校对和校验。历史单语版本仅按脚本列出的已发布版本保留；后续版本完整执行四语流程。

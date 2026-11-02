@@ -17,6 +17,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      - name: Four-language release notes and release gates
+        run: |
+          python3 -B scripts/release_notes.py check-all
+          python3 -B scripts/test_release_notes.py
+          python3 -B scripts/test_prepare_update.py
       - name: Select Xcode with macOS 26 SDK
         run: sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer
       - name: Toolchain
@@ -38,8 +43,6 @@ jobs:
           name: fralo-output-diagnostics
           path: ${{ runner.temp }}/fralo-test-artifacts
           if-no-files-found: ignore
-      - name: Update feed validation tests
-        run: python3 scripts/test_prepare_update.py
       - name: Preview process handoff tests
         run: python3 -B scripts/test_stop_preview_processes.py
       - name: Build App and CLI
