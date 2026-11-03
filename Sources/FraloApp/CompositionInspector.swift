@@ -77,9 +77,10 @@ final class CompositionInspector: NSView {
     let devicePicker: ValuePicker
     let formatPicker: ValuePicker
     let exportSettings = NSStackView()
-    /// Output pixel size, shown once in the fixed footer.
+    /// Output specifications live with the other export settings in the scrolling form.
     let outputInfo = FraloStyle.text("—", role: .body)
-    let outputSize = FraloStyle.text("—", role: .body, secondary: true)
+    let sizeEstimate = EstimatedSizeView()
+    var outputSize: NSTextField { sizeEstimate.label }
     var onContinuousEditing: ((Bool) -> Void)?
     private let deviceDetails = NSView(), appearanceDetails = NSView(), compositionDetails = NSView(), backgroundDetails = NSView(), exportDetails = NSView()
     /// Layout and backdrop only exist in background mode; their dividers hide with them.
@@ -114,7 +115,7 @@ final class CompositionInspector: NSView {
         devicePicker = ValuePicker([L10n.tr("手机"), L10n.tr("平板"), L10n.tr("浏览器")], label: L10n.tr("设备类型"), selected: DisplayKind.allCases.firstIndex(of: settings.display)!, purpose: .tabs, size: .large)
         formatPicker = ValuePicker(["PNG", "JPEG"], label: L10n.tr("文件格式"), selected: settings.format == .png ? 0 : 1)
         backgroundType = ValuePicker([L10n.tr("纯色"), L10n.tr("渐变"), L10n.tr("图片")], label: L10n.tr("背景类型"))
-        pngCompression = ValuePicker([L10n.tr("原画质"), L10n.tr("适中"), L10n.tr("最小")], label: L10n.tr("文件大小"), selected: Self.pngPreset(settings))
+        pngCompression = ValuePicker([L10n.tr("原画质"), L10n.tr("适中"), L10n.tr("最小")], label: L10n.tr("压缩"), selected: Self.pngPreset(settings))
         // Value choices use the native regular size (24 pt): easier to hit than small, still a step below the large category tabs.
         super.init(frame: NSRect(x: 0, y: 0, width: 276, height: 500))
         mode.onChange = { [weak self] index in
@@ -134,33 +135,43 @@ final class CompositionInspector: NSView {
         pngCompression.onChange = { [weak self] index in
             self?.edit { $0.pngLossless = index == 0; if index > 0 { $0.pngQuality = Self.pngPresets[index - 1] } }
         }
-        // Group titles carry no value summary: the window subtitle names the device and the footer the output.
+        // Group titles carry no value summary; output specifications belong to Export.
         let deviceSection = section(L10n.tr("设备"), views: [devicePicker, deviceDetails])
         let appearanceSection = section(L10n.tr("外观"), views: [appearanceDetails])
         configure(compositionSection, views: [header(L10n.tr("构图")), compositionDetails])
         configure(backgroundSection, views: [header(L10n.tr("背景")), backgroundType, backgroundDetails])
-        configure(exportSettings, views: [header(L10n.tr("导出")), formatField, exportDetails])
+        outputInfo.setAccessibilityLabel(L10n.tr("导出尺寸"))
+        outputInfo.toolTip = L10n.tr("尺寸单位：像素")
+        outputInfo.setAccessibilityHelp(L10n.tr("尺寸单位：像素"))
+        outputSize.setAccessibilityLabel(L10n.tr("预计大小"))
+        let specifications = FraloStyle.stack([
+            field(L10n.tr("导出尺寸"), outputInfo, minimumHeight: 20),
+            field(L10n.tr("预计大小"), sizeEstimate, minimumHeight: 20)
+        ], spacing: 6, fillWidth: true)
+        let summary = FraloStyle.stack([FraloStyle.divider(), specifications], spacing: 12, fillWidth: true)
+        configure(exportSettings, views: [header(L10n.tr("导出")), formatField, exportDetails, summary])
+        exportSettings.setCustomSpacing(14, after: exportDetails)
         let body = FraloStyle.stack([deviceSection, FraloStyle.divider(), appearanceSection, compositionDivider, compositionSection,
                                      backgroundDivider, backgroundSection, FraloStyle.divider(), exportSettings],
                                     spacing: 16, fillWidth: true)
+        body.edgeInsets = NSEdgeInsets(top: 0, left: 0, bottom: 12, right: 0)
         let scroll = ScrollContent.make(body, inset: 0)
         scroll.translatesAutoresizingMaskIntoConstraints = false; addSubview(scroll)
         NSLayoutConstraint.activate([scroll.leadingAnchor.constraint(equalTo: leadingAnchor), scroll.trailingAnchor.constraint(equalTo: trailingAnchor),
                                      scroll.topAnchor.constraint(equalTo: topAnchor), scroll.bottomAnchor.constraint(equalTo: bottomAnchor)])
-        outputInfo.font = .monospacedDigitSystemFont(ofSize: 12.5, weight: .regular)
+        outputInfo.font = .monospacedDigitSystemFont(ofSize: 12.5, weight: .regular); outputInfo.alignment = .right
         outputSize.font = .monospacedDigitSystemFont(ofSize: 12.5, weight: .regular); outputSize.alignment = .right
         rebuildDevice(); rebuildAppearance(); rebuildComposition(); rebuildBackground(); rebuildExport()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
 
-    /// Fixed export specification and the primary action; it never scrolls with the settings.
+    /// Only the export action stays fixed while settings and output specifications scroll.
     func makeFooter(action: NSView) -> NSView {
-        let specs = FraloStyle.stack([outputInfo, NSView(), outputSize], axis: .horizontal, spacing: 8)
-        let column = FraloStyle.stack([FraloStyle.divider(), specs, action], spacing: 12, fillWidth: true)
+        let column = FraloStyle.stack([FraloStyle.divider(), action], spacing: 12, fillWidth: true)
         return column
     }
     func showOutputSize(_ count: Int?, busy: Bool = false) {
-        outputSize.stringValue = count.map { L10n.tr("约 \(ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file)) / 张") } ?? (busy ? L10n.tr("正在估算…") : "—")
+        sizeEstimate.show(count, busy: busy)
     }
     func set(_ value: CompositionSettings) {
         // Artwork dragging updates positions only; selection controls keep their identity and focus.
@@ -208,11 +219,11 @@ final class CompositionInspector: NSView {
         label.textColor = .tertiaryLabelColor; return label
     }
     /// Label on the leading edge, a fixed-width control on the trailing edge.
-    private func field(_ title: String, _ control: NSView, width: CGFloat? = nil) -> NSView {
+    private func field(_ title: String, _ control: NSView, width: CGFloat? = nil, minimumHeight: CGFloat = 28) -> NSView {
         let label = FraloStyle.text(title, role: .detail, secondary: true); label.font = .systemFont(ofSize: 12.5)
         if let width { control.widthAnchor.constraint(equalToConstant: width).isActive = true }
         let row = FraloStyle.stack([label, NSView(), control], axis: .horizontal, spacing: 8)
-        row.heightAnchor.constraint(greaterThanOrEqualToConstant: 28).isActive = true
+        row.heightAnchor.constraint(greaterThanOrEqualToConstant: minimumHeight).isActive = true
         return row
     }
     private func slider(_ title: String, range: ClosedRange<Double>, value: Double, onChange: @escaping (Double) -> Void) -> CompactSliderField {
@@ -373,7 +384,7 @@ final class CompositionInspector: NSView {
         // Transparent output is always PNG; the stored JPEG choice comes back with a background.
         let format: NSView
         if settings.mode == .transparent {
-            let value = FraloStyle.text(L10n.tr("PNG（保留透明）"), role: .detail, secondary: true); value.font = .systemFont(ofSize: 12.5)
+            let value = FraloStyle.text(L10n.tr("PNG（保留透明）"), role: .detail); value.font = .systemFont(ofSize: 12.5)
             format = field(L10n.tr("格式"), value)
         } else {
             formatPicker.selectedIndex = settings.format == .png ? 0 : 1
@@ -386,7 +397,7 @@ final class CompositionInspector: NSView {
         } else {
             pngCompression.selectedIndex = Self.pngPreset(settings)
             // Three translated choices need the full inspector width rather than a 172 pt value slot.
-            let label = FraloStyle.text(L10n.tr("文件大小"), role: .detail, secondary: true)
+            let label = FraloStyle.text(L10n.tr("压缩"), role: .detail, secondary: true); label.font = .systemFont(ofSize: 12.5)
             views.append(FraloStyle.stack([label, pngCompression], spacing: 6, fillWidth: true))
         }
         install(views, in: exportDetails, spacing: 6)

@@ -82,6 +82,22 @@ final class DesignSystemTests: XCTestCase {
     @MainActor func testPreviewActivityIsDelayedCancelledAndKeepsToolbarGeometry() async throws {
         let toolbar = ViewToolbar(); toolbar.frame = NSRect(x: 0, y: 0, width: 420, height: 48)
         toolbar.layoutSubtreeIfNeeded()
+        func readoutInk() throws -> Int {
+            let view = toolbar.zoom
+            let bitmap = try XCTUnwrap(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(view.bounds.width),
+                pixelsHigh: Int(view.bounds.height), bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+            let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap))
+            NSGraphicsContext.saveGraphicsState(); defer { NSGraphicsContext.restoreGraphicsState() }
+            NSGraphicsContext.current = context; context.cgContext.clear(view.bounds)
+            view.effectiveAppearance.performAsCurrentDrawingAppearance { view.draw(view.bounds) }
+            context.flushGraphics()
+            return (0..<bitmap.pixelsHigh).reduce(0) { total, y in
+                total + (0..<bitmap.pixelsWide).filter { (bitmap.colorAt(x: $0, y: y)?.alphaComponent ?? 0) > 0.02 }.count
+            }
+        }
+        toolbar.showStatus("59%")
+        XCTAssertGreaterThan(try readoutInk(), 0)
         let before = toolbar.zoomIn.frame
         toolbar.beginPreviewUpdate(); toolbar.finishPreviewUpdate()
         try await Task.sleep(nanoseconds: 230_000_000)
@@ -90,10 +106,29 @@ final class DesignSystemTests: XCTestCase {
         try await Task.sleep(nanoseconds: 230_000_000)
         toolbar.layoutSubtreeIfNeeded()
         XCTAssertTrue(toolbar.isUpdatingPreview)
+        XCTAssertFalse(toolbar.zoom.showsDisclosure)
+        XCTAssertFalse(toolbar.zoom.isEnabled, "The empty readout cannot open a menu while showing activity")
+        if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            XCTAssertEqual(try readoutInk(), 0, "Loading must remove the chevron as well as the percentage")
+            XCTAssertFalse(toolbar.progress.isHidden)
+        }
         XCTAssertEqual(toolbar.zoomIn.frame, before, "Showing progress must not shift toolbar actions")
+        toolbar.showStatus("67%")
+        toolbar.preferences.reduceMotion = true
+        XCTAssertTrue(toolbar.progress.isHidden); XCTAssertFalse(toolbar.progress.isRunning)
+        XCTAssertEqual(toolbar.zoom.displayTitle, "…")
+        XCTAssertFalse(toolbar.zoom.showsDisclosure, "Reduced motion must not restore a ghost chevron")
         toolbar.beginPreviewUpdate(); toolbar.finishPreviewUpdate()
         try await Task.sleep(nanoseconds: 230_000_000)
         XCTAssertFalse(toolbar.isUpdatingPreview)
+        XCTAssertTrue(toolbar.zoom.showsDisclosure); XCTAssertTrue(toolbar.zoom.isEnabled)
+        XCTAssertEqual(toolbar.zoom.displayTitle, "67%", "Finish restores the latest percentage")
+        XCTAssertGreaterThan(try readoutInk(), 0)
+        toolbar.zoom.isEnabled = false
+        toolbar.beginPreviewUpdate()
+        try await Task.sleep(nanoseconds: 230_000_000)
+        toolbar.finishPreviewUpdate()
+        XCTAssertFalse(toolbar.zoom.isEnabled, "Activity must preserve a previously disabled readout")
     }
 
     @MainActor func testActionButtonBusyPreservesWidthAndRequestedAvailability() async {

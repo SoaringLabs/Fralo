@@ -30,8 +30,8 @@ final class LocalizationTests: XCTestCase {
         let filename = "日本語-{1}-%@-截图.png"
         XCTAssertEqual(L10n.translate("无法读取配置 \(filename)：\("Permission denied")", language: "en"),
                        "Unable to read settings \(filename): Permission denied")
-        XCTAssertEqual(L10n.translate("将按 \("iPhone 18 Pro") 套框", language: "ja"),
-                       "iPhone 18 Pro のフレームを適用します")
+        XCTAssertEqual(L10n.translate("撤销「\(filename)」", language: "ja"),
+                       "「\(filename)」を取り消す")
         XCTAssertEqual(L10n.translate("成功 \(2) 张 · 跳过 \(1) 张 · 失败 \(0) 张\n未处理 \(3) 张 · 用时 \("1.50") 秒", language: "zh-Hant"),
                        "成功 2 張 · 略過 1 張 · 失敗 0 張\n未處理 3 張 · 用時 1.50 秒")
     }

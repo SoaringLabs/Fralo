@@ -146,12 +146,11 @@ private final class VisualChoiceCard: NSButton {
     private let style: Style
     private var horizontal: Bool { style != .tile }
     private let captionsBelow: Bool
-    private var hovered = false
-    private var tracking: NSTrackingArea?
+    private lazy var hoverFeedback = HoverFeedback(view: self)
     var artwork: NSImage? { didSet { needsDisplay = true } }
     var chosen = false { didSet { needsDisplay = true } }
-    var preferences = DesignPreferences() { didSet { needsDisplay = true } }
-    override var isEnabled: Bool { didSet { needsDisplay = true } }
+    var preferences = DesignPreferences() { didSet { refreshHover(); needsDisplay = true } }
+    override var isEnabled: Bool { didSet { refreshHover(); needsDisplay = true } }
     override var isFlipped: Bool { true }
     var surfaceBounds: NSRect { NSRect(x: 0, y: 0, width: bounds.width, height: bounds.height - (captionsBelow ? 24 : 0)) }
     init(item: VisualChoiceItem, style: Style, captionsBelow: Bool) {
@@ -161,17 +160,18 @@ private final class VisualChoiceCard: NSButton {
         setAccessibilityElement(true); setAccessibilityRole(.radioButton)
         setAccessibilityLabel(item.title + (item.detail.isEmpty ? "" : "，" + item.detail)); toolTip = item.title
         if !item.isAvailable { setAccessibilityEnabled(false) }
+        refreshHover()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); needsDisplay = true }
     override func highlight(_ flag: Bool) { super.highlight(flag); needsDisplay = true }
+    private func refreshHover() { hoverFeedback.update(enabled: isEnabled && item.isAvailable, preferences: preferences) }
+    override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); hoverFeedback.viewDidMoveToWindow() }
     override func updateTrackingAreas() {
-        super.updateTrackingAreas(); if let tracking { removeTrackingArea(tracking) }
-        let area = NSTrackingArea(rect: bounds, options: [.activeInKeyWindow, .mouseEnteredAndExited, .inVisibleRect], owner: self)
-        addTrackingArea(area); tracking = area
+        super.updateTrackingAreas(); hoverFeedback.updateTrackingAreas()
     }
-    override func mouseEntered(with event: NSEvent) { hovered = true; needsDisplay = true }
-    override func mouseExited(with event: NSEvent) { hovered = false; needsDisplay = true }
+    override func mouseEntered(with event: NSEvent) { hoverFeedback.enter() }
+    override func mouseExited(with event: NSEvent) { hoverFeedback.exit() }
     override func draw(_ dirtyRect: NSRect) {
         if !item.isAvailable {
             // Dim the whole card, including its caption, like a disabled control.
@@ -181,8 +181,8 @@ private final class VisualChoiceCard: NSButton {
         let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         let rect = surfaceBounds.insetBy(dx: 1, dy: 1)
         let path = NSBezierPath(roundedRect: rect, xRadius: 12, yRadius: 12)
-        let pressed = cell?.isHighlighted == true && isEnabled
-        let neutral = NSColor(white: dark ? 1 : 0, alpha: pressed ? 0.10 : hovered && isEnabled ? 0.075 : 0.035)
+        let pressed = cell?.isHighlighted == true && isEnabled && item.isAvailable
+        let neutral = NSColor(white: dark ? 1 : 0, alpha: pressed ? 0.10 : 0.035 + (0.075 - 0.035) * hoverFeedback.amount)
         let accented = chosen && isEnabled && !horizontal
         // Selection keeps a neutral fill; the accent ring and check carry the state.
         (accented ? NSColor(white: dark ? 1 : 0, alpha: dark ? 0.09 : 0.06) : neutral).setFill(); path.fill()
@@ -230,10 +230,11 @@ private final class VisualChoiceCard: NSButton {
         let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         let rect = bounds.insetBy(dx: 1, dy: 1)
         let path = NSBezierPath(roundedRect: rect, xRadius: 12, yRadius: 12)
-        let pressed = cell?.isHighlighted == true && isEnabled
+        let pressed = cell?.isHighlighted == true && isEnabled && item.isAvailable
         let accented = chosen && isEnabled
+        let resting: CGFloat = dark ? 0.06 : 0.045
         let fill = accented ? NSColor(white: dark ? 1 : 0, alpha: dark ? 0.09 : 0.06)
-            : NSColor(white: dark ? 1 : 0, alpha: pressed ? 0.10 : hovered && isEnabled ? 0.075 : dark ? 0.06 : 0.045)
+            : NSColor(white: dark ? 1 : 0, alpha: pressed ? 0.10 : resting + (0.075 - resting) * hoverFeedback.amount)
         fill.setFill(); path.fill()
         if accented || preferences.effectiveIncreaseContrast {
             (accented ? NSColor.controlAccentColor : NSColor.labelColor.withAlphaComponent(0.65)).setStroke()
@@ -246,8 +247,13 @@ private final class VisualChoiceCard: NSButton {
                         from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
         }
         let paragraph = NSMutableParagraphStyle(); paragraph.lineBreakMode = .byTruncatingTail
-        (item.title as NSString).draw(in: NSRect(x: 44, y: bounds.midY - 9, width: max(0, bounds.width - 44 - 32), height: 18),
-            withAttributes: [.font: NSFont.systemFont(ofSize: 12.5, weight: .semibold), .foregroundColor: isEnabled ? NSColor.labelColor : .disabledControlTextColor, .paragraphStyle: paragraph])
+        let title = NSAttributedString(string: item.title, attributes: [
+            .font: NSFont.systemFont(ofSize: 12.5, weight: .semibold),
+            .foregroundColor: isEnabled ? NSColor.labelColor : .disabledControlTextColor, .paragraphStyle: paragraph])
+        // Center the native text line itself; a fixed 18pt box put its glyphs above the symbols.
+        let titleHeight = title.size().height
+        title.draw(in: NSRect(x: 44, y: bounds.midY - titleHeight / 2,
+                              width: max(0, bounds.width - 44 - 32), height: titleHeight))
         if accented, let mark = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil)?.withSymbolConfiguration(.init(paletteColors: [.white, .controlAccentColor])) {
             mark.draw(in: NSRect(x: bounds.width - 26, y: bounds.midY - 8, width: 16, height: 16), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
         }

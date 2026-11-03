@@ -24,6 +24,10 @@ final class DevelopmentEntry: NSObject {
             (view as? WorkbenchView)?.motionPreferences = preferences
             (view as? CanvasToolbarBehavior)?.preferences = preferences
             (view as? HeaderBackdrop)?.preferences = preferences
+            (view as? DropZoneView)?.preferences = preferences
+            (view as? EstimatedSizeView)?.preferences = preferences
+            (view as? ViewToolbar)?.preferences = preferences
+            (view as? BatchList)?.preferences = preferences
             (view as? ThinScroller)?.preferences = preferences
             (view as? MaterialSurface)?.preferences = preferences
             (view as? SymbolButton)?.preferences = preferences

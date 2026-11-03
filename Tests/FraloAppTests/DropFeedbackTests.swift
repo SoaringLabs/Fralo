@@ -9,6 +9,57 @@ final class DropFeedbackTests: XCTestCase {
         URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Sources/FraloApp/Development/Fixtures/01-today.png")
     }
 
+    @MainActor func testEmptyTargetCrossfadesOnDragEntryExitAndRapidReentry() throws {
+        _ = NSApplication.shared
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            throw XCTSkip("The system disables animation")
+        }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 500),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; defer { window.close() }
+        let stage = EmptyStageView(action: ActionButton("Add", role: .primary))
+        window.contentView = stage
+        stage.showEmpty(title: "Drop screenshots", detail: "PNG / JPEG")
+        stage.layoutSubtreeIfNeeded()
+        XCTAssertNil(stage.zone.layer?.animation(forKey: kCATransition))
+
+        stage.showDrag(.accepting, title: "Release to add", detail: "4 images")
+        XCTAssertNotNil(stage.zone.layer?.animation(forKey: kCATransition) as? CATransition,
+                        "The entire guidance must transition, including its icon, text and button")
+        XCTAssertTrue(stage.zone.action.isHidden, "The logical drag state applies without waiting for the fade")
+
+        stage.showEmpty(title: "Drop screenshots", detail: "PNG / JPEG")
+        XCTAssertNotNil(stage.zone.layer?.animation(forKey: kCATransition) as? CATransition,
+                        "Leaving a drag must also transition back to the normal guidance")
+        XCTAssertFalse(stage.zone.action.isHidden)
+
+        stage.showDrag(.accepting, title: "Release to add", detail: "4 images")
+        XCTAssertTrue(stage.zone.action.isHidden, "A rapid re-entry must keep the latest drag state")
+        XCTAssertNotNil(stage.zone.layer?.animation(forKey: kCATransition))
+        stage.showError("Cannot render")
+        XCTAssertNil(stage.zone.layer?.animation(forKey: kCATransition), "An error replaces any outgoing drag animation")
+        XCTAssertFalse(stage.zone.action.isHidden)
+    }
+
+    @MainActor func testReducedMotionKeepsDragFeedbackImmediateInBothDirections() {
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 500),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false; defer { window.close() }
+        let stage = EmptyStageView(action: ActionButton("Add", role: .primary))
+        window.contentView = stage
+        stage.showEmpty(title: "Drop screenshots", detail: "PNG / JPEG")
+        stage.showDrag(.accepting, title: "Release to add", detail: "4 images")
+        stage.zone.preferences.reduceMotion = true
+        XCTAssertNil(stage.zone.layer?.animation(forKey: kCATransition), "Reduce Motion cancels the current transition")
+        stage.showEmpty(title: "Drop screenshots", detail: "PNG / JPEG")
+        XCTAssertNil(stage.zone.layer?.animation(forKey: kCATransition))
+        XCTAssertFalse(stage.zone.action.isHidden)
+        stage.showDrag(.rejecting, title: "Cannot add", detail: "PNG / JPEG only")
+        XCTAssertNil(stage.zone.layer?.animation(forKey: kCATransition))
+        XCTAssertTrue(stage.zone.action.isHidden)
+    }
+
     /// A descendant registered for drags becomes the destination under the pointer, so the container
     /// receives draggingExited mid-drag and its feedback flickers (NSImageView registers image types by default).
     @MainActor func testOnlyTheDropContainersRegisterForDrags() throws {

@@ -34,7 +34,7 @@ struct DropSummary: Equatable {
         }
         let title = appending ? L10n.tr("松开以追加 \(images) 张图片到批次") : L10n.tr("松开以添加 \(images) 张图片")
         let skipped = unsupported + duplicates
-        return (title, skipped > 0 ? L10n.tr("将添加 \(images) 张 · 忽略 \(skipped) 个文件") : L10n.tr("将按 \(device) 套框"))
+        return (title, skipped > 0 ? L10n.tr("将添加 \(images) 张 · 忽略 \(skipped) 个文件") : device)
     }
 }
 
@@ -120,29 +120,37 @@ final class EmptyStageView: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
 
     func showEmpty(title: String, detail: String) {
+        let animated = zone.isShowingDragFeedback
         isShowingError = false
-        zone.show(icon: "photo.badge.plus", title: title, detail: detail, hint: L10n.tr("或按 ⌘V 粘贴"))
-        zone.apply(.idle, animated: false); setFeedback(.idle, animated: false)
+        zone.show(.idle, icon: "photo.badge.plus", title: title, detail: detail, hint: L10n.tr("或按 ⌘V 粘贴"), animated: animated)
+        setFeedback(.idle, animated: animated)
         needsLayout = true; needsDisplay = true; refreshZoneAppearance()
     }
     func showError(_ message: String) {
         isShowingError = true
-        zone.show(icon: "exclamationmark.triangle", title: L10n.tr("无法生成成品"), detail: message, hint: nil)
-        zone.apply(.error, animated: false); setFeedback(.idle, animated: false)
+        zone.show(.error, icon: "exclamationmark.triangle", title: L10n.tr("无法生成成品"), detail: message, hint: nil, animated: false)
+        setFeedback(.idle, animated: false)
         needsLayout = true; needsDisplay = true; refreshZoneAppearance()
     }
     func showDrag(_ feedback: Feedback, title: String, detail: String) {
         let icon = feedback == .accepting ? "arrow.down.circle" : "nosign"
-        zone.show(icon: icon, title: title, detail: detail, hint: nil)
-        zone.apply(feedback == .accepting ? .accepting : .rejecting, animated: true)
+        zone.show(feedback == .accepting ? .accepting : .rejecting, icon: icon, title: title, detail: detail, hint: nil, animated: true)
         setFeedback(feedback, animated: true)
     }
     private func setFeedback(_ feedback: Feedback, animated: Bool) {
-        CATransaction.begin()
-        CATransaction.setAnimationDuration(animated ? FraloMotion.duration(.selection) : 0)
-        CATransaction.setDisableActions(!animated || FraloMotion.duration(.selection) == 0)
-        tint.opacity = feedback == .accepting ? 1 : 0
+        let opacity: Float = feedback == .accepting ? 1 : 0
+        let duration = animated ? FraloMotion.duration(.structure, preferences: zone.preferences) : 0
+        let from = tint.presentation()?.opacity ?? tint.opacity
+        tint.removeAnimation(forKey: "feedback")
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        tint.opacity = opacity
         CATransaction.commit()
+        if duration > 0, from != opacity {
+            let fade = CABasicAnimation(keyPath: "opacity")
+            fade.fromValue = from; fade.toValue = opacity; fade.duration = duration
+            fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            tint.add(fade, forKey: "feedback")
+        }
     }
 
     /// Fits the frame within the viewing area, leaving a little air above and below.
@@ -150,9 +158,19 @@ final class EmptyStageView: NSView {
         guard let device, !isShowingError else { return nil }
         let area = NSRect(x: viewingInsets.left, y: viewingInsets.top, width: bounds.width - viewingInsets.left - viewingInsets.right,
                           height: bounds.height - viewingInsets.top - viewingInsets.bottom)
-        let size = device.image.size
+        // Normalize the empty phone's viewing envelope just like the populated fit.
+        // Per-model raster proportions/rounding must not move a rounded edge by a point.
+        // This changes only the empty preview rectangle, never native output dimensions.
+        let size: NSSize
+        if device.display == .phone {
+            size = CompositionSettings.phoneModels.map { FrameGeometry(model: $0).orientedSize(device.orientation) }
+                .min { max($0.width, $0.height) < max($1.width, $1.height) } ?? device.image.size
+        } else { size = device.image.size }
         guard area.width > 40, area.height > 40, size.width > 0, size.height > 0 else { return nil }
-        let scale = min(area.width * 0.92 / size.width, area.height * 0.9 / size.height, 760 / size.height)
+        // A phone keeps the same maximum visual size when rotated; constrain its
+        // longest edge so a wide window cannot turn the landscape preview into a tablet.
+        let cappedDimension = device.display == .phone ? max(size.width, size.height) : size.height
+        let scale = min(area.width * 0.92 / size.width, area.height * 0.9 / size.height, 760 / cappedDimension)
         let fitted = NSSize(width: (size.width * scale).rounded(), height: (size.height * scale).rounded())
         return NSRect(x: (area.midX - fitted.width / 2).rounded(), y: (area.midY - fitted.height / 2).rounded(), width: fitted.width, height: fitted.height)
     }
@@ -171,6 +189,7 @@ final class EmptyStageView: NSView {
                               height: max(0, bounds.height - viewingInsets.top - viewingInsets.bottom))
             zone.cornerRadius = 18
             zone.frame = NSRect(x: area.midX - min(area.width, 380) / 2, y: area.midY - min(area.height, 320) / 2, width: min(area.width, 380), height: min(area.height, 320)).integral
+            zone.contentCenterOffset = .zero
             return
         }
         let unit = max(10, min(18, screen.width / 22))
@@ -183,6 +202,10 @@ final class EmptyStageView: NSView {
         zone.cornerRadius = max(8, device.cornerRadius * frame.width - unit)
         zone.frame = NSRect(x: screen.minX + inset.left, y: screen.minY + inset.top,
                             width: max(0, screen.width - inset.left - inset.right), height: max(0, screen.height - inset.top - inset.bottom)).integral
+        // The border avoids the island; guidance belongs at the full screen's center.
+        // Compute both axes for rotation, and reset when leaving the phone layout.
+        zone.contentCenterOffset = device.display == .phone
+            ? NSPoint(x: screen.midX - zone.frame.midX, y: screen.midY - zone.frame.midY) : .zero
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -195,7 +218,12 @@ final class EmptyStageView: NSView {
         NSGraphicsContext.restoreGraphicsState()
         if device.display == .browser, let screen = screenRect {
             // Viewing-only blank page follows the export shell, independently of the app.
+            NSGraphicsContext.saveGraphicsState()
+            if let context = NSGraphicsContext.current?.cgContext {
+                context.addPath(CompositionRenderer.browserWindowOutline(in: frame)); context.clip()
+            }
             pageColor.setFill(); NSBezierPath(rect: screen).fill()
+            NSGraphicsContext.restoreGraphicsState()
         }
     }
     private var isDark: Bool { effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua }
@@ -221,15 +249,29 @@ final class EmptyStageView: NSView {
 @MainActor
 final class DropZoneView: NSView {
     enum Style { case idle, accepting, rejecting, error }
+    var preferences = DesignPreferences() {
+        didSet { if preferences.effectiveReduceMotion { layer?.removeAnimation(forKey: kCATransition) } }
+    }
     let action: ActionButton
     private let icon = NSImageView()
     private let title = FraloStyle.text("", role: .heading)
     private let detail = FraloStyle.text("", role: .detail, secondary: true)
     private let hint = FraloStyle.text("", role: .caption, secondary: true)
     private let content: NSStackView
+    private var contentCenterX: NSLayoutConstraint?
+    private var contentCenterY: NSLayoutConstraint?
     private let border = CAShapeLayer()
     private var style = Style.idle
+    var isShowingDragFeedback: Bool { style == .accepting || style == .rejecting }
     var cornerRadius: CGFloat = 18 { didSet { needsLayout = true } }
+    var contentCenterOffset = NSPoint.zero {
+        didSet {
+            guard oldValue != contentCenterOffset else { return }
+            contentCenterX?.constant = contentCenterOffset.x
+            contentCenterY?.constant = contentCenterOffset.y
+            needsLayout = true
+        }
+    }
     override var isFlipped: Bool { true }
 
     init(action: ActionButton) {
@@ -252,8 +294,11 @@ final class DropZoneView: NSView {
         wantsLayer = true
         border.fillColor = nil; layer?.addSublayer(border)
         content.translatesAutoresizingMaskIntoConstraints = false; addSubview(content)
+        let centerX = content.centerXAnchor.constraint(equalTo: centerXAnchor)
+        let centerY = content.centerYAnchor.constraint(equalTo: centerYAnchor)
+        contentCenterX = centerX; contentCenterY = centerY
         NSLayoutConstraint.activate([
-            content.centerXAnchor.constraint(equalTo: centerXAnchor), content.centerYAnchor.constraint(equalTo: centerYAnchor),
+            centerX, centerY,
             content.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, constant: -24),
             detail.widthAnchor.constraint(lessThanOrEqualToConstant: 280),
             title.widthAnchor.constraint(equalTo: content.widthAnchor), detail.widthAnchor.constraint(lessThanOrEqualTo: content.widthAnchor)
@@ -263,19 +308,29 @@ final class DropZoneView: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
 
     private var detailText = ""
-    func show(icon symbol: String, title: String, detail: String, hint: String?) {
+    /// Crossfade one complete rendered target, including its dashed/solid border and
+    /// stack layout. Drag acceptance and button visibility still update immediately;
+    /// there is no delayed completion that can overwrite a newer drag state.
+    func show(_ style: Style, icon symbol: String, title: String, detail: String, hint: String?, animated: Bool) {
+        if self.style != style || !animated {
+            layoutSubtreeIfNeeded()
+            layer?.removeAnimation(forKey: kCATransition)
+            let duration = animated && window != nil ? FraloMotion.duration(.structure, preferences: preferences) : 0
+            if duration > 0 {
+                let fade = CATransition(); fade.type = .fade; fade.duration = duration
+                fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                layer?.add(fade, forKey: kCATransition)
+            }
+        }
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        self.style = style
         icon.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
         self.title.stringValue = title; detailText = detail; self.detail.isHidden = detail.isEmpty; fitDetail()
         self.hint.attributedStringValue = Self.shortcutHint(hint ?? ""); self.hint.isHidden = hint == nil
         setAccessibilityHelp(title + "。" + detail)
-    }
-    /// Drag states replace the actions with feedback; the button returns once the drag ends.
-    func apply(_ style: Style, animated: Bool) {
-        self.style = style
         action.isHidden = style == .accepting || style == .rejecting
-        let duration = animated ? FraloMotion.duration(.selection) : 0
-        CATransaction.begin(); CATransaction.setAnimationDuration(duration); CATransaction.setDisableActions(duration == 0)
         refreshColors()
+        layoutSubtreeIfNeeded()
         CATransaction.commit()
     }
     /// Pasting is a quick way in, so the shortcut itself reads at full strength within the quieter hint.

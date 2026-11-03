@@ -138,6 +138,8 @@ public final class SymbolButton: NSButton {
 public final class ChoiceMenu: NSPopUpButton {
     public var onChange: ((Int) -> Void)?
     public var showsSurface = true { didSet { needsDisplay = true } }
+    /// Suppress the affordance during activity without changing the control's layout width.
+    public var showsDisclosure = true { didSet { needsDisplay = true } }
     public var displayTitle: String? { didSet { invalidateIntrinsicContentSize(); needsDisplay = true } }
     public var leadingSymbol: String? { didSet { invalidateIntrinsicContentSize(); needsDisplay = true } }
     public init(_ titles: [String], label: String, selected: Int = 0, onChange: ((Int) -> Void)? = nil) {
@@ -183,12 +185,13 @@ public final class ChoiceMenu: NSPopUpButton {
         if !showsSurface && leading == 11 {
             // A bare readout keeps its value and chevron together as one centered label.
             let width = min(ceil((text as NSString).size(withAttributes: attributes).width), bounds.width - 38)
-            leading = max(11, (bounds.width - width - 16) / 2); arrowX = leading + width + 6
+            leading = max(11, (bounds.width - width - (showsDisclosure ? 16 : 0)) / 2)
+            arrowX = showsDisclosure ? leading + width + 6 : bounds.maxX - 11
         }
         let paragraph = NSMutableParagraphStyle(); paragraph.lineBreakMode = .byTruncatingTail
         var textAttributes = attributes; textAttributes[.paragraphStyle] = paragraph
         (text as NSString).draw(in: NSRect(x: leading, y: bounds.midY - 8, width: max(0, arrowX - leading - 4), height: 19), withAttributes: textAttributes)
-        if let arrow = NSImage(systemSymbolName: showsSurface ? "chevron.up.chevron.down" : "chevron.down", accessibilityDescription: nil) {
+        if showsDisclosure, let arrow = NSImage(systemSymbolName: showsSurface ? "chevron.up.chevron.down" : "chevron.down", accessibilityDescription: nil) {
             let tinted = NSImage(size: NSSize(width: 10, height: 12), flipped: false) { target in
                 let scale = min(target.width / max(1, arrow.size.width), target.height / max(1, arrow.size.height))
                 let size = NSSize(width: arrow.size.width * scale, height: arrow.size.height * scale)
@@ -406,6 +409,8 @@ public final class ExportAction: NSStackView {
         primary.drawsSurface = false; disclosure.drawsSurface = false
         divider.wantsLayer = true
         primary.font = .systemFont(ofSize: 13.5, weight: .semibold)
+        primary.iconSize = 16
+        primary.image = primary.image?.withSymbolConfiguration(.init(pointSize: 16, weight: .medium))
         addArrangedSubview(primary); addArrangedSubview(divider); addArrangedSubview(disclosure)
         NSLayoutConstraint.activate([heightAnchor.constraint(equalToConstant: 40), primary.heightAnchor.constraint(equalTo: heightAnchor),
             disclosure.heightAnchor.constraint(equalTo: heightAnchor), disclosure.widthAnchor.constraint(equalToConstant: 34),

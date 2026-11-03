@@ -11,6 +11,8 @@ public class ActionButton: NSButton {
     public var drawsSurface = true { didSet { needsDisplay = true } }
     /// Primary fill in place of the accent color, e.g. the neutral export capsule.
     public var primaryTint: NSColor? { didSet { needsDisplay = true } }
+    /// Individual actions can optically balance their symbol without changing shared sizes.
+    public var iconSize: CGFloat? { didSet { invalidateIntrinsicContentSize(); needsLayout = true; needsDisplay = true } }
     public var onPress: (() -> Void)?
     public var preferences = DesignPreferences() { didSet { refresh() } }
     private let explicitLabel: String?
@@ -18,9 +20,8 @@ public class ActionButton: NSButton {
     private var accessibilityObserver: NSObjectProtocol?
     private let activity = NSProgressIndicator()
     private var requestedEnabled = true
-    private var tracking: NSTrackingArea?
-    private var windowObservers: [NSObjectProtocol] = []
-    private(set) var isHovered = false
+    private lazy var hoverFeedback = HoverFeedback(view: self)
+    var isHovered: Bool { hoverFeedback.isHovered }
     public var isBusy = false { didSet { super.isEnabled = requestedEnabled && !isBusy; refresh() } }
     public override var isEnabled: Bool {
         get { super.isEnabled }
@@ -62,7 +63,6 @@ public class ActionButton: NSButton {
     }
     required public init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     deinit {
-        windowObservers.forEach(NotificationCenter.default.removeObserver)
         if let accessibilityObserver { NSWorkspace.shared.notificationCenter.removeObserver(accessibilityObserver) }
     }
 
@@ -89,29 +89,21 @@ public class ActionButton: NSButton {
     public override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); needsDisplay = true }
     public override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        windowObservers.forEach(NotificationCenter.default.removeObserver); windowObservers.removeAll()
-        guard let window else { return }
-        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
-            windowObservers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.isHovered = false; self?.needsDisplay = true }
-            })
-        }
+        hoverFeedback.viewDidMoveToWindow()
     }
     public override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        if let tracking { removeTrackingArea(tracking) }
-        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
-        addTrackingArea(area); tracking = area
+        hoverFeedback.updateTrackingAreas()
     }
-    public override func mouseEntered(with event: NSEvent) { isHovered = isEnabled; needsDisplay = true }
-    public override func mouseExited(with event: NSEvent) { isHovered = false; needsDisplay = true }
+    public override func mouseEntered(with event: NSEvent) { hoverFeedback.enter() }
+    public override func mouseExited(with event: NSEvent) { hoverFeedback.exit() }
     public override func layout() {
         super.layout()
         let x: CGFloat = title.isEmpty || image == nil ? bounds.midX - iconSide / 2 : contentStart
         activity.frame = NSRect(x: x, y: bounds.midY - iconSide / 2, width: iconSide, height: iconSide)
     }
     private func refresh() {
-        if !isEnabled { isHovered = false }
+        hoverFeedback.update(enabled: isEnabled, preferences: preferences)
         setAccessibilityLabel(isBusy ? L10n.tr("\(accessibleName)，正在处理") : accessibleName)
         if isBusy && !preferences.effectiveReduceMotion { activity.startAnimation(nil) }
         else { activity.stopAnimation(nil) }
@@ -128,7 +120,7 @@ public class ActionButton: NSButton {
     private var buttonHeight: CGFloat { size == .regular ? FraloStyle.Button.height : FraloStyle.Button.compactHeight }
     private var inset: CGFloat { size == .regular ? FraloStyle.Button.inset : FraloStyle.Button.compactInset }
     private var radius: CGFloat { size == .regular ? FraloStyle.Button.radius : FraloStyle.Button.compactRadius }
-    private var iconSide: CGFloat { size == .regular ? FraloStyle.Button.icon : FraloStyle.Button.compactIcon }
+    private var iconSide: CGFloat { iconSize ?? (size == .regular ? FraloStyle.Button.icon : FraloStyle.Button.compactIcon) }
     private var iconSlot: CGFloat { image == nil ? 0 : iconSide + (size == .regular ? 10 : 8) }
     private var contentStart: CGFloat {
         let text = (title as NSString).size(withAttributes: [.font: font ?? FraloStyle.TextRole.body.font]).width
@@ -143,24 +135,28 @@ public class ActionButton: NSButton {
         let contrast = preferences.effectiveIncreaseContrast
         let path = NSBezierPath(roundedRect: surfaceRect, xRadius: radius, yRadius: radius)
         let base = NSColor.labelColor.withAlphaComponent(0.065)
+        let hover = hoverFeedback.amount
         var fill = base, edge = NSColor.separatorColor, ink = NSColor.labelColor
         var hasSurface = true
         switch role {
         case .primary:
-            let colors = Self.primaryColors(accent: primaryTint ?? .controlAccentColor, hovered: isHovered, pressed: pressed)
-            fill = colors.background; ink = colors.foreground
+            let colors = Self.primaryColors(accent: primaryTint ?? .controlAccentColor, pressed: pressed)
+            let hovered = Self.primaryColors(accent: primaryTint ?? .controlAccentColor, hovered: true, pressed: pressed)
+            fill = colors.background.blended(withFraction: hover, of: hovered.background) ?? colors.background
+            ink = colors.foreground
             edge = fill.blended(withFraction: 0.18, of: .black) ?? fill
         case .secondary:
-            if isHovered { fill = fill.blended(withFraction: 0.06, of: .labelColor) ?? fill }
+            fill = fill.blended(withFraction: 0.06 * hover, of: .labelColor) ?? fill
             if pressed { fill = fill.blended(withFraction: 0.12, of: .labelColor) ?? fill }
         case .quiet:
-            hasSurface = state == .on || isHovered || pressed
+            hasSurface = state == .on || hover > 0 || pressed
             fill = base.blended(withFraction: pressed ? 0.15 : 0.07, of: .labelColor) ?? base
+            if state != .on && !pressed { fill = fill.withAlphaComponent(fill.alphaComponent * hover) }
             edge = state == .on && contrast ? .labelColor : .clear
         case .destructive:
             ink = .systemRed
             edge = NSColor.systemRed.withAlphaComponent(contrast ? 0.8 : 0.24)
-            if isHovered || pressed { fill = base.blended(withFraction: pressed ? 0.17 : 0.08, of: .systemRed) ?? base }
+            fill = base.blended(withFraction: pressed ? 0.17 : 0.08 * hover, of: .systemRed) ?? base
         }
         if !isEnabled {
             fill = base; edge = .separatorColor; ink = .disabledControlTextColor
@@ -179,9 +175,9 @@ public class ActionButton: NSButton {
             }
             edge.setStroke(); path.lineWidth = contrast ? 1.25 : 0.5; path.stroke()
         }
-        if !drawsSurface && isEnabled && (isHovered || pressed) {
+        if !drawsSurface && isEnabled && (hover > 0 || pressed) {
             let feedback: NSColor = role == .primary ? (ink == .white ? .black : .white) : .black
-            feedback.withAlphaComponent(pressed ? 0.13 : 0.06).setFill()
+            feedback.withAlphaComponent(pressed ? 0.13 : 0.06 * hover).setFill()
             path.fill()
         }
         let slot = iconSlot

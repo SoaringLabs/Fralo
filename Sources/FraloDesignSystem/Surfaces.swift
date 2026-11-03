@@ -210,10 +210,12 @@ public struct BatchEntry {
     public let id: String
     public let title: String
     public let detail: String
+    public let detailToolTip: String?
     public let image: NSImage?
     public let failed: Bool
-    public init(id: String, title: String, detail: String = "", image: NSImage? = nil, failed: Bool = false) {
+    public init(id: String, title: String, detail: String = "", detailToolTip: String? = nil, image: NSImage? = nil, failed: Bool = false) {
         self.id = id; self.title = title; self.detail = detail; self.image = image; self.failed = failed
+        self.detailToolTip = detailToolTip
     }
 }
 
@@ -252,6 +254,9 @@ public final class ThumbnailRow: NSTableCellView {
         let detail = FraloStyle.text(entry.failed ? L10n.tr("无法读取") : entry.detail, role: .caption)
         detail.font = .monospacedDigitSystemFont(ofSize: 11.5, weight: .regular)
         detail.textColor = entry.failed ? .systemRed : .tertiaryLabelColor
+        if !entry.failed, let help = entry.detailToolTip {
+            detail.toolTip = help; detail.setAccessibilityHelp(help)
+        }
         let text = FraloStyle.stack([name, detail], spacing: 3)
         text.translatesAutoresizingMaskIntoConstraints = false; addSubview(text)
         NSLayoutConstraint.activate([
@@ -309,14 +314,88 @@ private final class BatchNavigationTable: NSTableView {
 }
 
 @MainActor
-private final class BatchSelectionRow: NSTableRowView {
-    var compact = true
+final class BatchSelectionRow: NSTableRowView {
+    var compact = true { didSet { refreshHover(animated: false) } }
+    var preferences = DesignPreferences() {
+        didSet { refreshHover(animated: false); needsDisplay = true }
+    }
     var horizontalInset: CGFloat = 0
     var trailingInset: CGFloat = 0
     var topPadding: CGFloat = 0
+    private var tracking: NSTrackingArea?
+    private var observers: [NSObjectProtocol] = []
+    private var displayObserver: NSObjectProtocol?
+    private var hovered = false
+    private var targetHover: CGFloat = 0
+    @objc dynamic var hoverAmount: CGFloat = 0 { didSet { needsDisplay = true } }
     private var dark: Bool { effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua }
+    private var cardBounds: NSRect {
+        batchRowBounds(bounds, leading: horizontalInset, trailing: trailingInset, vertical: 1,
+                       topPadding: topPadding, flipped: isFlipped)
+    }
+    override class func defaultAnimation(forKey key: NSAnimatablePropertyKey) -> Any? {
+        key == "hoverAmount" ? CABasicAnimation() : super.defaultAnimation(forKey: key)
+    }
+    override var isSelected: Bool {
+        didSet { refreshHover(animated: false); needsDisplay = true }
+    }
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        observers.forEach(NotificationCenter.default.removeObserver); observers.removeAll()
+        if let displayObserver { NSWorkspace.shared.notificationCenter.removeObserver(displayObserver); self.displayObserver = nil }
+        hovered = false; refreshHover(animated: false)
+        guard let window else { return }
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.syncPointer() }
+            })
+        }
+        displayObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in MainActor.assumeIsolated { self?.refreshHover(animated: false); self?.needsDisplay = true } }
+        syncPointer()
+    }
+    deinit {
+        observers.forEach(NotificationCenter.default.removeObserver)
+        if let displayObserver { NSWorkspace.shared.notificationCenter.removeObserver(displayObserver) }
+    }
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(rect: .zero, options: [.inVisibleRect, .mouseEnteredAndExited, .activeInKeyWindow], owner: self)
+        tracking = area; addTrackingArea(area)
+        // Covers newly realized/reused rows and geometry moving under a stationary pointer.
+        syncPointer()
+    }
+    private func syncPointer() {
+        let inside = window.map { $0.isKeyWindow && !isHiddenOrHasHiddenAncestor &&
+            visibleRect.contains(convert($0.mouseLocationOutsideOfEventStream, from: nil)) } ?? false
+        guard hovered != inside else { return }
+        hovered = inside
+        refreshHover(animated: false)
+    }
+    override func mouseEntered(with event: NSEvent) { hovered = true; refreshHover() }
+    override func mouseExited(with event: NSEvent) { hovered = false; refreshHover() }
+    private func refreshHover(animated: Bool = true) {
+        let value: CGFloat = !compact && hovered && !isSelected && window?.isKeyWindow == true ? 1 : 0
+        guard value != targetHover || !animated else { return }
+        targetHover = value
+        let duration = animated && window != nil ? FraloMotion.duration(.hover, preferences: preferences) : 0
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            animator().hoverAmount = value
+        }
+        if duration == 0 { hoverAmount = value }
+    }
     override func drawBackground(in dirtyRect: NSRect) {
-        guard compact else { return }
+        guard compact else {
+            guard !isSelected, hoverAmount > 0 else { return }
+            let alpha: CGFloat = preferences.effectiveIncreaseContrast ? 0.08 : dark ? 0.055 : 0.035
+            NSColor.labelColor.withAlphaComponent(alpha * min(1, max(0, hoverAmount))).setFill()
+            NSBezierPath(roundedRect: cardBounds, xRadius: 12, yRadius: 12).fill()
+            return
+        }
         NSColor.controlBackgroundColor.withAlphaComponent(0.55).setFill()
         NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 5), xRadius: 11, yRadius: 11).fill()
         NSColor.labelColor.withAlphaComponent(0.10).setStroke()
@@ -327,15 +406,21 @@ private final class BatchSelectionRow: NSTableRowView {
     override var interiorBackgroundStyle: NSView.BackgroundStyle { .normal }
     override func drawSelection(in dirtyRect: NSRect) {
         guard compact else {
-            // A neutral wash, not an accent block: the framed thumbnail stays the strongest element.
-            (dark ? NSColor.white.withAlphaComponent(0.09) : NSColor.black.withAlphaComponent(0.06)).setFill()
-            NSBezierPath(roundedRect: batchRowBounds(bounds, leading: horizontalInset, trailing: trailingInset, vertical: 1,
-                                                   topPadding: topPadding, flipped: isFlipped), xRadius: 12, yRadius: 12).fill(); return
+            // Selection remains stronger than the transient pointer wash, without recoloring the artwork.
+            let alpha: CGFloat = preferences.effectiveIncreaseContrast ? 0.20 : dark ? 0.16 : 0.10
+            NSColor.labelColor.withAlphaComponent(alpha).setFill()
+            let path = NSBezierPath(roundedRect: cardBounds, xRadius: 12, yRadius: 12)
+            path.fill()
+            if preferences.effectiveIncreaseContrast {
+                NSColor.labelColor.withAlphaComponent(0.45).setStroke(); path.lineWidth = 1; path.stroke()
+            }
+            return
         }
         NSColor.controlAccentColor.withAlphaComponent(0.17).setFill()
         let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 5), xRadius: 11, yRadius: 11)
         path.fill(); NSColor.controlAccentColor.setStroke(); path.lineWidth = 1.5; path.stroke()
     }
+    override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); needsDisplay = true }
 }
 
 @MainActor
@@ -343,6 +428,13 @@ public final class BatchList: PanelScrollView, NSTableViewDataSource, NSTableVie
     private let table = BatchNavigationTable()
     private var updating = false
     private let compact: Bool
+    public var preferences = DesignPreferences() {
+        didSet {
+            table.enumerateAvailableRowViews { row, _ in
+                (row as? BatchSelectionRow)?.preferences = self.preferences
+            }
+        }
+    }
     /// Document spacing lives inside the first row, leaving native scroll edges in place.
     public var contentTopPadding: CGFloat = 0 {
         didSet { table.contentTopPadding = contentTopPadding; table.reloadData() }
@@ -421,6 +513,7 @@ public final class BatchList: PanelScrollView, NSTableViewDataSource, NSTableVie
     }
     public func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
         let view = BatchSelectionRow(); view.compact = compact; view.horizontalInset = rowHorizontalInset; view.trailingInset = table.rowTrailingInset
+        view.preferences = preferences
         view.topPadding = row == 0 ? contentTopPadding : 0
         return view
     }
@@ -696,13 +789,16 @@ public final class ViewToolbar: NSView {
     /// Status shown in the zoom readout: the current percentage or brief feedback such as “已复制”.
     public let dimensions = FraloStyle.text("—", role: .detail, secondary: true)
     public let composition = ChoiceMenu(["4:3"], label: L10n.tr("画布比例"))
-    private let progress = NSProgressIndicator()
+    let progress = ArcActivityIndicator(label: L10n.tr("正在更新预览"))
+    public var preferences = DesignPreferences() { didSet { refreshActivity() } }
+    private var displayObserver: NSObjectProtocol?
+    private var zoomBeforeActivity: (enabled: Bool, disclosure: Bool)?
     private var row: NSStackView!
     public private(set) var isCompact = false
     private var pendingActivity: DispatchWorkItem?
     private var activityVersion = 0
     public private(set) var isUpdatingPreview = false
-    public var showsComposition = false { didSet { composition.isHidden = !showsComposition; zoom.isHidden = showsComposition } }
+    public var showsComposition = false { didSet { composition.isHidden = !showsComposition; zoom.isHidden = showsComposition; refreshActivity() } }
     public init() {
         super.init(frame: .zero)
         surface.isInteractive = true
@@ -716,8 +812,7 @@ public final class ViewToolbar: NSView {
         zoom.showsSurface = false; composition.showsSurface = false; composition.isHidden = true
         zoom.font = .monospacedDigitSystemFont(ofSize: 13, weight: .regular)
         zoom.widthAnchor.constraint(greaterThanOrEqualToConstant: 72).isActive = true
-        progress.style = .spinning; progress.controlSize = .small; progress.isDisplayedWhenStopped = false
-        progress.setAccessibilityLabel(L10n.tr("正在更新预览")); progress.translatesAutoresizingMaskIntoConstraints = false
+        progress.isHidden = true; progress.translatesAutoresizingMaskIntoConstraints = false
         row = FraloStyle.stack([zoomOut, zoom, zoomIn, composition], axis: .horizontal, spacing: 2)
         row.setCustomSpacing(8, after: zoomIn)
         row.translatesAutoresizingMaskIntoConstraints = false; surface.contentView.addSubview(row)
@@ -728,13 +823,19 @@ public final class ViewToolbar: NSView {
             surface.topAnchor.constraint(equalTo: topAnchor), surface.bottomAnchor.constraint(equalTo: bottomAnchor),
             row.leadingAnchor.constraint(equalTo: surface.contentView.leadingAnchor, constant: 6), row.trailingAnchor.constraint(equalTo: surface.contentView.trailingAnchor, constant: -6),
             row.centerYAnchor.constraint(equalTo: surface.contentView.centerYAnchor),
-            progress.centerXAnchor.constraint(equalTo: zoom.centerXAnchor, constant: -6), progress.centerYAnchor.constraint(equalTo: zoom.centerYAnchor),
+            progress.centerXAnchor.constraint(equalTo: zoom.centerXAnchor), progress.centerYAnchor.constraint(equalTo: zoom.centerYAnchor),
             progress.widthAnchor.constraint(equalToConstant: 14), progress.heightAnchor.constraint(equalToConstant: 14)
         ])
         showStatus("—")
+        displayObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in MainActor.assumeIsolated { self?.refreshActivity() } }
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
-    deinit { pendingActivity?.cancel() }
+    deinit {
+        pendingActivity?.cancel()
+        if let displayObserver { NSWorkspace.shared.notificationCenter.removeObserver(displayObserver) }
+    }
     public override func layout() {
         super.layout()
         layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: Self.height / 2, cornerHeight: Self.height / 2, transform: nil)
@@ -765,7 +866,7 @@ public final class ViewToolbar: NSView {
     public func showStatus(_ text: String, detail: String? = nil) {
         dimensions.stringValue = text
         if let detail { dimensions.toolTip = detail; zoom.toolTip = L10n.tr("缩放比例 · \(detail)") }
-        zoom.displayTitle = isUpdatingPreview ? "" : text
+        if isUpdatingPreview { refreshActivity() } else { zoom.displayTitle = text }
     }
     public func fitControls(to availableWidth: CGFloat) {
         let compact = availableWidth > 0 && availableWidth < 440
@@ -781,9 +882,10 @@ public final class ViewToolbar: NSView {
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, self.activityVersion == version else { return }
-                self.isUpdatingPreview = true; self.zoom.displayTitle = ""
-                if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion { self.progress.startAnimation(nil) }
-                else { self.zoom.displayTitle = "…" }
+                self.zoomBeforeActivity = (self.zoom.isEnabled, self.zoom.showsDisclosure)
+                self.isUpdatingPreview = true
+                self.zoom.isEnabled = false; self.zoom.showsDisclosure = false
+                self.refreshActivity()
             }
         }
         pendingActivity = work
@@ -791,7 +893,18 @@ public final class ViewToolbar: NSView {
     }
     public func finishPreviewUpdate() {
         pendingActivity?.cancel(); pendingActivity = nil; activityVersion += 1
-        isUpdatingPreview = false; progress.stopAnimation(nil); zoom.displayTitle = dimensions.stringValue
+        isUpdatingPreview = false; refreshActivity()
+        if let previous = zoomBeforeActivity {
+            zoom.isEnabled = previous.enabled; zoom.showsDisclosure = previous.disclosure
+            zoomBeforeActivity = nil
+        }
+        zoom.displayTitle = dimensions.stringValue
+    }
+    private func refreshActivity() {
+        let rotating = isUpdatingPreview && !preferences.effectiveReduceMotion && !showsComposition
+        progress.isHidden = !rotating; progress.isRunning = rotating
+        progress.increaseContrast = preferences.effectiveIncreaseContrast
+        if isUpdatingPreview { zoom.displayTitle = preferences.effectiveReduceMotion ? "…" : "" }
     }
 }
 

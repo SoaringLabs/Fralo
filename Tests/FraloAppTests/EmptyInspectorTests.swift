@@ -10,6 +10,88 @@ final class EmptyInspectorTests: XCTestCase {
         URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Sources/FraloApp/Development/Fixtures/03-journal.png")
     }
 
+    @MainActor func testEmptyBrowserPageKeepsThePopulatedWindowCorners() throws {
+        _ = NSApplication.shared
+        let stage = EmptyStageView(action: ActionButton("Add", role: .primary))
+        stage.showEmpty(title: "Drop screenshots", detail: "PNG / JPEG")
+        for browser in BrowserStyle.allCases {
+            for appearance in BrowserAppearance.allCases {
+                var settings = CompositionSettings(); settings.display = .browser
+                settings.browser = browser; settings.browserAppearance = appearance; settings.transparentShadow = .none
+                let rendered = try CompositionRenderer.render(ImageInput(url: fixture), settings: settings, maxDimension: 1200)
+                let layout = try CompositionRenderer.screenLayout(settings)
+                stage.device = .init(image: NSImage(cgImage: rendered.image, size: NSSize(width: rendered.image.width, height: rendered.image.height)),
+                                     screen: layout.rect, cornerRadius: layout.cornerRadius, display: .browser,
+                                     orientation: .portrait, browserAppearance: appearance)
+                for size in [NSSize(width: 900, height: 700), NSSize(width: 1200, height: 900)] {
+                    stage.setFrameSize(size); stage.layoutSubtreeIfNeeded()
+                    let context = try XCTUnwrap(CGContext(data: nil, width: Int(size.width), height: Int(size.height), bitsPerComponent: 8,
+                        bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                    context.translateBy(x: 0, y: size.height); context.scaleBy(x: 1, y: -1)
+                    NSGraphicsContext.saveGraphicsState()
+                    NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: true)
+                    stage.draw(stage.bounds)
+                    NSGraphicsContext.restoreGraphicsState()
+                    let bytes = try XCTUnwrap(context.data).assumingMemoryBound(to: UInt8.self)
+                    let frame = try XCTUnwrap(stage.deviceRect), screen = try XCTUnwrap(stage.screenRect)
+                    func alpha(_ x: CGFloat, _ y: CGFloat) -> UInt8 {
+                        bytes[Int(y) * context.bytesPerRow + Int(x) * 4 + 3]
+                    }
+                    let name = "\(browser)/\(appearance)/\(size)"
+                    for x in [frame.minX + 1, frame.maxX - 2] {
+                        // The contact shadow may remain, but the blank page must not fill the corner.
+                        XCTAssertLessThan(alpha(x, frame.maxY - 2), 180, name)
+                        XCTAssertEqual(alpha(x, screen.minY + 2), 255, "The upper content seam remains square: \(name)")
+                    }
+                    XCTAssertEqual(alpha(frame.midX, frame.maxY - 2), 255, name)
+                }
+            }
+        }
+    }
+
+    @MainActor func testGuidanceCentersOnPhoneScreenButKeepsOtherTargetsAndIslandMargins() throws {
+        _ = NSApplication.shared
+        let stage = EmptyStageView(action: ActionButton("Add", role: .primary))
+        let content = try XCTUnwrap(stage.zone.subviews.compactMap { $0 as? NSStackView }.first)
+        stage.showEmpty(title: "Drop screenshots", detail: "PNG / JPEG")
+        for size in [NSSize(width: 1030, height: 640), NSSize(width: 1400, height: 950)] {
+            stage.setFrameSize(size)
+            stage.showEmpty(title: "Drop screenshots", detail: "PNG / JPEG")
+            // Reuse one stage to catch stale phone offsets when switching targets.
+            for (display, orientation) in [(DisplayKind.phone, Orientation.portrait), (.tablet, .portrait),
+                                            (.phone, .landscape), (.browser, .landscape)] {
+                let imageSize = orientation == .portrait ? NSSize(width: 400, height: 800) : NSSize(width: 800, height: 400)
+                stage.device = .init(image: NSImage(size: imageSize), screen: CGRect(x: 0.03, y: 0.03, width: 0.94, height: 0.94),
+                                     cornerRadius: 0.05, display: display, orientation: orientation)
+                stage.layoutSubtreeIfNeeded()
+                let screen = try XCTUnwrap(stage.screenRect), zone = stage.zone.frame
+                let expected = display == .phone ? screen : zone
+                for feedback in [false, true, false] {
+                    if feedback { stage.showDrag(.accepting, title: "Release to add", detail: "iPhone · Portrait") }
+                    else { stage.showEmpty(title: "Drop screenshots", detail: "PNG / JPEG") }
+                    stage.layoutSubtreeIfNeeded()
+                    let drawnContent = stage.convert(content.bounds, from: content)
+                    XCTAssertEqual(drawnContent.midX, expected.midX, accuracy: 1, "\(display) \(orientation) horizontal center")
+                    XCTAssertEqual(drawnContent.midY, expected.midY, accuracy: 1, "\(display) \(orientation) vertical center")
+                    XCTAssertEqual(stage.zone.frame, zone, "Changing feedback must not move the border")
+                }
+                if display == .phone, orientation == .portrait {
+                    XCTAssertGreaterThan(zone.minY - screen.minY, screen.maxY - zone.maxY, "The border still clears the top island")
+                } else if display == .phone {
+                    XCTAssertGreaterThan(screen.maxX - zone.maxX, zone.minX - screen.minX, "The border still clears the side island")
+                } else {
+                    XCTAssertEqual(zone.midX, screen.midX, accuracy: 1)
+                    XCTAssertEqual(zone.midY, screen.midY, accuracy: 1)
+                }
+            }
+            stage.showError("Cannot render")
+            stage.layoutSubtreeIfNeeded()
+            let fallback = stage.convert(content.bounds, from: content)
+            XCTAssertEqual(fallback.midX, stage.zone.frame.midX, accuracy: 1)
+            XCTAssertEqual(fallback.midY, stage.zone.frame.midY, accuracy: 1)
+        }
+    }
+
     @MainActor func testEmptyBatchCollapsesOnlyTheListAndKeepsTheInspector() throws {
         _ = NSApplication.shared
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

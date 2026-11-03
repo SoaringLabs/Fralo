@@ -6,7 +6,9 @@ import FraloDesignSystem
 /// like Find My's own titlebar view. The window titlebar itself stays transparent.
 @MainActor
 final class HeaderBackdrop: NSView {
-    static let fadeIn: TimeInterval = 0.2, fadeOut: TimeInterval = 0.25, hideDelay: TimeInterval = 0.3
+    // Approximate the recorded Find My cadence: prompt response, then a soft tail.
+    // The brief exit debounce absorbs boundary jitter without a noticeable hold.
+    static let fadeIn: TimeInterval = 0.25, fadeOut: TimeInterval = 0.3, hideDelay: TimeInterval = 0.05
     let effect = NSVisualEffectView()
     private let fallback = NSView()
     private let hairline = NSView()
@@ -37,7 +39,7 @@ final class HeaderBackdrop: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
     override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); refreshMaterial() }
 
-    /// Shows immediately; hides after a short delay so crossing between toolbar items never flickers.
+    /// Starts revealing immediately; a brief exit debounce is cancelled on re-entry.
     func setShown(_ shown: Bool) {
         if shown {
             hideWork?.cancel(); hideWork = nil
@@ -59,7 +61,7 @@ final class HeaderBackdrop: NSView {
         let duration = window == nil || preferences.effectiveReduceMotion ? 0 : duration
         NSAnimationContext.runAnimationGroup { context in
             context.duration = duration
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             animator().alphaValue = value
         }
         // Zero-duration proxies can defer their setter; apply the endpoint now.

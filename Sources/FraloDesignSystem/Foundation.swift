@@ -102,11 +102,11 @@ public struct DesignPreferences: Equatable {
 
 @MainActor
 public enum FraloMotion {
-    public enum Transition { case selection, structure, preview }
+    public enum Transition { case hover, selection, structure, preview }
     public static func duration(_ transition: Transition, preferences: DesignPreferences = .init()) -> TimeInterval {
         guard !preferences.effectiveReduceMotion else { return 0 }
         switch transition {
-        case .selection: return 0.18
+        case .hover, .selection: return 0.18
         case .structure: return 0.22
         case .preview: return 0.16
         }

@@ -57,6 +57,11 @@
 "粘贴图片-%03d.png" = "Pasted-Image-%03d.png";
 "删除图片" = "Delete Image";
 "添加截图后显示尺寸" = "Add a screenshot to see dimensions";
+"导出尺寸" = "Dimensions";
+"尺寸单位：像素" = "Dimensions are in pixels.";
+"预计大小" = "Estimated Size";
+"压缩" = "Compression";
+"原图尺寸：{0} 像素" = "Original dimensions: {0} pixels";
 "原始图片：{0} · {1} × {2}" = "Original: {0} · {1} × {2}";
 "成品画布，{0}" = "Output canvas, {0}";
 "重试预览" = "Retry Preview";
@@ -124,7 +129,7 @@
 "设备" = "Device";
 "构图" = "Composition";
 "背景" = "Background";
-"约 {0} / 张" = "About {0} / image";
+"{0} / 张" = "{0} / image";
 "正在估算…" = "Estimating…";
 "1:1 方形" = "1:1 Square";
 "4:3 横向" = "4:3 Landscape";
@@ -181,7 +186,6 @@
 "松开以追加 {0} 张图片到批次" = "Drop to append images to the batch: {0}";
 "松开以添加 {0} 张图片" = "Drop to add images: {0}";
 "将添加 {0} 张 · 忽略 {1} 个文件" = "To add: {0} · Files to skip: {1}";
-"将按 {0} 套框" = "Frame with {0}";
 "或按 ⌘V 粘贴" = "Or press ⌘V to paste";
 "无法生成成品" = "Unable to Generate Output";
 "图片拖放区域" = "Image Drop Area";

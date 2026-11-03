@@ -252,7 +252,7 @@ final class PanelPolishTests: XCTestCase {
                 XCTAssertEqual(try XCTUnwrap(canvas.image).size, size)
                 XCTAssertEqual(try XCTUnwrap(canvas.zoom), fitZoom, accuracy: 0.0001)
                 XCTAssertEqual(canvas.imageRect, fitRect)
-                XCTAssertTrue(viewing.dimensions.stringValue.hasSuffix("%"), "The floating bar shows the zoom; pixel size lives in the inspector footer")
+                XCTAssertTrue(viewing.dimensions.stringValue.hasSuffix("%"), "The floating bar shows the zoom; pixel size lives in Export")
                 XCTAssertEqual(viewing.dimensions.toolTip, "\(Int(size.width)) × \(Int(size.height)) px")
             }
             controller.actualPixels(nil); root.layoutSubtreeIfNeeded()
@@ -279,7 +279,8 @@ final class PanelPolishTests: XCTestCase {
         let scroll = try XCTUnwrap(inspector.subviews.first as? NSScrollView)
         let document = try XCTUnwrap(scroll.documentView)
         XCTAssertTrue(inspector.exportSettings.isDescendant(of: document), "Export format and JPEG parameters must scroll with the other settings")
-        XCTAssertFalse(inspector.outputInfo.isDescendant(of: document), "Output size stays in the fixed footer above the export action")
+        XCTAssertTrue(inspector.outputInfo.isDescendant(of: inspector.exportSettings), "Output dimensions belong to Export")
+        XCTAssertTrue(inspector.outputSize.isDescendant(of: inspector.exportSettings), "Estimated bytes belong to Export")
         XCTAssertTrue(inspector.outputInfo.isDescendant(of: root.right))
         XCTAssertFalse(inspector.mode.isDescendant(of: document), "The mode selector stays pinned above the scrolling form")
         // Reproduce the user's always-visible native scrollbar preference without changing the OS.
@@ -305,9 +306,11 @@ final class PanelPolishTests: XCTestCase {
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap { descendants($0) } }
         let root = try XCTUnwrap(controller.window?.contentView)
         let toolbar = try XCTUnwrap(descendants(root).compactMap { $0 as? ViewToolbar }.first)
-        let activity = descendants(root).compactMap { $0 as? NSProgressIndicator }.filter { !($0.superview is ActionButton) }
-        XCTAssertEqual(activity.count, 1)
-        for spinner in activity { XCTAssertTrue(spinner.isDescendant(of: toolbar), "Preview activity needs a stable place beside preview controls") }
+        let activity = descendants(root).compactMap { $0 as? ArcActivityIndicator }
+        XCTAssertEqual(activity.count, 2, "Preview and estimate activity share one glyph implementation")
+        XCTAssertEqual(activity.filter { $0.isDescendant(of: toolbar) }.count, 1)
+        let inspector = try XCTUnwrap((root as? WorkbenchView)?.right.body as? CompositionInspector)
+        XCTAssertTrue(activity.contains { $0 === inspector.sizeEstimate.indicator })
     }
     @MainActor func testSwitchingBatchInputKeepsTheFixedOrientationIllustration() async throws {
         _ = NSApplication.shared
@@ -348,14 +351,14 @@ final class PanelPolishTests: XCTestCase {
         XCTAssertEqual(try illustration(), before, "The inspector demo must not follow the selected input")
         let inspector = try XCTUnwrap(root.right.body as? CompositionInspector)
         for _ in 0..<150 where inspector.outputSize.stringValue.isEmpty || inspector.outputSize.stringValue == "—" || inspector.outputSize.stringValue == L10n.tr("正在估算…") { try await Task.sleep(nanoseconds: 20_000_000) }
-        let wrapper = L10n.tr("约 \("__SIZE__") / 张").components(separatedBy: "__SIZE__")
+        let wrapper = L10n.tr("\("__SIZE__") / 张").components(separatedBy: "__SIZE__")
         XCTAssertTrue(inspector.outputSize.stringValue.hasPrefix(wrapper[0]) && inspector.outputSize.stringValue.hasSuffix(wrapper[1]), "The per-image size is estimated automatically after each preview")
-        let compression = try XCTUnwrap(descendants(inspector).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == L10n.tr("文件大小") })
+        let compression = try XCTUnwrap(descendants(inspector).compactMap { $0 as? ValuePicker }.first { $0.accessibilityLabel() == L10n.tr("压缩") })
         let previous = canvas.image; compression.choose(1)
         for _ in 0..<250 where canvas.image === previous { try await Task.sleep(nanoseconds: 20_000_000) }
         XCTAssertFalse(inspector.settings.pngLossless)
         XCTAssertFalse(canvas.image === previous)
-        XCTAssertTrue(inspector.outputSize.stringValue.hasPrefix(wrapper[0]), "Reuse PNG preview encoding to report bytes without another render")
+        XCTAssertTrue(inspector.outputSize.stringValue.hasPrefix(wrapper[0]) && inspector.outputSize.stringValue.hasSuffix(wrapper[1]), "Reuse PNG preview encoding to report bytes without another render")
     }
 
 }
