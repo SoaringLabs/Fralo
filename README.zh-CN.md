@@ -15,6 +15,7 @@
 [![许可：MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 [**下载**](https://github.com/SoaringLabs/Fralo/releases/latest) ·
+[**CLI 快速上手**](#命令行) ·
 [更新记录](CHANGELOG.md) ·
 [安装说明](INSTALL.md) ·
 [贡献指南](CONTRIBUTING.md)
@@ -134,57 +135,64 @@ Fralo 0.1.1 及以后版本可在应用内升级：选择 **Fralo → 检查更�
 
 ## 命令行
 
-完整构图和 AI Agent 自动化从 `fralo guide` 开始，也可阅读[离线 CLI 说明](docs/cli.md)。
-`fralo capabilities --json` 列出已实现能力，`fralo schema` 给出完整配置约束。
-先用 `fralo example browser > recipe.json` 生成示例，再运行
-`fralo compose ./screenshots --output ./framed --config recipe.json --json`。
-`fralo config --app > recipe.json` 可读取 App 已保存的完整构图；临时参数不会改写 App 设置。
-添加 `--dry-run` 只预检输入和计划输出，不创建文件或目录。以下命令继续保留旧版透明手机套框行为。
+用终端或 Agent 把截图批量做成设备展示图。`fralo compose` 和 App 共用渲染器，
+支持手机、平板和浏览器外框，可导出透明 PNG，也可以添加背景并导出 PNG 或 JPEG。
 
-`fralo` CLI 随 App 一起安装，无需打开 App 窗口即可渲染透明手机外框：
+### 从截图到成品
 
-```bash
-/Applications/Fralo.app/Contents/MacOS/fralo --help
-```
-
-Fralo 不会修改 `PATH`，如需全局使用请自行链接或复制。
+使用包含 `compose` 的构建，在仓库根目录运行下面三条命令。
+随 App 安装的 CLI 位于 `/Applications/Fralo.app/Contents/MacOS/fralo`。
+如果终端找不到 `fralo`，用这个完整路径代替。
 
 ```bash
-# 列出可用机型
-fralo models
-
-# 处理文件夹中的所有 PNG / JPEG
-fralo render ./screenshots --output ./framed
-
-# 指定机型和方向，并输出 JSON 结果
-fralo render one.png two.jpg --output ./framed \
-  --model iphone-18-pro-max --orientation portrait --json
+fralo example phone > phone.json
+fralo compose examples/01-today.png --output ./framed --config phone.json --dry-run --json
+fralo compose examples/01-today.png --output ./framed --config phone.json --json
 ```
 
-| 选项 | 说明 |
+<p align="center">
+  <img src="docs/assets/cli-compose.png" width="270" alt="Fralo CLI 实际导出的成品，Field Notes 截图置于 iPhone 外框中，搭配暖色纹理背景">
+</p>
+
+这份手机示例配置会生成 `framed/01-today-fralo.png`，画布尺寸为 1350 × 2400。
+预检只列出计划输出，不创建文件或目录。把输入换成文件夹即可批量出图。
+想复用在 App 里保存的效果，可以把 `--config phone.json` 换成 `--app-settings`。
+
+### 让脚本读懂结果
+
+`--json` 把一份结构化报告写到标准输出，进度走标准错误。
+下面是上述命令的结果节选。
+
+```json
+{
+  "status": "completed",
+  "succeeded": 1,
+  "failed": 0,
+  "outputFormat": "png"
+}
+```
+
+每个条目都包含输入、输出路径和状态。部分图片失败时，其他图片仍可导出。
+脚本可以通过退出码 `1` 判断这批有失败，再读取各失败条目的错误码。
+默认跳过已有输出。
+
+| 想查看 | 指令 |
 | --- | --- |
-| `--output`, `-o <目录>` | 输出目录（必填） |
-| `--input`, `-i <路径>` | 追加输入，可重复；文件夹不递归 |
-| `--model <ID>` | 机型，例如 `iphone-18-pro-max`，见 `fralo models` |
-| `--orientation <方向>` | `portrait` 或 `landscape` |
-| `--overwrite` | 覆盖已有输出；始终保护原始输入 |
-| `--json` | 结果以 JSON 写到标准输出，进度写到标准错误 |
+| 离线指南和完整流程 | `fralo guide` |
+| 当前支持的命令和格式 | `fralo capabilities --json` |
+| 配置字段、默认值和可选值 | `fralo schema --json` |
 
-CLI 支持 iPhone 16、17、18 Pro 与 Pro Max 共六款外框。配置优先级为：
-内置默认值 → App 已保存设置 → 本次参数；参数不会写回 App。输出文件命名为 `<原名>-fralo.png`。
+完整参数、示例和退出码见 [CLI 指南](docs/cli.md)。
 
 <details>
-<summary><b>配置与退出码</b></summary>
+<summary><b>旧版手机套框命令</b></summary>
 
-设置文件位于 `~/Library/Application Support/Fralo/settings.json`。可用
-`FRALO_SETTINGS_PATH` 为脚本和测试指定独立配置文件。
+`fralo render` 保留原来的手机透明套框流程。
+`fralo models` 列出旧命令支持的六款 iPhone 机型，`fralo settings` 显示旧版配置。
 
-| 退出码 | 含义 |
-| --- | --- |
-| `0` | 完成（可能有跳过的文件） |
-| `1` | 存在处理失败的图片 |
-| `2` | 参数错误或启动失败 |
-| `130` | 按 Ctrl-C 取消，已完成的文件会保留 |
+```bash
+fralo render ./screenshots --output ./framed --model iphone-18-pro-max --json
+```
 
 </details>
 
@@ -249,7 +257,7 @@ GitHub 使用公开查询；遇到限流时可设置 `GITHUB_TOKEN` 或 `GH_TOKE
 ## 范围与限制
 
 - 设备外框为原创的参数化绘制，不是 Apple 官方或照片级精确模板，不包含任何 Apple 官方设备素材。
-- 截图从不拉伸变形。App 始终在设备屏幕内显示完整截图；CLI 铺满屏幕并允许最多 3% 的裁切，
+- 截图从不拉伸变形。App 始终在设备屏幕内显示完整截图；旧版 `render` 命令铺满屏幕并允许最多 3% 的裁切，
   比例差异更大的图片会报告失败。
 - Fralo 不编辑截图内容、不纠正方向，也不添加文字说明。
 
