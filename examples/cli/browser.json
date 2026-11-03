@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "display": "browser",
+  "browser": "safari",
+  "browserAppearance": "dark",
+  "mode": "background",
+  "canvas": "16:9",
+  "background": "gradient",
+  "format": "jpeg"
+}

@@ -115,6 +115,10 @@ def main():
         (staged / "Contents/Info.plist").write_bytes(plistlib.dumps(info))
         for filename in ("LICENSE", "INSTALL.md", "AUTHORS.md"):
             shutil.copy2(ROOT / filename, resources / filename)
+        cli_docs = resources / "CLI"
+        cli_docs.mkdir()
+        shutil.copy2(ROOT / "docs/cli.md", cli_docs / "guide.md")
+        shutil.copytree(ROOT / "examples/cli", cli_docs / "examples")
         shutil.copy2(ROOT / ".build/artifacts/sparkle/Sparkle/LICENSE", resources / "Sparkle-LICENSE")
         signing_options = ["--options", "runtime", "--timestamp"] if args.sign else []
         # Sign the update helper before its enclosing framework and application.
@@ -130,6 +134,11 @@ def main():
     # The App signing pass can update the embedded executable's signature.
     # Ship exactly that signed CLI in both locations.
     shutil.copy2(app / "Contents/MacOS/fralo", dist / "fralo")
+    for name in ("CLI", "Fralo_FraloCore.bundle", "Fralo_FraloLocalization.bundle"):
+        companion = dist / name
+        if companion.exists():
+            shutil.rmtree(companion)
+        shutil.copytree(app / "Contents/Resources" / name, companion)
     run("codesign", "--verify", "--deep", "--strict", str(app))
     print(f"App: {app}")
     print(f"CLI: {dist / 'fralo'}")

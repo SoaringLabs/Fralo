@@ -16,6 +16,8 @@ public struct ExportEntry: Codable, Sendable {
     public let output: String
     public let status: Status
     public let reason: String?
+    /// Stable machine code for composition exports; legacy render reports stay unchanged.
+    public var code: String? = nil
 }
 
 public struct ExportReport: Codable, Sendable {
@@ -169,13 +171,18 @@ public enum BatchExporter {
                 ? availableOutputURL(for: preferred, reservingFileNames: otherNames) : preferred
             progress(ExportProgress(completed: entries.count, total: inputs.count, currentName: input.name))
             let entry: ExportEntry = autoreleasepool {
+                var failureCode = "source_protected"
                 do {
                     guard !inputPaths.contains(output.standardizedFileURL.resolvingSymlinksInPath().path) else {
                         throw FraloError.message(L10n.tr("不能覆盖任何原始截图。"))
                     }
-                    if collisionPolicy == .skip && FileManager.default.fileExists(atPath: output.path) {
-                        return ExportEntry(input: input.name, output: output.path, status: .skipped, reason: L10n.tr("已有同名文件"))
+                    let occupied = FileManager.default.fileExists(atPath: output.path)
+                        || (composition != nil && (try? FileManager.default.destinationOfSymbolicLink(atPath: output.path)) != nil)
+                    if collisionPolicy == .skip && occupied {
+                        return ExportEntry(input: input.name, output: output.path, status: .skipped, reason: L10n.tr("已有同名文件"), code: composition == nil ? nil : "output_exists")
                     }
+                    if composition != nil { failureCode = "input_invalid"; _ = try input.dimensions() }
+                    failureCode = "render_failed"
                     let data: Data
                     if let composition {
                         let frame = try CompositionRenderer.render(input, settings: composition, backgroundData: backdrop)
@@ -184,12 +191,15 @@ public enum BatchExporter {
                         let frame = try FrameRenderer.render(input, settings: settings)
                         data = try FrameRenderer.pngData(frame.image)
                     }
+                    failureCode = "output_write_failed"
                     let written = try write(data, to: preferred, collisionPolicy: collisionPolicy, reservingFileNames: otherNames)
                     return ExportEntry(input: input.name, output: written?.path ?? output.path,
                                        status: written != nil ? .success : .skipped,
-                                       reason: written != nil ? nil : L10n.tr("已有同名文件"))
+                                       reason: written != nil ? nil : L10n.tr("已有同名文件"),
+                                       code: composition == nil || written != nil ? nil : "output_exists")
                 } catch {
-                    return ExportEntry(input: input.name, output: output.path, status: .failed, reason: error.localizedDescription)
+                    return ExportEntry(input: input.name, output: output.path, status: .failed, reason: error.localizedDescription,
+                                       code: composition == nil ? nil : failureCode)
                 }
             }
             entries.append(entry)
