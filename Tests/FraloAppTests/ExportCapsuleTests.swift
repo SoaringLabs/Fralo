@@ -166,23 +166,25 @@ final class ExportCapsuleTests: XCTestCase {
         capsule.begin(total: 3, thumbnail: nil) { started += 1 }
         XCTAssertEqual(started, 1)
 
-        // While the glass grows on screen, work waits for it...
         let (shown, visible) = host()
         visible.orderFrontRegardless()
         defer { visible.close() }
+        // An interrupted grow still hands over, so an export can never hang unstarted.
+        var interrupted = 0
+        shown.begin(total: 3, thumbnail: nil) { interrupted += 1 }
+        shown.hide(animated: true)
+        XCTAssertEqual(interrupted, 1)
+
+        // The deferral itself needs real motion: an on-screen window and Reduce Motion off.
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion, visible.isVisible else {
+            throw XCTSkip("System Reduce Motion or an off-screen test window disables the grow, so work starts at once")
+        }
         var ready = 0
         shown.begin(total: 3, thumbnail: nil) { ready += 1 }
         XCTAssertEqual(ready, 0, "Export work must not start while the capsule is still reshaping")
         let deadline = Date().addingTimeInterval(2)
         while ready == 0, Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.02)) }
         XCTAssertEqual(ready, 1, "It starts once the grow has finished")
-
-        // ...and an interrupted grow still hands over, so an export can never hang unstarted.
-        var interrupted = 0
-        shown.hide(animated: false)
-        shown.begin(total: 3, thumbnail: nil) { interrupted += 1 }
-        shown.hide(animated: true)
-        XCTAssertEqual(interrupted, 1)
     }
 
     @MainActor func testPreviewShimmerLoopsUntilTheRunEnds() throws {
@@ -190,6 +192,13 @@ final class ExportCapsuleTests: XCTestCase {
         canvas.wantsLayer = true
         canvas.image = NSImage(size: NSSize(width: 100, height: 200), flipped: false) { rect in NSColor.black.setFill(); rect.fill(); return true }
         let shimmer = PreviewShimmer()
+        var reduced = DesignPreferences(); reduced.reduceMotion = true
+        shimmer.start(on: canvas, preferences: reduced)
+        XCTAssertFalse(shimmer.isRunning, "Reduce Motion keeps the preview still")
+
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            throw XCTSkip("System Reduce Motion intentionally disables the shimmer")
+        }
         shimmer.start(on: canvas, preferences: DesignPreferences())
         let host = try XCTUnwrap(shimmer.host)
         XCTAssertTrue(shimmer.isRunning)
@@ -202,10 +211,6 @@ final class ExportCapsuleTests: XCTestCase {
         shimmer.stop()
         XCTAssertFalse(shimmer.isRunning)
         XCTAssertEqual(host.opacity, 0)
-
-        var reduced = DesignPreferences(); reduced.reduceMotion = true
-        shimmer.start(on: canvas, preferences: reduced)
-        XCTAssertFalse(shimmer.isRunning)
     }
 
     @MainActor private func host() -> (ExportCapsule, NSWindow) {
