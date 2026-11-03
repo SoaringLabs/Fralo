@@ -23,6 +23,7 @@ This builds Debug, creates a separate `Fralo Design Lab.app` with bundle identif
 | Materials | Live native material candidates and blending modes around an independent image |
 | Motion | Replay choice, list collapse and clean preview; compare reduced motion |
 | Scenarios | Phone/iPad/browser layouts, transparent/background modes, inspector pages, 0/3/100 inputs, long names and loading/failure cases |
+| Export | The production export capsule (FRALO-45) on a miniature stage: simulated success, partial failure and cancellation runs over each background fixture or a transparent canvas |
 
 The appearance selector changes this window only. Preview checkboxes strengthen accessibility behavior locally; the footer separately reports actual OS settings. System-setting changes also refresh the lab. Reset restores local experiment values, not user product settings.
 
@@ -31,6 +32,12 @@ Materials includes a Debug-only **背景通透感** experiment. **材质层不�
 The lab window has a clear nonopaque base. Only Materials removes its neutral root/tab fill so the experimental region can composite with the actual desktop; other pages retain their neutral surface. The image and inspector do not inherit the effect layer's opacity. Reduced-transparency settings disable the sliders, hide the experimental tint and restore the opaque fallback, while retaining the selected values for later comparison. Use a varied desktop backdrop and compare focused/unfocused states; native desktop composition still needs direct observation.
 
 In Scenarios, the image list fills the space between the fixed panel header and footer and grows with the window. Each inspector page owns one scroll view; the mode selector, tabs and export footer remain visible. Native overlay scrollers hide automatically without a persistent white gutter. Short settings pages do not force overflow.
+
+## Export capsule
+
+**Export** drives the production `ExportCapsule` with fictional runs; nothing is written to disk, and Show in Finder only reports itself. Choose an ending, batch size and backdrop, then **模拟导出**. The page uses the lab's local accessibility previews, so Reduce Motion skips the reshaping and stroke animations and Reduce Transparency switches the glass to its opaque fallback.
+
+For review captures, `scripts/run-design-lab.sh --design-lab-page=Export --export-lab-play=0|1|2 --export-lab-snapshot=/absolute/prefix` replays success, partial failure or cancellation and writes window captures as the capsule grows (`-grow*`), runs (`-mid*`), completes (`-done*`, `-end`) and collapses (`-collapse*`). Like production, the simulated run starts only once the capsule has finished growing. In Workbench Preview, `--preview-export=/absolute/directory` exports the opened batch there without the save panel, and `--preview-export-capture=/absolute/prefix` captures the real window as it runs. Both flags are Debug-only.
 
 ## Shared button style
 

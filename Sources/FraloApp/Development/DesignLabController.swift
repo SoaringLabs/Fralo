@@ -4,7 +4,7 @@ import FraloDesignSystem
 
 @MainActor
 final class DesignLabState {
-    enum Page: String, CaseIterable { case foundations = "Foundations", components = "Components", materials = "Materials", motion = "Motion", scenarios = "Scenarios" }
+    enum Page: String, CaseIterable { case foundations = "Foundations", components = "Components", materials = "Materials", motion = "Motion", scenarios = "Scenarios", export = "Export" }
     var preferences = DesignPreferences()
     var appearance = 0
     var selectedPage = 0
@@ -13,6 +13,7 @@ final class DesignLabState {
     var materialOpacity = 100.0
     var materialTint = 0.0
     var scenario = ScenarioState()
+    var export = ExportLabState()
     let samples: LabSamples
     init(samples: LabSamples? = nil) { self.samples = samples ?? LabSamples() }
 }
@@ -61,7 +62,7 @@ final class DesignLabController: NSWindowController {
             toggle("模拟减少动态效果", value: state.preferences.reduceMotion) { $0.preferences.reduceMotion = $1 },
             toggle("模拟增强对比度", value: state.preferences.increaseContrast) { $0.preferences.increaseContrast = $1 },
             NSView(), ActionButton("重置实验", role: .quiet) { [weak self] in
-                self?.state.preferences = .init(); self?.state.appearance = 0; self?.state.scenario = .init()
+                self?.state.preferences = .init(); self?.state.appearance = 0; self?.state.scenario = .init(); self?.state.export = .init()
                 self?.state.materialIndex = 0; self?.state.blendingIndex = 0
                 self?.state.materialOpacity = 100; self?.state.materialTint = 0; self?.rebuild()
             }
@@ -71,7 +72,7 @@ final class DesignLabController: NSWindowController {
         motionView = MotionExperiment(state: state)
         let pages: [(String, NSView)] = [
             ("Foundations", LabPages.foundations(state: state)), ("Components", LabPages.components(state: state)),
-            ("Materials", materialView), ("Motion", motionView), ("Scenarios", scenarioView)
+            ("Materials", materialView), ("Motion", motionView), ("Scenarios", scenarioView), ("Export", ExportLab(state: state))
         ]
         tabs = InspectorTabs(pages)
         tabs.selectTabViewItem(at: state.selectedPage)

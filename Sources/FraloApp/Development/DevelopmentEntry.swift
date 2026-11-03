@@ -7,6 +7,7 @@ import FraloDesignSystem
 final class DevelopmentEntry: NSObject {
     /// Deterministic content geometry for native reference-image comparisons.
     func applyPreviewGeometry(to window: NSWindow?) {
+        if let controller = window?.windowController as? MainWindowController { runExportPreviewIfRequested(controller) }
         guard CommandLine.arguments.contains("--workbench-preview"), let window,
               let argument = CommandLine.arguments.first(where: { $0.hasPrefix("--preview-window=") }) else { return }
         let parts = argument.dropFirst("--preview-window=".count).split(separator: "x").compactMap { Double($0) }
@@ -27,6 +28,7 @@ final class DevelopmentEntry: NSObject {
             (view as? DropZoneView)?.preferences = preferences
             (view as? EstimatedSizeView)?.preferences = preferences
             (view as? ViewToolbar)?.preferences = preferences
+            (view as? ExportCapsule)?.preferences = preferences
             (view as? BatchList)?.preferences = preferences
             (view as? ThinScroller)?.preferences = preferences
             (view as? MaterialSurface)?.preferences = preferences
@@ -34,6 +36,29 @@ final class DevelopmentEntry: NSObject {
             view.subviews.forEach(apply)
         }
         if let content = window.contentView { apply(content) }
+    }
+    /// `--preview-export=/absolute/dir` exports the opened batch there after launch, without the save panel;
+    /// `--preview-export-capture=/absolute/prefix` captures the window as the capsule grows, mid-run and at the result.
+    private var exportActivity: NSObjectProtocol?
+    func runExportPreviewIfRequested(_ controller: MainWindowController) {
+        guard CommandLine.arguments.contains("--workbench-preview"),
+              let argument = CommandLine.arguments.first(where: { $0.hasPrefix("--preview-export=") }) else { return }
+        let directory = URL(fileURLWithPath: String(argument.dropFirst("--preview-export=".count)), isDirectory: true)
+        let prefix = CommandLine.arguments.first(where: { $0.hasPrefix("--preview-export-capture=") }).map { String($0.dropFirst("--preview-export-capture=".count)) }
+        exportActivity = ProcessInfo.processInfo.beginActivity(options: .userInitiatedAllowingIdleSystemSleep, reason: "Export preview")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak controller] in
+            guard let controller else { return }
+            controller.previewExport(to: directory)
+            guard let prefix, let number = controller.window?.windowNumber else { return }
+            for (delay, label) in [(0.2, "grow"), (0.9, "mid"), (4.0, "end")] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    let process = Process(); process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+                    process.arguments = ["-x", "-o", "-l", String(number), "\(prefix)-\(label).png"]
+                    try? process.run(); process.waitUntilExit()
+                    FileHandle.standardError.write(Data("export-preview capture \(label)\n".utf8))
+                }
+            }
+        }
     }
     /// `--preview-settings=appearance|updates` opens the real Settings window in Workbench Preview.
     /// `--preview-updates=available` substitutes a fake Sparkle so the enabled state can be reviewed without a signed app.
@@ -113,7 +138,14 @@ final class DevelopmentEntry: NSObject {
     }
     @objc private func openLab(_ sender: Any?) { showLab() }
     func showLab() {
-        if controller == nil { controller = DesignLabController() }
+        if controller == nil {
+            controller = DesignLabController()
+            // `--design-lab-page=Export` opens a page by its tab name for review captures.
+            if let argument = CommandLine.arguments.first(where: { $0.hasPrefix("--design-lab-page=") }),
+               let page = DesignLabState.Page.allCases.firstIndex(where: { $0.rawValue == argument.dropFirst("--design-lab-page=".count) }) {
+                controller?.state.selectedPage = page; controller?.rebuild()
+            }
+        }
         controller?.showWindow(nil); controller?.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
