@@ -19,6 +19,53 @@ final class InspectorGroupsTests: XCTestCase {
         visible(CompactSliderField.self, in: inspector).first { $0.slider.accessibilityLabel() == label }
     }
 
+    @MainActor func testExportSpecificationsFitLocalizedRowsAndStayOutOfTheFixedFooter() throws {
+        _ = NSApplication.shared
+        let originalLanguage = L10n.language; defer { L10n.setLanguage(originalLanguage) }
+        for language in L10n.supportedLanguages {
+            L10n.setLanguage(language)
+            let inspector = CompositionInspector(settings: CompositionSettings())
+            let action = ExportAction(count: 1)
+            let footer = inspector.makeFooter(action: action)
+            let panel = FloatingPanel(header: inspector.mode, body: inspector, footer: footer, bodySpacing: 16)
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1030, height: 640),
+                                  styleMask: [.borderless], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            // The workbench sets the inspector's frame; making it the window's root
+            // lets AppKit grow the window to the controls' intrinsic width instead.
+            panel.frame = NSRect(x: 0, y: 0, width: WorkbenchView.inspectorWidth, height: 560)
+            window.contentView?.addSubview(panel)
+            defer { window.close() }
+            XCTAssertFalse(inspector.outputInfo.isDescendant(of: footer))
+            XCTAssertFalse(inspector.outputSize.isDescendant(of: footer))
+            XCTAssertTrue(action.isDescendant(of: footer))
+            for background in [false, true] {
+                inspector.mode.choose(background ? 1 : 0)
+                if background { inspector.formatPicker.choose(1) }
+                for state in 0...2 {
+                    inspector.outputInfo.stringValue = state == 0 ? "—" : "1444 × 2964"
+                    inspector.showOutputSize(state == 2 ? 12_345_678 : nil, busy: state == 1)
+                    panel.layoutSubtreeIfNeeded()
+                    for value in [inspector.outputInfo, inspector.outputSize] {
+                        XCTAssertTrue(value.isDescendant(of: inspector.exportSettings))
+                        let valueView: NSView = value === inspector.outputSize ? inspector.sizeEstimate : value
+                        let row = try XCTUnwrap(valueView.superview as? NSStackView)
+                        let label = try XCTUnwrap(row.arrangedSubviews.first as? NSTextField)
+                        let labelWidth = (label.stringValue as NSString).size(withAttributes: [.font: try XCTUnwrap(label.font)]).width
+                        let valueWidth = (value.stringValue as NSString).size(withAttributes: [.font: try XCTUnwrap(value.font)]).width
+                        XCTAssertGreaterThanOrEqual(label.bounds.width + 1, labelWidth, "\(language): \(label.stringValue)")
+                        XCTAssertGreaterThanOrEqual(value.bounds.width + 1, valueWidth, "\(language): \(value.stringValue)")
+                        let labelRect = label.alignmentRect(forFrame: label.frame)
+                        let valueRect = valueView.alignmentRect(forFrame: valueView.frame)
+                        XCTAssertLessThanOrEqual(labelRect.maxX + 8, valueRect.minX + 1)
+                        XCTAssertLessThanOrEqual(valueRect.maxX, row.bounds.maxX + 1)
+                        XCTAssertLessThanOrEqual(row.bounds.width, 277, "Exercise the fixed inspector's 276pt form width")
+                    }
+                }
+            }
+        }
+    }
+
     @MainActor func testTransparentModeShowsOnlyDeviceAppearanceAndFixedPNGExport() throws {
         _ = NSApplication.shared
         var settings = CompositionSettings(); settings.format = .jpeg; settings.deviceOpacity = 0.4
@@ -29,7 +76,7 @@ final class InspectorGroupsTests: XCTestCase {
         XCTAssertTrue(inspector.formatPicker.isHiddenOrHasHiddenAncestor || inspector.formatPicker.superview == nil)
         XCTAssertNil(slider(L10n.tr("不透明度"), inspector), "Transparent output is always opaque")
         XCTAssertNil(slider(L10n.tr("画质"), inspector), "JPEG settings never apply to transparent output")
-        XCTAssertNotNil(visible(ValuePicker.self, in: inspector).first { $0.accessibilityLabel() == L10n.tr("文件大小") })
+        XCTAssertNotNil(visible(ValuePicker.self, in: inspector).first { $0.accessibilityLabel() == L10n.tr("压缩") })
         XCTAssertFalse(texts(inspector).contains { $0.contains("iPhone 18") }, "Group titles carry no device summary")
     }
 
@@ -125,7 +172,7 @@ final class InspectorGroupsTests: XCTestCase {
         for picker in pickers {
             XCTAssertEqual(picker.controlSize, tabs.contains(picker.accessibilityLabel() ?? "") ? .large : .regular, picker.accessibilityLabel() ?? "")
         }
-        XCTAssertEqual(Set(pickers.compactMap { $0.accessibilityLabel() }), [L10n.tr("设备类型"), L10n.tr("配色"), L10n.tr("阴影"), L10n.tr("背景类型"), L10n.tr("文件格式"), L10n.tr("文件大小")], "The mode switch lives above the scrolling groups")
+        XCTAssertEqual(Set(pickers.compactMap { $0.accessibilityLabel() }), [L10n.tr("设备类型"), L10n.tr("配色"), L10n.tr("阴影"), L10n.tr("背景类型"), L10n.tr("文件格式"), L10n.tr("压缩")], "The mode switch lives above the scrolling groups")
         XCTAssertEqual(inspector.mode.controlSize, .large)
     }
 

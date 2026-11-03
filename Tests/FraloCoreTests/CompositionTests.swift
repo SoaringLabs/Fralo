@@ -315,6 +315,47 @@ final class CompositionTests: XCTestCase {
         XCTAssertGreaterThan(shadow.width, tight.width); XCTAssertGreaterThan(shadow.height, tight.height)
         XCTAssertEqual(try pixels(shadow)[3], 0, "Shadow needs a transparent outer edge rather than a clipped crop")
     }
+    func testBrowserContentIsFlushAndClippedByTheWindowSilhouette() throws {
+        let source = try solidInput(CGSize(width: 20, height: 60))
+        for browser in BrowserStyle.allCases {
+            for appearance in BrowserAppearance.allCases {
+                for ratio in WindowRatio.allCases {
+                    for limit in [750, 3000] {
+                        var settings = CompositionSettings()
+                        settings.display = .browser; settings.browser = browser
+                        settings.browserAppearance = appearance; settings.windowRatio = ratio
+                        settings.transparentShadow = .none
+                        let rendered = try CompositionRenderer.render(source, settings: settings, maxDimension: limit)
+                        // Read the encoded PNG, so this checks delivered pixels as well as preview rendering.
+                        let image = try ImageInput(data: CompositionRenderer.data(rendered.image, settings: settings), name: "browser.png").decode()
+                        let bytes = try pixels(image), width = image.width, height = image.height
+                        let scale = CGFloat(width) / 1500
+                        let top = Int(ceil((browser == .chrome ? 86 : 64) * scale))
+                        let name = "\(browser)/\(appearance)/\(ratio)/\(limit)"
+                        func pixel(_ x: Int, _ y: Int) -> ArraySlice<UInt8> {
+                            let index = (y * width + x) * 4
+                            return bytes[index..<(index + 4)]
+                        }
+                        // Tall source leaves black letterboxing at both sides. No shell-colored gutter
+                        // or independently rounded upper content corners may show through.
+                        for (x, y) in [(0, top + 1), (width - 1, top + 1),
+                                       (0, height / 2), (width - 1, height / 2),
+                                       (width / 4, height - 1), (width * 3 / 4, height - 1)] {
+                            let value = Array(pixel(x, y))
+                            // A fractional raster edge can be antialiased, but must remain content-colored.
+                            if y == height - 1 { XCTAssertGreaterThan(value[3], 0, name) }
+                            else { XCTAssertEqual(value[3], 255, "\(name) at \(x),\(y)") }
+                            XCTAssertLessThanOrEqual(value[0], 12, "Content must meet the shell edge: \(name) at \(x),\(y)")
+                        }
+                        let inset = Int(3 * scale)
+                        for x in [inset, width - 1 - inset] {
+                            XCTAssertEqual(pixel(x, height - 1 - inset).last, 0, "Content must not escape the lower window corner: \(name)")
+                        }
+                    }
+                }
+            }
+        }
+    }
     func testPreviewReductionKeepsRealOutputSizeAndBackgroundPanBounds() throws {
         for display in DisplayKind.allCases {
             var s = CompositionSettings(); s.display = display; s.transparentShadow = .soft
@@ -363,7 +404,8 @@ final class CompositionTests: XCTestCase {
                     XCTAssertTrue(isSource(inside.0, inside.1), name)
                     if outside.0 >= 0, outside.0 < native.width, outside.1 < native.height { XCTAssertFalse(isSource(outside.0, outside.1), name) }
                 }
-                XCTAssertGreaterThan(layout.cornerRadius, 0, name)
+                if display == .browser { XCTAssertEqual(layout.cornerRadius, 0, name) }
+                else { XCTAssertGreaterThan(layout.cornerRadius, 0, name) }
             }
         }
     }

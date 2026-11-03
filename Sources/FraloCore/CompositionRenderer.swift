@@ -217,11 +217,18 @@ public enum CompositionRenderer {
         return (CGRect(x: rect.minX / native.width, y: rect.minY / native.height, width: rect.width / native.width, height: rect.height / native.height),
                 radius / native.width)
     }
+    /// The same browser silhouette bounds populated output and the empty preview's blank page.
+    public static func browserWindowOutline(in rect: CGRect) -> CGPath {
+        let radius = rect.width * 16 / 1500
+        return CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
+    }
     private static func shellLayout(_ settings: CompositionSettings) -> (size: CGSize, screen: CGRect, radius: CGFloat) {
         let tablet = settings.display == .tablet
         let size = tablet ? (settings.orientation == .portrait ? CGSize(width: 1100, height: 1442) : CGSize(width: 1442, height: 1100)) : CGSize(width: 1500, height: 1500 / settings.windowRatio.ratio)
-        let screen = tablet ? CGRect(origin: .zero, size: size).insetBy(dx: 38, dy: 38) : CGRect(x: 2, y: settings.browser == .chrome ? 86 : 64, width: size.width - 4, height: size.height - (settings.browser == .chrome ? 88 : 66))
-        return (size, screen, tablet ? 30 : 4)
+        let toolbarHeight: CGFloat = settings.browser == .chrome ? 86 : 64
+        let screen = tablet ? CGRect(origin: .zero, size: size).insetBy(dx: 38, dy: 38)
+            : CGRect(x: 0, y: toolbarHeight, width: size.width, height: size.height - toolbarHeight)
+        return (size, screen, tablet ? 30 : 0)
     }
     private static func shell(_ input: ImageInput, settings: CompositionSettings, maxDimension: Int?) throws -> RenderedComposition {
         let tablet = settings.display == .tablet
@@ -236,7 +243,18 @@ public enum CompositionRenderer {
         let dark = settings.browserAppearance == .dark
         let bodyColor = tablet ? CGColor(srgbRed: 0.12, green: 0.13, blue: 0.14, alpha: 1)
             : dark ? CGColor(srgbRed: 0.16, green: 0.16, blue: 0.17, alpha: 1) : CGColor(srgbRed: 0.92, green: 0.92, blue: 0.93, alpha: 1)
-        fill(CGRect(origin: .zero, size: size), radius: tablet ? 62 : 16, color: bodyColor, context: context)
+        let body = CGRect(origin: .zero, size: size)
+        if tablet {
+            fill(body, radius: 62, color: bodyColor, context: context)
+        } else {
+            // One window silhouette owns every browser edge. Content meets the toolbar
+            // at a square seam and reaches the sides/bottom without escaping its corners.
+            context.addPath(browserWindowOutline(in: body))
+            context.clip()
+            context.setFillColor(CGColor(gray: 0.04, alpha: 1)); context.fill(body)
+            context.setFillColor(bodyColor)
+            context.fill(CGRect(x: 0, y: 0, width: size.width, height: screen.minY))
+        }
         if tablet {
             context.setStrokeColor(CGColor(gray: 0.55, alpha: 1)); context.setLineWidth(3)
             context.addPath(CGPath(roundedRect: CGRect(origin: .zero, size: size).insetBy(dx: 3, dy: 3), cornerWidth: 60, cornerHeight: 60, transform: nil)); context.strokePath()

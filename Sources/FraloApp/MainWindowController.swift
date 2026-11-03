@@ -450,8 +450,13 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private func selectionChanged() { updateActions(); requestPreview() }
     private func refreshList() {
         itemIndices = Dictionary(uniqueKeysWithValues: items.enumerated().map { ($0.element.input.id, $0.offset) })
-        list.update(items.map { BatchEntry(id: $0.input.id, title: $0.input.name, detail: $0.pixelSize.map { "\(Int($0.width)) × \(Int($0.height))" } ?? "",
-                                           image: $0.thumbnail, failed: $0.error != nil) })
+        list.update(items.map { batchEntry(for: $0) })
+    }
+    private func batchEntry(for item: Item) -> BatchEntry {
+        let dimensions = item.pixelSize.map { "\(Int($0.width)) × \(Int($0.height))" }
+        return BatchEntry(id: item.input.id, title: item.input.name, detail: dimensions ?? "",
+                          detailToolTip: dimensions.map { L10n.tr("原图尺寸：\($0) 像素") },
+                          image: item.thumbnail, failed: item.error != nil)
     }
     @objc private func batchMenu(_ sender: NSButton) {
         let menu = batchItemsMenu()
@@ -541,9 +546,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
                 self.items[index].thumbnail = nil; self.items[index].error = error.localizedDescription
             }
             let item = self.items[index]
-            self.list.updateEntry(BatchEntry(id: id, title: item.input.name,
-                detail: item.pixelSize.map { "\(Int($0.width)) × \(Int($0.height))" } ?? "",
-                image: item.thumbnail, failed: item.error != nil), at: index)
+            self.list.updateEntry(self.batchEntry(for: item), at: index)
         }
     }
     private func requestPreview(preservePositioning: Bool = false) {
@@ -556,11 +559,11 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         }
         previewRequest += 1; renderWork?.cancel(); rendered = nil; renderedID = nil
         previewToken.cancel(); let token = CancellationToken(); previewToken = token
-        inspectorUI.showOutputSize(nil)
+        inspectorUI.showOutputSize(nil, busy: selectedIndex != nil)
         guard let index = selectedIndex else {
             canvas.image = nil; showEmptyGuidance(); emptyStage.isHidden = false
             previewScroll.isHidden = true; footer.isHidden = true; filename.stringValue = ""; position.stringValue = ""
-            window?.title = "Fralo"; dimensions.stringValue = L10n.tr("尚无成品"); inspectorUI.outputInfo.stringValue = L10n.tr("添加截图后显示尺寸"); viewing.finishPreviewUpdate(); updateActions(); return
+            window?.title = "Fralo"; dimensions.stringValue = L10n.tr("尚无成品"); inspectorUI.outputInfo.stringValue = "—"; viewing.finishPreviewUpdate(); updateActions(); return
         }
         let input = items[index].input, snapshot = settings, generation = previewRequest
         window?.title = input.name; filename.stringValue = input.name; position.stringValue = "\(index + 1) / \(items.count)"
@@ -587,8 +590,8 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
                         self.backgroundImageSize = backgroundSize
                         if let row = self.items.firstIndex(where: { $0.input.id == input.id }), self.items[row].error != nil { self.items[row].error = nil; self.refreshList() }
                         self.dimensions.toolTip = L10n.tr("原始图片：\(input.name) · \(Int(sourceSize.width)) × \(Int(sourceSize.height))")
-                        self.inspectorUI.outputInfo.stringValue = "\(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height)) px"
-                        self.inspectorUI.showOutputSize(byteCount)
+                        self.inspectorUI.outputInfo.stringValue = "\(Int(frame.pixelSize.width)) × \(Int(frame.pixelSize.height))"
+                        self.inspectorUI.showOutputSize(byteCount, busy: byteCount == nil && !self.isExporting)
                         self.positioningLayers = frame.previewLayers
                         self.canvas.finishPositioningArtwork(discard: true)
                         if let layers = frame.previewLayers {
@@ -603,6 +606,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
                         self.emptyStage.isHidden = true; self.layoutPreview()
                         if byteCount == nil { self.calculateCurrentSize() }
                     case .failure(let error):
+                        self.inspectorUI.showOutputSize(nil)
                         self.positioningLayers = nil; self.canvas.finishPositioningArtwork(discard: true)
                         self.canvas.image = nil; self.emptyStage.isHidden = false
                         self.emptyAction.title = L10n.tr("重试预览"); self.emptyAction.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: nil)

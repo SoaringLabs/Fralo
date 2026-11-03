@@ -39,12 +39,14 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
     private let menu: NSMenu
     private let document = HeaderDocument()
     private var sidebarHidden = false
+    let help: ToolbarHelp
     var controlViews: [NSView] { toolbar.items.compactMap(\.view) }
     var controlMenus: [NSMenu] { [menu] }
 
     init(owner: MainWindowController, splitView: NSSplitView, menu: NSMenu, sidebarHidden: Bool) {
         self.owner = owner; self.splitView = splitView; self.menu = menu
         self.sidebarHidden = sidebarHidden
+        help = ToolbarHelp(window: owner.window)
         super.init()
         toolbar.delegate = self; toolbar.displayMode = .iconOnly; toolbar.allowsUserCustomization = false
     }
@@ -94,6 +96,10 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
         let image = NSImage(systemSymbolName: symbol, accessibilityDescription: title)!
         let button = NSButton(image: image, target: owner, action: action)
         button.bezelStyle = .toolbar; button.setButtonType(.momentaryPushIn)
+        if identifier == "copyCurrent" {
+            let pointSize = button.font?.pointSize ?? NSFont.systemFontSize
+            button.symbolConfiguration = .init(pointSize: pointSize * 0.95, weight: .regular)
+        }
         button.setAccessibilityLabel(title); button.toolTip = title
         // Match the Notes two-action cluster: 44 pt between the icon centers.
         button.widthAnchor.constraint(equalToConstant: 44).isActive = true
@@ -125,5 +131,10 @@ final class WorkbenchHeader: NSObject, NSToolbarDelegate {
         toolbar.items.first { $0.itemIdentifier.rawValue == "inspector" }?.toolTip = title
         toolbar.items.first { $0.itemIdentifier.rawValue == "copyCurrent" }?.isEnabled = canCopy
         toolbar.items.first { $0.itemIdentifier.rawValue == "exportCurrent" }?.isEnabled = canExport
+        help.configure(toolbar.items.compactMap { item in
+            guard ["add", "sidebar", "copyCurrent", "exportCurrent", "inspector", "more"].contains(item.itemIdentifier.rawValue),
+                  let text = item.toolTip else { return nil }
+            return (item, text)
+        })
     }
 }
