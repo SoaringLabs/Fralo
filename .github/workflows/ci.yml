@@ -35,7 +35,7 @@ jobs:
       - name: Unit tests
         env:
           FRALO_TEST_ARTIFACTS: ${{ runner.temp }}/fralo-test-artifacts
-        run: swift test
+        run: swift test --build-system native
       - name: Preserve failing output buffers
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -46,8 +46,12 @@ jobs:
       - name: Preview process handoff tests
         run: python3 -B scripts/test_stop_preview_processes.py
       - name: Build App and CLI
-        run: swift build -c release
+        run: swift build --build-system native -c release
       - name: CLI integration checks
-        run: python3 scripts/verify_cli.py "$(swift build -c release --show-bin-path)/fralo"
+        run: python3 scripts/verify_cli.py "$(swift build --build-system native -c release --show-bin-path)/fralo"
+      - name: Agent CLI contracts and executable documentation
+        run: python3 -B scripts/verify_agent_cli.py "$(swift build --build-system native -c release --show-bin-path)/fralo"
+      - name: CLI and GUI composition output parity
+        run: FRALO_CLI_BINARY="$(swift build --build-system native -c release --show-bin-path)/fralo" swift test --build-system native --skip-build --filter CLICompositionReferenceTests
       - name: Public source checks
         run: python3 scripts/check_public_source.py

@@ -14,7 +14,8 @@
 [![Swift](https://img.shields.io/badge/Swift-5.10-F05138?logo=swift&logoColor=white)](Package.swift)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-[**Download**](https://github.com/SoaringLabs/Fralo/releases/latest) ·
+[**Download the macOS App**](https://github.com/SoaringLabs/Fralo/releases/latest) ·
+[**CLI quickstart**](#command-line-interface) ·
 [Changelog](CHANGELOG.md) ·
 [Install guide](INSTALL.md) ·
 [Contributing](CONTRIBUTING.md)
@@ -140,52 +141,89 @@ Both single-image and batch exports ask for a save location and create a new `fr
 
 ## Command-line interface
 
-The `fralo` CLI ships inside the App and renders transparent phone frames without opening
-the App window:
+Turn screenshots into finished mockups from a terminal or an Agent. `fralo compose`
+uses the same renderer as the App for phone, tablet, and browser frames, with
+transparent PNG or background compositions in PNG or JPEG.
+
+Use a build that includes `compose`. If `fralo` is outside your PATH, use the
+bundled executable at `/Applications/Fralo.app/Contents/MacOS/fralo`.
+
+### Set up the look in the App, export the batch from the terminal
+
+Open a representative screenshot in Fralo and adjust the frame, background,
+and layout in the preview. Once you're happy with the saved composition, point
+the CLI at the folder you want to render.
 
 ```bash
-/Applications/Fralo.app/Contents/MacOS/fralo --help
+fralo compose ./screenshots --output ./framed --app-settings --dry-run --json
+fralo compose ./screenshots --output ./framed --app-settings --json
 ```
 
-Fralo never edits your `PATH`; link or copy the binary yourself if you want it there.
+`--app-settings` reads the saved workbench settings at the start of each run.
+Preflight lists the planned output without creating files or directories.
+
+### Reproduce the sample with a recipe
+
+Run these commands from the repository root to try a self-contained recipe.
 
 ```bash
-# List available device models
-fralo models
-
-# Frame every PNG/JPEG in a folder
-fralo render ./screenshots --output ./framed
-
-# Pick a model and orientation, and print a JSON report
-fralo render one.png two.jpg --output ./framed \
-  --model iphone-18-pro-max --orientation portrait --json
+fralo example phone > phone.json
+fralo compose examples/01-today.png --output ./framed --config phone.json --dry-run --json
+fralo compose examples/01-today.png --output ./framed --config phone.json --json
 ```
 
-| Option | Description |
+<p align="center">
+  <img src="docs/assets/cli-compose.png" width="270" alt="Actual Fralo CLI output showing the Field Notes screenshot in an iPhone frame on a warm textured background">
+</p>
+
+The phone recipe exports the image shown here as `framed/01-today-fralo.png`
+on a 1350 × 2400 canvas.
+
+### From command to script
+
+`--json` sends one structured report to stdout and keeps progress on stderr.
+Here are selected fields from a fresh export of the phone recipe above.
+
+```json
+{
+  "status": "completed",
+  "succeeded": 1,
+  "failed": 0,
+  "outputFormat": "png"
+}
+```
+
+Each entry includes the input, output path, and status. If one image fails,
+the batch can still export the others. Scripts can detect that with exit code
+`1` and use each failed entry's error code. Existing outputs are skipped by default.
+
+| Discover | Command |
 | --- | --- |
-| `--output`, `-o <dir>` | Output directory (required) |
-| `--input`, `-i <path>` | Additional input; repeatable. Folders are not read recursively. |
-| `--model <id>` | Device model, for example `iphone-18-pro-max`. See `fralo models`. |
-| `--orientation <value>` | `portrait` or `landscape` |
-| `--overwrite` | Replace existing output files. Inputs are always protected. |
-| `--json` | Write a JSON result to stdout; progress goes to stderr. |
+| Offline guide and workflow | `fralo guide` |
+| Available commands and formats | `fralo capabilities --json` |
+| Configuration fields, defaults, and allowed values | `fralo schema --json` |
 
-The CLI renders all six iPhone 16, 17, and 18 Pro and Pro Max frames. Settings resolve as
-built-in defaults → settings saved by the App → flags on this run; flags never write back to
-the App. Output files are named `<name>-fralo.png`.
+### Hand the batch to an Agent
+
+> Read the offline guide with `fralo guide`. Use my saved App composition
+> to render `./screenshots` into `./framed`. Run preflight with
+> `--app-settings --dry-run --json` first. If it reports errors, tell me which
+> inputs need attention before exporting. Otherwise, export with
+> `--app-settings --json` and report the output paths, skipped files, and any
+> failures with their error codes.
+
+See the [full CLI guide](docs/cli.md) for all options, examples, and exit codes.
 
 <details>
-<summary><b>Configuration and exit codes</b></summary>
+<summary><b>Legacy phone framing commands</b></summary>
 
-Settings live in `~/Library/Application Support/Fralo/settings.json`. Set
-`FRALO_SETTINGS_PATH` to use a separate file for scripts and tests.
+Use `fralo render` for the original transparent phone framing workflow.
+`fralo models` lists the six supported legacy iPhone models, and
+`fralo settings` shows the legacy configuration.
 
-| Exit code | Meaning |
-| --- | --- |
-| `0` | Finished (some files may have been skipped) |
-| `1` | One or more images failed |
-| `2` | Invalid arguments or startup error |
-| `130` | Canceled with Ctrl-C; finished files are kept |
+```bash
+fralo render ./screenshots --output ./framed --model iphone-18-pro-max --json
+```
 
 </details>
 
@@ -256,7 +294,7 @@ optionally set `GITHUB_TOKEN` or `GH_TOKEN` if rate-limited. Offline checks for 
 - Device frames are original, parametric drawings. They are not Apple's official frames or
   photo-accurate templates, and no official Apple device artwork is included.
 - Screenshots are never stretched. The App always shows the whole screenshot inside the
-  device screen. The CLI fills the screen and allows up to 3% cropping; images whose aspect
+  device screen. The legacy `render` command fills the screen and allows up to 3% cropping; images whose aspect
   ratio differs more than that are reported as failed.
 - Fralo does not edit screenshot content, correct orientation, or add captions.
 
