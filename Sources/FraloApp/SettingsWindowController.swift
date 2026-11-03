@@ -228,8 +228,8 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         }
         self.picker = picker
         return [SettingsGroup(L10n.tr("界面"), rows: [
-            SettingsGroup.row(L10n.tr("外观"), detail: L10n.tr("选择浅色、深色，或随系统自动切换。"), control: picker, searchID: SettingsSearch.Row.appearance)
-        ], footer: L10n.tr("更改会自动保存，并即时应用到 Fralo 的所有窗口。")), languageGroup()]
+            SettingsGroup.row(L10n.tr("外观"), detail: nil, control: picker, searchID: SettingsSearch.Row.appearance)
+        ]), languageGroup()]
     }
 
     private func languageGroup() -> NSView {

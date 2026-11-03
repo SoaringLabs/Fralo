@@ -49,8 +49,8 @@ built on the same Core Graphics rendering core.
   placed 1:1, without resampling. Rounded corners and the Dynamic Island are masked
   automatically.
 - **PNG or JPEG.** Lossless PNG, smaller PNG presets, or JPEG with quality and fill color.
-- **Safe exports.** Existing files are skipped unless you choose to overwrite, originals are
-  never touched, exports can be canceled, and one failed image does not stop the batch.
+- **Safe exports.** The App keeps existing files and adds a number when a name is taken.
+  Originals are preserved, exports can be canceled, and one failed image does not stop the batch.
 - **A real Mac app.** Native sidebar, toolbar, menus, keyboard shortcuts, undo and redo,
   English, Simplified Chinese, Traditional Chinese, and Japanese, light and dark appearance,
   and support for Reduce Motion, Reduce Transparency, and Increase Contrast.
@@ -115,6 +115,8 @@ fall back to English.
    actual pixels with ⌘1.
 5. **Export.** ⇧⌘E exports the whole batch to a folder, ⌘E exports the current image, and
    ⌘C copies the current result at full resolution.
+
+Both single-image and batch exports ask for a save location and create a new `fralo-YYYYMMDD-HHmmss` folder there for that export. A single-image export also lets you edit the filename. The App names files `fralo-<original-name>-YYYYMMDD-HHmmss.png` (or `.jpg`), using local time and one timestamp per export. Existing names receive `-2`, `-3`, and so on. All images from that export go inside the new folder; if its name is taken, a numbered folder is created instead. The completion dialog opens that folder. The CLI keeps its stable `<name>-fralo.png` names and explicit `--overwrite` behavior.
 
 <details>
 <summary><b>Keyboard shortcuts</b></summary>

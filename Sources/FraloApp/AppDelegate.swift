@@ -130,7 +130,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             value.target = controller; value.keyEquivalentModifierMask = modifiers; menu.addItem(value)
         }
         item(file, L10n.tr("添加图片…"), #selector(MainWindowController.addImages(_:)), "o")
-        item(file, L10n.tr("导入文件夹…"), #selector(MainWindowController.addFolder(_:)), "o", modifiers: [.command, .shift])
+        item(file, L10n.tr("从文件夹添加图片…"), #selector(MainWindowController.addFolder(_:)), "o", modifiers: [.command, .shift])
         item(file, L10n.tr("新批次"), #selector(MainWindowController.newBatch(_:)), "n")
         file.addItem(.separator())
         item(file, L10n.tr("导出全部…"), #selector(MainWindowController.exportAll(_:)), "e", modifiers: [.command, .shift])

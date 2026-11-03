@@ -34,7 +34,7 @@ final class PanelPolishTests: XCTestCase {
         XCTAssertEqual(inspectorAction.action, #selector(MainWindowController.toggleInspector(_:)))
         XCTAssertFalse(try XCTUnwrap(toolbar.items.first { $0.itemIdentifier.rawValue == "document" }).isBordered)
         XCTAssertEqual(Array(toolbar.items.suffix(6).map(\.itemIdentifier)), [.init("copyCurrent"), .init("exportCurrent"), .space, .init("inspector"), .space, .init("more")])
-        XCTAssertEqual(more.menu.items.filter { !$0.isSeparatorItem }.map(\.title), [L10n.tr("添加图片…"), L10n.tr("导入文件夹…"), L10n.tr("粘贴图片"), L10n.tr("删除"), L10n.tr("清空所有"), L10n.tr("设置…")])
+        XCTAssertEqual(more.menu.items.filter { !$0.isSeparatorItem }.map(\.title), [L10n.tr("添加图片…"), L10n.tr("从文件夹添加图片…"), L10n.tr("粘贴图片"), L10n.tr("删除"), L10n.tr("清空所有"), L10n.tr("设置…")])
         XCTAssertTrue(more.menu.items.filter { !$0.isSeparatorItem }.allSatisfy { $0.image?.isTemplate == true })
         if #available(macOS 27.0, *) { XCTAssertTrue(more.menu.items.filter { !$0.isSeparatorItem }.allSatisfy { $0.value(forKey: "preferredImageVisibility") as? Int == 1 }) }
         XCTAssertEqual(more.menu.items.filter { !$0.isSeparatorItem }.map(\.keyEquivalent), ["o", "o", "v", "\u{8}", "", ","])

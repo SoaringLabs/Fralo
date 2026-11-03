@@ -337,7 +337,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private func moreMenu() -> NSMenu {
         let menu = NSMenu()
         menu.addItem(actionItem(L10n.tr("添加图片…"), #selector(addImages(_:)), symbol: "photo.badge.plus", key: "o"))
-        menu.addItem(actionItem(L10n.tr("导入文件夹…"), #selector(addFolder(_:)), symbol: "folder.badge.plus", key: "o", modifiers: [.command, .shift]))
+        menu.addItem(actionItem(L10n.tr("从文件夹添加图片…"), #selector(addFolder(_:)), symbol: "folder.badge.plus", key: "o", modifiers: [.command, .shift]))
         menu.addItem(actionItem(L10n.tr("粘贴图片"), #selector(pasteImage(_:)), symbol: "doc.on.clipboard", key: "v"))
         menu.addItem(.separator())
         batchItemsMenu().items.forEach { $0.menu?.removeItem($0); menu.addItem($0) }
@@ -465,13 +465,13 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     @objc func addImages(_ sender: Any?) {
         guard !isExporting else { return }
         let panel = NSOpenPanel(); panel.allowedContentTypes = [.png, .jpeg]; panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false; panel.message = L10n.tr("选择要套框的截图")
+        panel.canChooseDirectories = false; panel.message = L10n.tr("选择要添加的图片"); panel.prompt = L10n.tr("添加")
         panel.beginSheetModal(for: window!) { [weak self] response in if response == .OK { self?.importURLs(panel.urls) } }
     }
     @objc func addFolder(_ sender: Any?) {
         guard !isExporting else { return }
         let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.allowsMultipleSelection = false
-        panel.message = L10n.tr("导入文件夹当前层的 PNG / JPEG 图片")
+        panel.message = L10n.tr("添加文件夹当前层的 PNG / JPEG 图片"); panel.prompt = L10n.tr("添加")
         panel.beginSheetModal(for: window!) { [weak self] response in if response == .OK { self?.importURLs(panel.urls) } }
     }
     func importURLs(_ urls: [URL]) {
@@ -736,28 +736,51 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         }
     }
     @objc func exportAll(_ sender: Any?) {
-        guard !items.isEmpty, !isExporting else { return }
-        window?.makeFirstResponder(nil)
-        let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.canCreateDirectories = true
-        panel.prompt = L10n.tr("导出"); panel.message = L10n.tr("选择输出文件夹")
-        let overwrite = NSButton(checkboxWithTitle: L10n.tr("覆盖已有同名输出文件"), target: nil, action: nil); panel.accessoryView = overwrite
-        panel.beginSheetModal(for: window!) { [weak self] response in
-            guard response == .OK, let directory = panel.url, let self else { return }
-            self.startExport(self.items.map(\.input), directory: directory, overwrite: overwrite.state == .on)
-        }
+        chooseExportDirectory(for: items.map(\.input))
     }
     @objc func exportCurrent(_ sender: Any?) {
         guard let index = selectedIndex, !isExporting else { return }
+        chooseExportDirectory(for: [items[index].input])
+    }
+    private func chooseExportDirectory(for inputs: [ImageInput]) {
+        guard !inputs.isEmpty, !isExporting else { return }
         window?.makeFirstResponder(nil)
-        let input = items[index].input
-        let panel = NSSavePanel(); panel.allowedContentTypes = [settings.outputFormat == .png ? .png : .jpeg]; panel.canCreateDirectories = true
-        panel.nameFieldStringValue = BatchExporter.outputNames(for: [input], format: settings.outputFormat)[0]
+        let format = settings.outputFormat
+        let date = Date()
+        let names = BatchExporter.outputNames(for: inputs, format: format, date: date)
+        let folderName = BatchExporter.exportFolderName(for: date)
+        let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false; panel.canCreateDirectories = true
+        panel.prompt = L10n.tr("导出"); panel.message = L10n.tr("选择保存位置")
+        let folderInfo = label(L10n.tr("新建文件夹：\(folderName)"), size: 12, secondary: true)
+        var accessoryRows: [NSView] = [folderInfo]
+        let nameField: NSTextField?
+        if inputs.count == 1 {
+            let field = NSTextField(string: names[0]); field.setAccessibilityLabel(L10n.tr("文件名"))
+            field.widthAnchor.constraint(equalToConstant: 320).isActive = true
+            let row = NSStackView(views: [label(L10n.tr("文件名")), field])
+            row.orientation = .horizontal; row.alignment = .centerY; row.spacing = 10
+            accessoryRows.append(row)
+            nameField = field
+        } else { nameField = nil }
+        let accessory = NSStackView(views: accessoryRows)
+        accessory.orientation = .vertical; accessory.alignment = .leading; accessory.spacing = 10
+        panel.accessoryView = accessory; panel.isAccessoryViewDisclosed = true
         panel.beginSheetModal(for: window!) { [weak self] response in
-            guard response == .OK, let url = panel.url else { return }
-            self?.startExport([input], directory: url.deletingLastPathComponent(), overwrite: true, names: [url.lastPathComponent])
+            guard response == .OK, let directory = panel.url else { return }
+            var outputNames = names
+            if let nameField {
+                let typed = nameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !typed.isEmpty {
+                    let ext = (typed as NSString).pathExtension.lowercased()
+                    let validExtensions = format == .png ? ["png"] : ["jpg", "jpeg"]
+                    outputNames[0] = validExtensions.contains(ext) ? typed : typed + (format == .png ? ".png" : ".jpg")
+                }
+            }
+            self?.startExport(inputs, directory: directory, names: outputNames, date: date)
         }
     }
-    private func startExport(_ inputs: [ImageInput], directory: URL, overwrite: Bool, names: [String]? = nil) {
+    private func startExport(_ inputs: [ImageInput], directory: URL, names: [String], date: Date) {
         let snapshot = settings, token = CancellationToken()
         let backdrop: Data?
         do { backdrop = try CompositionRenderer.backgroundData(snapshot) } catch { showError(error.localizedDescription); return }
@@ -777,7 +800,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         progressPanel = panel; window?.beginSheet(panel)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let result = Result {
-                try BatchExporter.run(inputs: inputs, settings: RenderSettings(model: snapshot.phoneModel, orientation: snapshot.orientation), directory: directory, overwrite: overwrite, cancellation: token, outputNames: names, composition: snapshot, backgroundData: backdrop) { progress in
+                try BatchExporter.runInNewDirectory(inputs: inputs, settings: RenderSettings(model: snapshot.phoneModel, orientation: snapshot.orientation), parentDirectory: directory, date: date, cancellation: token, outputNames: names, composition: snapshot, backgroundData: backdrop) { progress in
                     DispatchQueue.main.async { count.stringValue = L10n.tr("已完成 \(progress.completed) / \(progress.total)"); current.stringValue = L10n.tr("正在处理：\(progress.currentName)"); bar.doubleValue = Double(progress.completed) }
                 }
             }
@@ -787,12 +810,13 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
                 self.updateNotice = nil
                 if self.quitAfterExport { NSApp.reply(toApplicationShouldTerminate: true); return }
                 switch result {
-                case .success(let report):
+                case .success(let output):
+                    let report = output.report
                     // Keep cancellation/failure/skip summaries visible before installing.
                     // A wholly successful export can hand off directly without a blocking sheet.
                     if report.failed == 0 && report.skipped == 0 && !report.cancelled,
                        self.onExportFinished?() == true { return }
-                    self.showReport(report, directory: directory)
+                    self.showReport(report, directory: output.directory)
                 case .failure(let error): self.showError(error.localizedDescription)
                 }
             }

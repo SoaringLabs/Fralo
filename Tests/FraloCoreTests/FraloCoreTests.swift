@@ -109,7 +109,7 @@ final class FraloCoreTests: XCTestCase {
         let repeatReport = try BatchExporter.run(inputs: [good], settings: RenderSettings(model: .iPhone16Pro), directory: folder)
         XCTAssertEqual(repeatReport.skipped, 1)
         XCTAssertEqual(before, try Data(contentsOf: folder.appendingPathComponent("screen-fralo.png")))
-        let replaced = try BatchExporter.run(inputs: [good], settings: RenderSettings(model: .iPhone16Pro), directory: folder, overwrite: true)
+        let replaced = try BatchExporter.run(inputs: [good], settings: RenderSettings(model: .iPhone16Pro), directory: folder, collisionPolicy: .replace)
         XCTAssertEqual(replaced.succeeded, 1); XCTAssertNotEqual(before, try Data(contentsOf: folder.appendingPathComponent("screen-fralo.png")))
         let decoded = try JSONDecoder().decode(ExportReport.self, from: JSONEncoder().encode(report))
         XCTAssertEqual(decoded.failed, 1)
@@ -138,7 +138,171 @@ final class FraloCoreTests: XCTestCase {
         let input = try source(), url = folder.appendingPathComponent("original.png")
         try input.data!.write(to: url)
         let before = try Data(contentsOf: url)
-        let report = try BatchExporter.run(inputs: [ImageInput(url: url)], settings: RenderSettings(), directory: folder, overwrite: true, outputNames: ["original.png"])
+        let report = try BatchExporter.run(inputs: [ImageInput(url: url)], settings: RenderSettings(), directory: folder, collisionPolicy: .replace, outputNames: ["original.png"])
         XCTAssertEqual(report.failed, 1); XCTAssertEqual(before, try Data(contentsOf: url))
+    }
+
+    func testTimestampedNamesShareLocalTimeAndPreserveSourceStems() throws {
+        let inputs = try [source(name: "首页 v2.png"), source(name: "首页 v2.jpg"), source(name: "settings.jpeg")]
+        let date = Date(timeIntervalSince1970: 0), zone = try XCTUnwrap(TimeZone(secondsFromGMT: 8 * 3600))
+        let png = BatchExporter.outputNames(for: inputs, date: date, timeZone: zone)
+        XCTAssertEqual(png, ["fralo-首页 v2-19700101-080000.png", "fralo-首页 v2-19700101-080000-2.png", "fralo-settings-19700101-080000.png"])
+        XCTAssertEqual(BatchExporter.outputNames(for: [inputs[0]], date: date, timeZone: zone)[0], png[0])
+        XCTAssertEqual(BatchExporter.outputNames(for: inputs, format: .jpeg, date: date, timeZone: zone),
+                       png.map { ($0 as NSString).deletingPathExtension + ".jpg" })
+    }
+
+    func testKeepBothNumbersRepeatedExportsAndPreservesExistingBytes() throws {
+        let preferred = folder.appendingPathComponent("fralo-screen-19700101-080000.png")
+        let existing = Data("existing file".utf8); try existing.write(to: preferred)
+        let input = try source()
+        for suffix in [2, 3] {
+            let report = try BatchExporter.run(inputs: [input], settings: .init(), directory: folder,
+                                              collisionPolicy: .keepBoth, outputNames: [preferred.lastPathComponent])
+            XCTAssertEqual(report.succeeded, 1); XCTAssertEqual(report.skipped, 0)
+            XCTAssertEqual(URL(fileURLWithPath: report.entries[0].output).lastPathComponent, "fralo-screen-19700101-080000-\(suffix).png")
+            XCTAssertEqual(try Data(contentsOf: preferred), existing)
+            XCTAssertNoThrow(try ImageInput(url: URL(fileURLWithPath: report.entries[0].output)).decode())
+        }
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: folder.path).count, 3, "No temporary files remain")
+    }
+
+    func testKeepBothPreservesSourceWhenItsNameIsChosenForOutput() throws {
+        let input = try source(), url = folder.appendingPathComponent("original.png")
+        try input.data!.write(to: url)
+        let before = try Data(contentsOf: url)
+        let report = try BatchExporter.run(inputs: [ImageInput(url: url)], settings: .init(), directory: folder,
+                                          collisionPolicy: .keepBoth, outputNames: ["original.png"])
+        XCTAssertEqual(report.succeeded, 1)
+        XCTAssertEqual(URL(fileURLWithPath: report.entries[0].output).lastPathComponent, "original-2.png")
+        XCTAssertEqual(try Data(contentsOf: url), before)
+    }
+
+    func testKeepBothTreatsExistingDirectoryAsOccupiedFileName() throws {
+        let occupied = folder.appendingPathComponent("image.png", isDirectory: true)
+        try FileManager.default.createDirectory(at: occupied, withIntermediateDirectories: false)
+        let result = try BatchExporter.run(inputs: [source()], settings: .init(), directory: folder,
+                                          collisionPolicy: .keepBoth, outputNames: ["image.png"])
+        XCTAssertEqual(result.succeeded, 1)
+        XCTAssertEqual(URL(fileURLWithPath: result.entries[0].output).lastPathComponent, "image-2.png")
+        XCTAssertNoThrow(try ImageInput(url: URL(fileURLWithPath: result.entries[0].output)).decode())
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: occupied.path), [])
+    }
+
+    func testAvailableNameSkipsDirectoriesDanglingSymlinksAndReservedBatchNames() throws {
+        let target = folder.appendingPathComponent("image.png")
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: false)
+        let link = folder.appendingPathComponent("image-2.png")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: folder.appendingPathComponent("missing"))
+        XCTAssertEqual(BatchExporter.availableOutputURL(for: target, reservingFileNames: ["image-3.png"]).lastPathComponent, "image-4.png")
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: link.path), folder.appendingPathComponent("missing").path)
+    }
+
+    func testKeepBothReservesOtherBatchNamesAndRetainsFailedInputReporting() throws {
+        try Data("existing".utf8).write(to: folder.appendingPathComponent("same.png"))
+        let input = try source(), bad = ImageInput(data: Data("bad".utf8), name: "broken.png")
+        let report = try BatchExporter.run(inputs: [input, input, bad], settings: .init(), directory: folder,
+                                          collisionPolicy: .keepBoth, outputNames: ["same.png", "same-2.png", "bad.png"])
+        XCTAssertEqual(report.succeeded, 2); XCTAssertEqual(report.failed, 1)
+        XCTAssertEqual(report.entries.prefix(2).map { URL(fileURLWithPath: $0.output).lastPathComponent }, ["same-3.png", "same-2.png"])
+        XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("same.png")), Data("existing".utf8))
+    }
+
+    func testConcurrentKeepBothExportsNeverReplaceEachOther() async throws {
+        let input = try source(), directory = try XCTUnwrap(folder)
+        let reports = try await withThrowingTaskGroup(of: ExportReport.self, returning: [ExportReport].self) { group in
+            for _ in 0..<2 {
+                group.addTask {
+                    try BatchExporter.run(inputs: [input], settings: .init(), directory: directory,
+                                          collisionPolicy: .keepBoth, outputNames: ["same.png"])
+                }
+            }
+            var reports: [ExportReport] = []
+            for try await report in group { reports.append(report) }
+            return reports
+        }
+        XCTAssertTrue(reports.allSatisfy { $0.succeeded == 1 })
+        XCTAssertEqual(Set(reports.flatMap { $0.entries.map(\.output) }).count, 2)
+        XCTAssertEqual(Set(try FileManager.default.contentsOfDirectory(atPath: directory.path)), ["same.png", "same-2.png"])
+    }
+
+    func testSingleExportCreatesFolderWithMatchingImageTimestamp() throws {
+        let result = try BatchExporter.runInNewDirectory(inputs: [source()], settings: .init(), parentDirectory: folder,
+                                                        date: Date(timeIntervalSince1970: 0), timeZone: try XCTUnwrap(TimeZone(secondsFromGMT: 28800)))
+        XCTAssertEqual(result.directory.lastPathComponent, "fralo-19700101-080000")
+        XCTAssertEqual(result.directory.deletingLastPathComponent().standardizedFileURL, folder.standardizedFileURL)
+        XCTAssertEqual(result.report.succeeded, 1)
+        XCTAssertEqual(URL(fileURLWithPath: result.report.entries[0].output).deletingLastPathComponent(), result.directory)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: result.directory.path), ["fralo-screen-19700101-080000.png"])
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: folder.path), ["fralo-19700101-080000"])
+    }
+
+    func testEveryExportCreatesAnotherFolderAndPreservesEarlierContents() throws {
+        let date = Date(timeIntervalSince1970: 0), zone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let existing = folder.appendingPathComponent("fralo-19700101-000000")
+        try FileManager.default.createDirectory(at: existing, withIntermediateDirectories: false)
+        let sentinel = existing.appendingPathComponent("keep.txt"), bytes = Data("preserve this export".utf8)
+        try bytes.write(to: sentinel)
+        for suffix in [2, 3] {
+            let result = try BatchExporter.runInNewDirectory(inputs: [source()], settings: .init(), parentDirectory: folder, date: date, timeZone: zone)
+            XCTAssertEqual(result.directory.lastPathComponent, "fralo-19700101-000000-\(suffix)")
+            XCTAssertEqual(result.report.succeeded, 1)
+            XCTAssertEqual(try Data(contentsOf: sentinel), bytes)
+            XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: existing.path), ["keep.txt"])
+        }
+    }
+
+    func testExportFolderSkipsExistingFilesAndDanglingSymlinks() throws {
+        let bytes = Data("keep".utf8), path = folder.appendingPathComponent("fralo-19700101-000000")
+        try bytes.write(to: path)
+        let link = folder.appendingPathComponent("fralo-19700101-000000-2")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: folder.appendingPathComponent("missing"))
+        let result = try BatchExporter.runInNewDirectory(inputs: [source()], settings: .init(), parentDirectory: folder,
+                                                        date: Date(timeIntervalSince1970: 0), timeZone: try XCTUnwrap(TimeZone(secondsFromGMT: 0)))
+        XCTAssertEqual(result.directory.lastPathComponent, "fralo-19700101-000000-3")
+        XCTAssertEqual(try Data(contentsOf: path), bytes)
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: link.path), folder.appendingPathComponent("missing").path)
+    }
+
+    func testConcurrentExportsReceiveSeparateFolders() async throws {
+        let input = try source(), parent = try XCTUnwrap(folder), zone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let directories = try await withThrowingTaskGroup(of: URL.self, returning: [URL].self) { group in
+            for _ in 0..<2 {
+                group.addTask {
+                    try BatchExporter.runInNewDirectory(inputs: [input], settings: .init(), parentDirectory: parent,
+                                                        date: Date(timeIntervalSince1970: 0), timeZone: zone).directory
+                }
+            }
+            var paths: [URL] = []
+            for try await path in group { paths.append(path) }
+            return paths
+        }
+        XCTAssertEqual(Set(directories.map(\.lastPathComponent)), ["fralo-19700101-000000", "fralo-19700101-000000-2"])
+        for path in directories { XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: path.path).count, 1) }
+    }
+
+    func testNewFolderKeepsPartialSuccessAndCancelledOutputTogether() throws {
+        let good = try source(), bad = ImageInput(data: Data("bad".utf8), name: "broken.png")
+        let partial = try BatchExporter.runInNewDirectory(inputs: [good, bad], settings: .init(), parentDirectory: folder)
+        XCTAssertEqual(partial.report.succeeded, 1); XCTAssertEqual(partial.report.failed, 1)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: partial.directory.path).count, 1)
+        let token = CancellationToken()
+        let cancelled = try BatchExporter.runInNewDirectory(inputs: [good, good], settings: .init(), parentDirectory: folder, cancellation: token) {
+            if $0.completed == 1 { token.cancel() }
+        }
+        XCTAssertTrue(cancelled.report.cancelled); XCTAssertEqual(cancelled.report.succeeded, 1); XCTAssertEqual(cancelled.report.unprocessed, 1)
+        XCTAssertNotEqual(cancelled.directory, partial.directory)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: cancelled.directory.path).count, 1)
+        XCTAssertEqual(URL(fileURLWithPath: cancelled.report.entries[0].output).deletingLastPathComponent(), cancelled.directory)
+    }
+
+    func testInvalidExportDoesNotCreateAFolder() throws {
+        XCTAssertThrowsError(try BatchExporter.runInNewDirectory(inputs: [], settings: .init(), parentDirectory: folder))
+        XCTAssertThrowsError(try BatchExporter.runInNewDirectory(inputs: [source()], settings: .init(), parentDirectory: folder, outputNames: ["../escape.png"]))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: folder.path), [])
+        let file = folder.appendingPathComponent("file"), bytes = Data("not a directory".utf8)
+        try bytes.write(to: file)
+        XCTAssertThrowsError(try BatchExporter.runInNewDirectory(inputs: [source()], settings: .init(), parentDirectory: file))
+        XCTAssertEqual(try Data(contentsOf: file), bytes)
     }
 }
