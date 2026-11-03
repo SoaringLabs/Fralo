@@ -69,6 +69,8 @@ def main():
         assert digest(dist / "fralo") == digest(app / "Contents/MacOS/fralo")
         for name in ("INSTALL.md", "AUTHORS.md", "LICENSE"):
             assert digest(app / "Contents/Resources" / name) == digest(ROOT / name)
+        assert digest(app / "Contents/Resources/CLI/guide.md") == digest(ROOT / "docs/cli.md")
+        assert manifest(app / "Contents/Resources/CLI/examples") == manifest(ROOT / "examples/cli")
         assert digest(app / "Contents/Resources/Sparkle-LICENSE") == digest(
             ROOT / ".build/artifacts/sparkle/Sparkle/LICENSE")
         assert (volume / "Applications").is_symlink()

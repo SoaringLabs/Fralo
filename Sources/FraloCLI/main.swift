@@ -9,6 +9,10 @@ Fralo \(FraloInfo.version) — 本地批量截图套框 · \(FraloInfo.developer
   fralo render <图片或文件夹>... --output <目录> [选项]
   fralo models [--json]
   fralo settings
+  fralo compose <input>... --output <dir> [--config <json> | --app-settings] [--dry-run] [--json]
+  fralo capabilities | schema | config | guide | example
+
+Agent quick start: fralo guide (offline; full GUI composition via compose).
 
 选项：
   --input, -i <路径>          追加输入，可重复；文件夹只读当前层
@@ -33,6 +37,7 @@ private func json<T: Encodable>(_ value: T) throws {
 
 private func run() throws -> Int32 {
     var args = Array(CommandLine.arguments.dropFirst())
+    if let command = args.first, AgentCLI.commands.contains(command) { return AgentCLI.run(args) }
     if args.isEmpty || args.contains("--help") || args.contains("-h") { print(usage); return 0 }
     if args == ["--version"] { print("fralo \(FraloInfo.version)"); return 0 }
     if args.first == "models" {

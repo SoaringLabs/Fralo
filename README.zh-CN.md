@@ -134,6 +134,13 @@ Fralo 0.1.1 及以后版本可在应用内升级：选择 **Fralo → 检查更�
 
 ## 命令行
 
+完整构图和 AI Agent 自动化从 `fralo guide` 开始，也可阅读[离线 CLI 说明](docs/cli.md)。
+`fralo capabilities --json` 列出已实现能力，`fralo schema` 给出完整配置约束。
+先用 `fralo example browser > recipe.json` 生成示例，再运行
+`fralo compose ./screenshots --output ./framed --config recipe.json --json`。
+`fralo config --app > recipe.json` 可读取 App 已保存的完整构图；临时参数不会改写 App 设置。
+添加 `--dry-run` 只预检输入和计划输出，不创建文件或目录。以下命令继续保留旧版透明手机套框行为。
+
 `fralo` CLI 随 App 一起安装，无需打开 App 窗口即可渲染透明手机外框：
 
 ```bash

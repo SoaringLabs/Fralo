@@ -140,6 +140,15 @@ Both single-image and batch exports ask for a save location and create a new `fr
 
 ## Command-line interface
 
+For complete GUI composition and agent automation, start with `fralo guide` or
+the [offline CLI guide](docs/cli.md). Discover implemented capabilities with
+`fralo capabilities --json`, inspect `fralo schema`, then run
+`fralo compose ./screenshots --output ./framed --config recipe.json --json`.
+Generate a recipe with `fralo example browser > recipe.json` or capture the
+App's saved composition with `fralo config --app > recipe.json`.
+Use `--dry-run` to check inputs and planned output without creating files.
+The commands below retain the legacy transparent-phone rendering contract.
+
 The `fralo` CLI ships inside the App and renders transparent phone frames without opening
 the App window:
 
