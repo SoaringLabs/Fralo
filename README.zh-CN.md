@@ -14,7 +14,7 @@
 [![Swift](https://img.shields.io/badge/Swift-5.10-F05138?logo=swift&logoColor=white)](Package.swift)
 [![许可：MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-[**下载**](https://github.com/SoaringLabs/Fralo/releases/latest) ·
+[**下载 macOS App**](https://github.com/SoaringLabs/Fralo/releases/latest) ·
 [**CLI 快速上手**](#命令行) ·
 [更新记录](CHANGELOG.md) ·
 [安装说明](INSTALL.md) ·
@@ -138,11 +138,25 @@ Fralo 0.1.1 及以后版本可在应用内升级：选择 **Fralo → 检查更�
 用终端或 Agent 把截图批量做成设备展示图。`fralo compose` 和 App 共用渲染器，
 支持手机、平板和浏览器外框，可导出透明 PNG，也可以添加背景并导出 PNG 或 JPEG。
 
-### 从截图到成品
+请使用包含 `compose` 的构建。如果终端找不到 `fralo`，可使用 App 内置的
+`/Applications/Fralo.app/Contents/MacOS/fralo`。
 
-使用包含 `compose` 的构建，在仓库根目录运行下面三条命令。
-随 App 安装的 CLI 位于 `/Applications/Fralo.app/Contents/MacOS/fralo`。
-如果终端找不到 `fralo`，用这个完整路径代替。
+### 在 App 调好构图，用 CLI 批量出图
+
+先在 Fralo 打开一张有代表性的截图，在预览里调整外框、背景和布局。
+构图保存后，把要处理的截图文件夹交给 CLI。
+
+```bash
+fralo compose ./screenshots --output ./framed --app-settings --dry-run --json
+fralo compose ./screenshots --output ./framed --app-settings --json
+```
+
+`--app-settings` 在每次运行开始时读取已保存的工作台设置。
+预检只列出计划输出，不创建文件或目录。
+
+### 用独立配置复现示例
+
+在仓库根目录运行下面三条命令，即可用示例配置出图。
 
 ```bash
 fralo example phone > phone.json
@@ -154,14 +168,12 @@ fralo compose examples/01-today.png --output ./framed --config phone.json --json
   <img src="docs/assets/cli-compose.png" width="270" alt="Fralo CLI 实际导出的成品，Field Notes 截图置于 iPhone 外框中，搭配暖色纹理背景">
 </p>
 
-这份手机示例配置会生成 `framed/01-today-fralo.png`，画布尺寸为 1350 × 2400。
-预检只列出计划输出，不创建文件或目录。把输入换成文件夹即可批量出图。
-想复用在 App 里保存的效果，可以把 `--config phone.json` 换成 `--app-settings`。
+上图是用手机示例配置实际导出的 `framed/01-today-fralo.png`，画布尺寸为 1350 × 2400。
 
 ### 让脚本读懂结果
 
 `--json` 把一份结构化报告写到标准输出，进度走标准错误。
-下面是上述命令的结果节选。
+下面是首次运行手机示例时的结果节选。
 
 ```json
 {
@@ -181,6 +193,14 @@ fralo compose examples/01-today.png --output ./framed --config phone.json --json
 | 离线指南和完整流程 | `fralo guide` |
 | 当前支持的命令和格式 | `fralo capabilities --json` |
 | 配置字段、默认值和可选值 | `fralo schema --json` |
+
+### 把这批截图交给 Agent
+
+> 先用 `fralo guide` 阅读离线指南。请复用我在 App 里保存的构图，
+> 把 `./screenshots` 导出到 `./framed`。先用
+> `--app-settings --dry-run --json` 预检。如果有错误，先告诉我哪些输入需要处理。
+> 预检通过后，用 `--app-settings --json` 导出，并列出输出路径、跳过的文件，
+> 以及失败的文件和对应错误码。
 
 完整参数、示例和退出码见 [CLI 指南](docs/cli.md)。
 

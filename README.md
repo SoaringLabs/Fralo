@@ -14,7 +14,7 @@
 [![Swift](https://img.shields.io/badge/Swift-5.10-F05138?logo=swift&logoColor=white)](Package.swift)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-[**Download**](https://github.com/SoaringLabs/Fralo/releases/latest) ·
+[**Download the macOS App**](https://github.com/SoaringLabs/Fralo/releases/latest) ·
 [**CLI quickstart**](#command-line-interface) ·
 [Changelog](CHANGELOG.md) ·
 [Install guide](INSTALL.md) ·
@@ -145,11 +145,26 @@ Turn screenshots into finished mockups from a terminal or an Agent. `fralo compo
 uses the same renderer as the App for phone, tablet, and browser frames, with
 transparent PNG or background compositions in PNG or JPEG.
 
-### From screenshot to finished image
+Use a build that includes `compose`. If `fralo` is outside your PATH, use the
+bundled executable at `/Applications/Fralo.app/Contents/MacOS/fralo`.
 
-Run this example from the repository root with a build that includes `compose`.
-The bundled executable lives at `/Applications/Fralo.app/Contents/MacOS/fralo`.
-Substitute that path for `fralo` if the executable is outside your PATH.
+### Set up the look in the App, export the batch from the terminal
+
+Open a representative screenshot in Fralo and adjust the frame, background,
+and layout in the preview. Once you're happy with the saved composition, point
+the CLI at the folder you want to render.
+
+```bash
+fralo compose ./screenshots --output ./framed --app-settings --dry-run --json
+fralo compose ./screenshots --output ./framed --app-settings --json
+```
+
+`--app-settings` reads the saved workbench settings at the start of each run.
+Preflight lists the planned output without creating files or directories.
+
+### Reproduce the sample with a recipe
+
+Run these commands from the repository root to try a self-contained recipe.
 
 ```bash
 fralo example phone > phone.json
@@ -161,15 +176,13 @@ fralo compose examples/01-today.png --output ./framed --config phone.json --json
   <img src="docs/assets/cli-compose.png" width="270" alt="Actual Fralo CLI output showing the Field Notes screenshot in an iPhone frame on a warm textured background">
 </p>
 
-The phone recipe exports `framed/01-today-fralo.png` on a 1350 × 2400 canvas.
-Preflight lists the planned output without creating files or directories.
-To render a batch, pass a folder. To reuse the look you saved in the App,
-replace `--config phone.json` with `--app-settings`.
+The phone recipe exports the image shown here as `framed/01-today-fralo.png`
+on a 1350 × 2400 canvas.
 
 ### From command to script
 
 `--json` sends one structured report to stdout and keeps progress on stderr.
-Here are selected fields from the example above.
+Here are selected fields from a fresh export of the phone recipe above.
 
 ```json
 {
@@ -189,6 +202,15 @@ the batch can still export the others. Scripts can detect that with exit code
 | Offline guide and workflow | `fralo guide` |
 | Available commands and formats | `fralo capabilities --json` |
 | Configuration fields, defaults, and allowed values | `fralo schema --json` |
+
+### Hand the batch to an Agent
+
+> Read the offline guide with `fralo guide`. Use my saved App composition
+> to render `./screenshots` into `./framed`. Run preflight with
+> `--app-settings --dry-run --json` first. If it reports errors, tell me which
+> inputs need attention before exporting. Otherwise, export with
+> `--app-settings --json` and report the output paths, skipped files, and any
+> failures with their error codes.
 
 See the [full CLI guide](docs/cli.md) for all options, examples, and exit codes.
 
