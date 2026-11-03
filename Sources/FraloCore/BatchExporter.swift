@@ -56,20 +56,96 @@ public struct ExportProgress: Sendable {
 }
 
 public enum BatchExporter {
-    public static func outputNames(for inputs: [ImageInput], format: ImageFormat = .png) -> [String] {
+    public enum CollisionPolicy: Sendable { case skip, keepBoth, replace }
+
+    private static func timestamp(for date: Date, timeZone: TimeZone) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return formatter.string(from: date)
+    }
+
+    public static func exportFolderName(for date: Date, timeZone: TimeZone = .current) -> String {
+        "fralo-\(timestamp(for: date, timeZone: timeZone))"
+    }
+
+    /// A date opts into the app's versioned names. Nil preserves the CLI's stable names.
+    public static func outputNames(for inputs: [ImageInput], format: ImageFormat = .png,
+                                   date: Date? = nil, timeZone: TimeZone = .current) -> [String] {
         let suffixName = format == .png ? "png" : "jpg"
+        let timestamp = date.map { Self.timestamp(for: $0, timeZone: timeZone) }
         var used = Set<String>()
         return inputs.map { input in
             let stem = input.stem.isEmpty ? L10n.tr("图片") : input.stem
-            var candidate = "\(stem)-fralo.\(suffixName)", suffix = 2
+            let base = timestamp.map { "fralo-\(stem)-\($0)" } ?? "\(stem)-fralo"
+            var candidate = "\(base).\(suffixName)", suffix = 2
             while !used.insert(candidate.lowercased()).inserted {
-                candidate = "\(stem)-fralo-\(suffix).\(suffixName)"; suffix += 1
+                candidate = "\(base)-\(suffix).\(suffixName)"; suffix += 1
             }
             return candidate
         }
     }
 
-    public static func run(inputs: [ImageInput], settings: RenderSettings, directory: URL, overwrite: Bool = false,
+    /// Also treats directories and dangling symlinks as occupied names.
+    public static func availableOutputURL(for preferred: URL, reservingFileNames: Set<String> = []) -> URL {
+        let stem = preferred.deletingPathExtension().lastPathComponent
+        let ext = preferred.pathExtension
+        var candidate = preferred, suffix = 2
+        while FileManager.default.fileExists(atPath: candidate.path)
+            || (try? FileManager.default.destinationOfSymbolicLink(atPath: candidate.path)) != nil
+            || reservingFileNames.contains(candidate.lastPathComponent.lowercased()) {
+            let name = "\(stem)-\(suffix)" + (ext.isEmpty ? "" : ".\(ext)")
+            candidate = preferred.deletingLastPathComponent().appendingPathComponent(name, isDirectory: preferred.hasDirectoryPath)
+            suffix += 1
+        }
+        return candidate
+    }
+
+    /// App exports own a new directory; the CLI continues to use run's explicit destination.
+    public static func runInNewDirectory(inputs: [ImageInput], settings: RenderSettings, parentDirectory: URL,
+                                         date: Date = Date(), timeZone: TimeZone = .current,
+                                         cancellation: CancellationToken = CancellationToken(),
+                                         outputNames explicitNames: [String]? = nil,
+                                         composition: CompositionSettings? = nil, backgroundData: Data? = nil,
+                                         progress: (ExportProgress) -> Void = { _ in }) throws -> (directory: URL, report: ExportReport) {
+        guard !inputs.isEmpty else { throw FraloError.message(L10n.tr("没有可导出的图片。")) }
+        let settings = try settings.validated(), composition = try composition?.validated()
+        let backdrop = try backgroundData ?? composition.flatMap { try CompositionRenderer.backgroundData($0) }
+        let names = explicitNames ?? outputNames(for: inputs, format: composition?.outputFormat ?? .png, date: date, timeZone: timeZone)
+        try validateOutputNames(names, count: inputs.count)
+        try FileManager.default.createDirectory(at: parentDirectory, withIntermediateDirectories: true)
+        let preferred = parentDirectory.appendingPathComponent(exportFolderName(for: date, timeZone: timeZone), isDirectory: true)
+        let directory: URL
+        while true {
+            let candidate = availableOutputURL(for: preferred)
+            let result = candidate.withUnsafeFileSystemRepresentation { Darwin.mkdir($0!, 0o777) }
+            if result == 0 { directory = candidate; break }
+            let code = errno
+            if code == EEXIST { continue }
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(code), userInfo: [NSFilePathErrorKey: candidate.path])
+        }
+        do {
+            let report = try run(inputs: inputs, settings: settings, directory: directory, collisionPolicy: .keepBoth,
+                                 cancellation: cancellation, outputNames: names, composition: composition,
+                                 backgroundData: backdrop, progress: progress)
+            return (directory, report)
+        } catch {
+            // Remove only an empty directory we just created. Partial output must survive.
+            _ = directory.withUnsafeFileSystemRepresentation { Darwin.rmdir($0!) }
+            throw error
+        }
+    }
+
+    private static func validateOutputNames(_ names: [String], count: Int) throws {
+        guard names.count == count else { throw FraloError.message(L10n.tr("导出文件名数量不匹配。")) }
+        guard names.allSatisfy({ !$0.isEmpty && ($0 as NSString).lastPathComponent == $0 && $0 != "." && $0 != ".." }) else {
+            throw FraloError.message(L10n.tr("输出文件名必须是文件名，不可包含目录。"))
+        }
+    }
+
+    public static func run(inputs: [ImageInput], settings: RenderSettings, directory: URL, collisionPolicy: CollisionPolicy = .skip,
                            cancellation: CancellationToken = CancellationToken(),
                            outputNames explicitNames: [String]? = nil, composition: CompositionSettings? = nil, backgroundData: Data? = nil,
                            progress: (ExportProgress) -> Void = { _ in }) throws -> ExportReport {
@@ -79,24 +155,25 @@ public enum BatchExporter {
         guard !inputs.isEmpty else { throw FraloError.message(L10n.tr("没有可导出的图片。")) }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let names = explicitNames ?? outputNames(for: inputs, format: composition?.outputFormat ?? .png)
-        guard names.count == inputs.count else { throw FraloError.message(L10n.tr("导出文件名数量不匹配。")) }
+        try validateOutputNames(names, count: inputs.count)
         let started = Date()
         var entries: [ExportEntry] = []
         let inputPaths = Set(inputs.compactMap { $0.url?.standardizedFileURL.resolvingSymlinksInPath().path })
+        let reservedNames = Set(names.map { $0.lowercased() })
         for (index, input) in inputs.enumerated() {
             if cancellation.isCancelled { break }
             let name = names[index]
-            guard !name.isEmpty, (name as NSString).lastPathComponent == name, name != ".", name != ".." else {
-                throw FraloError.message(L10n.tr("输出文件名必须是文件名，不可包含目录。"))
-            }
-            let output = directory.appendingPathComponent(name)
+            let preferred = directory.appendingPathComponent(name, isDirectory: false)
+            let otherNames = reservedNames.subtracting([name.lowercased()])
+            let output = collisionPolicy == .keepBoth
+                ? availableOutputURL(for: preferred, reservingFileNames: otherNames) : preferred
             progress(ExportProgress(completed: entries.count, total: inputs.count, currentName: input.name))
             let entry: ExportEntry = autoreleasepool {
                 do {
                     guard !inputPaths.contains(output.standardizedFileURL.resolvingSymlinksInPath().path) else {
                         throw FraloError.message(L10n.tr("不能覆盖任何原始截图。"))
                     }
-                    if !overwrite && FileManager.default.fileExists(atPath: output.path) {
+                    if collisionPolicy == .skip && FileManager.default.fileExists(atPath: output.path) {
                         return ExportEntry(input: input.name, output: output.path, status: .skipped, reason: L10n.tr("已有同名文件"))
                     }
                     let data: Data
@@ -107,8 +184,10 @@ public enum BatchExporter {
                         let frame = try FrameRenderer.render(input, settings: settings)
                         data = try FrameRenderer.pngData(frame.image)
                     }
-                    let written = try write(data, to: output, overwrite: overwrite)
-                    return ExportEntry(input: input.name, output: output.path, status: written ? .success : .skipped, reason: written ? nil : L10n.tr("已有同名文件"))
+                    let written = try write(data, to: preferred, collisionPolicy: collisionPolicy, reservingFileNames: otherNames)
+                    return ExportEntry(input: input.name, output: written?.path ?? output.path,
+                                       status: written != nil ? .success : .skipped,
+                                       reason: written != nil ? nil : L10n.tr("已有同名文件"))
                 } catch {
                     return ExportEntry(input: input.name, output: output.path, status: .failed, reason: error.localizedDescription)
                 }
@@ -120,15 +199,27 @@ public enum BatchExporter {
         report.composition = composition; return report
     }
 
-    private static func write(_ data: Data, to destination: URL, overwrite: Bool) throws -> Bool {
-        let temporary = destination.deletingLastPathComponent().appendingPathComponent(".fralo-\(UUID().uuidString).tmp")
+    private static func write(_ data: Data, to preferred: URL, collisionPolicy: CollisionPolicy,
+                              reservingFileNames: Set<String>) throws -> URL? {
+        let temporary = preferred.deletingLastPathComponent().appendingPathComponent(".fralo-\(UUID().uuidString).tmp")
         defer { try? FileManager.default.removeItem(at: temporary) }
         try data.write(to: temporary, options: .atomic)
-        let result = temporary.withUnsafeFileSystemRepresentation { source in
-            destination.withUnsafeFileSystemRepresentation { target in overwrite ? Darwin.rename(source!, target!) : Darwin.link(source!, target!) }
+        while true {
+            let destination = collisionPolicy == .keepBoth
+                ? availableOutputURL(for: preferred, reservingFileNames: reservingFileNames) : preferred
+            let result = temporary.withUnsafeFileSystemRepresentation { source in
+                destination.withUnsafeFileSystemRepresentation { target in
+                    collisionPolicy == .replace ? Darwin.rename(source!, target!)
+                        : Darwin.renamex_np(source!, target!, UInt32(RENAME_EXCL))
+                }
+            }
+            if result == 0 { return destination }
+            let code = errno
+            if code == EEXIST {
+                if collisionPolicy == .keepBoth { continue }
+                if collisionPolicy == .skip { return nil }
+            }
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(code), userInfo: [NSFilePathErrorKey: destination.path])
         }
-        if result == 0 { return true }
-        if !overwrite && errno == EEXIST { return false }
-        throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: [NSFilePathErrorKey: destination.path])
     }
 }

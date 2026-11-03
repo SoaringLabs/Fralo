@@ -27,7 +27,7 @@ enum SettingsSearch {
         return [
             Entry(pane: .appearance, row: nil, terms: L10n.tr("外观", alsoIn: en)),
             Entry(pane: .appearance, row: Row.appearance, terms: L10n.tr("界面", alsoIn: en) + L10n.tr("外观", alsoIn: en)
-                  + L10n.tr("选择浅色、深色，或随系统自动切换。", alsoIn: en) + L10n.tr("跟随系统", alsoIn: en)
+                  + L10n.tr("跟随系统", alsoIn: en)
                   + L10n.tr("浅色", alsoIn: en) + L10n.tr("深色", alsoIn: en)),
             Entry(pane: .appearance, row: Row.language, terms: L10n.tr("语言", alsoIn: en) + L10n.tr("界面语言", alsoIn: en)
                   + L10n.tr("跟随系统", alsoIn: en) + languages),

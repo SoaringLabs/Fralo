@@ -91,7 +91,7 @@ private func run() throws -> Int32 {
     interrupt.setEventHandler { cancellation.cancel() }; terminate.setEventHandler { cancellation.cancel() }
     interrupt.resume(); terminate.resume()
     defer { interrupt.cancel(); terminate.cancel() }
-    let report = try BatchExporter.run(inputs: inputs, settings: settings, directory: directory, overwrite: overwrite, cancellation: cancellation) { progress in
+    let report = try BatchExporter.run(inputs: inputs, settings: settings, directory: directory, collisionPolicy: overwrite ? .replace : .skip, cancellation: cancellation) { progress in
         if progress.completed < progress.total { stderr("[\(progress.completed)/\(progress.total)] \(progress.currentName)") }
     }
     if machineReadable { try json(report) } else {

@@ -291,7 +291,7 @@ final class CompositionTests: XCTestCase {
         XCTAssertTrue(cancelled.cancelled); XCTAssertEqual(cancelled.unprocessed, 1)
         let file = root.appendingPathComponent("source.png"), original = try FrameRenderer.pngData(source.decode())
         try original.write(to: file)
-        let protected = try BatchExporter.run(inputs: [ImageInput(url: file)], settings: .init(), directory: root, overwrite: true, outputNames: [file.lastPathComponent], composition: s)
+        let protected = try BatchExporter.run(inputs: [ImageInput(url: file)], settings: .init(), directory: root, collisionPolicy: .replace, outputNames: [file.lastPathComponent], composition: s)
         XCTAssertEqual(protected.failed, 1); XCTAssertEqual(try Data(contentsOf: file), original)
     }
     func testOutputRatiosAndTransparentShadowExtent() throws {
