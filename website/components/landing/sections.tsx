@@ -55,7 +55,7 @@ export function Hero({ dict }: { dict: Dictionary }) {
   return (
     <section className="flex flex-wrap items-center gap-10 px-[clamp(20px,5vw,72px)] pt-[clamp(32px,5vw,72px)] pb-14">
       <div className="flex min-w-0 max-w-[500px] flex-[1_1_340px] flex-col gap-[22px]">
-        <h1 className="display m-0 text-[clamp(38px,4.6vw,62px)] font-bold">
+        <h1 id="fralo-hero-title" tabIndex={-1} className="display m-0 text-[clamp(38px,4.6vw,62px)] font-bold">
           <Phrases phrases={dict.hero.title} />
         </h1>
         <p className="m-0 text-lg leading-relaxed text-muted-foreground">{dict.hero.lead}</p>
@@ -296,12 +296,15 @@ export function Closing({ dict, repository }: { dict: Dictionary; repository: Re
   )
 }
 
-export function Footer({ dict }: { dict: Dictionary }) {
+export function Footer({ dict, privacyHref }: { dict: Dictionary; privacyHref: string }) {
   return (
     <footer className="flex flex-wrap gap-x-6 gap-y-2 border-t border-border px-[clamp(20px,5vw,72px)] pt-6 pb-24 text-[13px] text-muted-foreground">
       <span className="mr-auto">SoaringLabs · {dict.footer.license}</span>
       <a href={`${repositoryURL}/blob/main/CHANGELOG.md`} className="hover:text-foreground">
         {dict.footer.changelog}
+      </a>
+      <a href={privacyHref} className="privacy-link">
+        {dict.privacy.link}
       </a>
       <a href={repositoryURL} className="hover:text-foreground">
         GitHub

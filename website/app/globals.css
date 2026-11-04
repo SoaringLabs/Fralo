@@ -272,3 +272,47 @@
     .canvas-layer, .morph, .device-fan .device, .dock { transition: none; }
   }
 }
+
+@layer components {
+  .privacy-link {
+    color: var(--foreground);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .privacy-link:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  .privacy-choice {
+    flex: 1 1 8.5rem;
+    min-height: 44px;
+    height: auto;
+    padding-block: 0.5rem;
+    white-space: normal;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .privacy-page {
+      --background: #1c1c1e;
+      --foreground: #f2f2f7;
+      --card: #242426;
+      --card-foreground: #f2f2f7;
+      --muted-foreground: #a1a1a6;
+      --border: #38383a;
+      --secondary: #2a2a2c;
+      --accent: #2a2a2d;
+      --press: rgb(255 255 255 / 13%);
+    }
+  }
+
+  @media (prefers-contrast: more) {
+    .privacy-card,
+    .privacy-page {
+      --border: var(--foreground);
+      --muted-foreground: var(--foreground);
+    }
+  }
+}
