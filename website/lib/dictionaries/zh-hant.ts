@@ -83,7 +83,6 @@ export const zhHant: Dictionary = {
     decline: "拒絕分析",
     allowed: "網站分析：已允許",
     notAllowed: "網站分析：已關閉",
-    analyticsOff: "本站目前未設定網站分析。",
     analyticsDetailsTitle: "網站分析會收集什麼",
     analyticsDetails: "如果你允許，Google Analytics 會收到瀏覽的頁面、互動情況、瀏覽器或裝置資訊等。Fralo 用這些資訊了解網站的使用情況。你可以隨時在這裡撤回同意。",
     googlePolicy: "Google 隱私權政策",

@@ -81,7 +81,6 @@ export const en = {
     decline: "Decline analytics",
     allowed: "Website analytics: allowed",
     notAllowed: "Website analytics: off",
-    analyticsOff: "This site currently has no analytics configured.",
     analyticsDetailsTitle: "What analytics measures",
     analyticsDetails: "If you opt in, Google Analytics receives information such as pages visited, interactions, and browser or device details. Fralo uses it to understand how the website is used. You can withdraw your choice here at any time.",
     googlePolicy: "Google’s privacy policy",

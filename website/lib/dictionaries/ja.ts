@@ -83,7 +83,6 @@ export const ja: Dictionary = {
     decline: "解析を拒否",
     allowed: "アクセス解析：許可済み",
     notAllowed: "アクセス解析：オフ",
-    analyticsOff: "現在、このサイトではアクセス解析を使用していません。",
     analyticsDetailsTitle: "アクセス解析で収集する情報",
     analyticsDetails: "許可した場合、閲覧したページや操作、ブラウザや端末に関する情報などが Google Analytics に送信されます。Fralo はサイトの利用状況を把握するために、この情報を利用します。同意はこのページでいつでも取り消せます。",
     googlePolicy: "Google のプライバシー ポリシー",

@@ -43,22 +43,17 @@ export default async function PrivacyPage({ params }: PageProps<"/[lang]/privacy
         <section aria-labelledby="website-privacy" className="mt-8 border-t pt-8">
           <h2 id="website-privacy" className="text-start text-xl font-semibold">{privacy.websiteTitle}</h2>
           <div className="mt-4 space-y-6">
-            {analyticsEnabled ? (
-              <PrivacyControls copy={privacy} />
-            ) : (
-              <section aria-labelledby="analytics" className="privacy-card rounded-2xl border bg-card p-4 sm:p-5">
-                <h3 id="analytics" className="text-start text-[15px] font-semibold">{privacy.analyticsTitle}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{privacy.analyticsOff}</p>
-              </section>
-            )}
             {analyticsEnabled && (
-              <section>
-                <h3 className="text-start font-semibold">{privacy.analyticsDetailsTitle}</h3>
-                <p className="mt-2 leading-relaxed text-muted-foreground">
-                  {privacy.analyticsDetails}{" "}
-                  <a href="https://policies.google.com/privacy" className="privacy-link">{privacy.googlePolicy}</a>
-                </p>
-              </section>
+              <>
+                <PrivacyControls copy={privacy} />
+                <section>
+                  <h3 className="text-start font-semibold">{privacy.analyticsDetailsTitle}</h3>
+                  <p className="mt-2 leading-relaxed text-muted-foreground">
+                    {privacy.analyticsDetails}{" "}
+                    <a href="https://policies.google.com/privacy" className="privacy-link">{privacy.googlePolicy}</a>
+                  </p>
+                </section>
+              </>
             )}
             <section>
               <h3 className="text-start font-semibold">{privacy.storageTitle}</h3>
