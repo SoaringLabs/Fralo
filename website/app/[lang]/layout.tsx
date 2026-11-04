@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next"
 import { notFound } from "next/navigation"
 import { getDictionary, hasLocale, localeInfo, locales, pathFor } from "@/lib/i18n"
+import { WebsiteAnalytics } from "@/components/privacy"
+import { analyticsMeasurementId } from "@/lib/privacy"
 import "../globals.css"
 
 const siteURL =
@@ -44,9 +46,13 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children, params }: LayoutProps<"/[lang]">) {
   const { lang } = await params
   if (!hasLocale(lang)) notFound()
+  const measurementId = analyticsMeasurementId()
   return (
     <html lang={localeInfo[lang].tag}>
-      <body>{children}</body>
+      <body>
+        {children}
+        {measurementId && <WebsiteAnalytics id={measurementId} />}
+      </body>
     </html>
   )
 }

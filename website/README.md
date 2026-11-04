@@ -51,3 +51,9 @@ On Vercel, set the project's Root Directory to `website`. Optional environment v
 
 - `SITE_URL`: canonical origin for metadata. Defaults to the Vercel production domain.
 - `GITHUB_TOKEN`: raises the GitHub API rate limit when fetching the star count and release.
+- `FRALO_GA_MEASUREMENT_ID`: optional GA4 measurement ID (`G-…`), read at build time. Leave unset to ship without website analytics or a consent prompt. Use a dedicated website property with no advertising destinations or features, and disable enhanced measurement if only page views are needed.
+
+The footer links to the localized **Privacy & settings** page in either configuration. When
+analytics is configured, Fralo keeps the Google tag out of the document until the visitor allows
+analytics. The decision is stored locally and shared by all language routes on that origin.
+Changing it to decline disables the tag and expires its Fralo analytics cookies.

@@ -11,7 +11,12 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     // The homepage reaches /en after the public redirect and locale selection.
-    return { beforeFiles: [{ source: "/", destination: "/en" }] }
+    return {
+      beforeFiles: [
+        { source: "/", destination: "/en" },
+        { source: "/privacy", destination: "/en/privacy" },
+      ],
+    }
   },
   images: {
     formats: ["image/avif", "image/webp"],
