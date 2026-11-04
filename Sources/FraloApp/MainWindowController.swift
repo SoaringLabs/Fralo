@@ -73,8 +73,10 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
     private var layingOutPreview = false
     private var pastedCount = 0
     private var cancellation: CancellationToken?
-    private var progressPanel: NSPanel?
-    private var updateNotice: NSTextField?
+    let exportCapsule = ExportCapsule(frame: .zero)
+    private var exportedFiles: [URL] = []
+    private var exportDirectory: URL?
+    private let exportShimmer = PreviewShimmer()
     /// Returns true when a pending update consumes successful export completion.
     var onExportFinished: (() -> Bool)?
     private var quitAfterExport = false
@@ -185,7 +187,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         footerTrailing = footer.trailingAnchor.constraint(equalTo: center.view.trailingAnchor)
         NSLayoutConstraint.activate([
             previewScroll.topAnchor.constraint(equalTo: center.view.topAnchor), previewScroll.leadingAnchor.constraint(equalTo: center.view.leadingAnchor), previewScroll.trailingAnchor.constraint(equalTo: center.view.trailingAnchor), previewScroll.bottomAnchor.constraint(equalTo: center.view.bottomAnchor),
-            footer.leadingAnchor.constraint(equalTo: center.view.leadingAnchor, constant: 24), footerTrailing!, footer.bottomAnchor.constraint(equalTo: center.view.bottomAnchor), footer.heightAnchor.constraint(equalToConstant: 76),
+            footer.leadingAnchor.constraint(equalTo: center.view.leadingAnchor, constant: 24), footerTrailing!, footer.bottomAnchor.constraint(equalTo: center.view.bottomAnchor), footer.heightAnchor.constraint(equalToConstant: WorkbenchView.viewingControlsHeight),
             viewing.centerXAnchor.constraint(equalTo: footer.centerXAnchor), viewing.centerYAnchor.constraint(equalTo: footer.centerYAnchor), viewing.widthAnchor.constraint(lessThanOrEqualTo: footer.widthAnchor), viewing.heightAnchor.constraint(equalToConstant: ViewToolbar.height)
         ])
         emptyAction.onPress = { [weak self] in self?.addImages(nil) }
@@ -204,6 +206,19 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
             operationFeedback.widthAnchor.constraint(lessThanOrEqualTo: footer.widthAnchor, constant: -24),
             operationFeedback.centerXAnchor.constraint(equalTo: footer.centerXAnchor)
         ])
+        // Export progress grows out of the viewing toolbar and settles back into it.
+        exportCapsule.translatesAutoresizingMaskIntoConstraints = false; center.view.addSubview(exportCapsule)
+        NSLayoutConstraint.activate([
+            exportCapsule.leadingAnchor.constraint(equalTo: center.view.leadingAnchor), exportCapsule.trailingAnchor.constraint(equalTo: center.view.trailingAnchor),
+            exportCapsule.topAnchor.constraint(equalTo: center.view.topAnchor), exportCapsule.bottomAnchor.constraint(equalTo: center.view.bottomAnchor)
+        ])
+        exportCapsule.anchor = { [weak self] in
+            guard let self else { return .zero }
+            return self.exportCapsule.convert(self.viewing.bounds, from: self.viewing)
+        }
+        exportCapsule.onCancel = { [weak self] in self?.cancelExport() }
+        exportCapsule.onReveal = { [weak self] in self?.revealExport() }
+        exportCapsule.onReturn = { [weak self] in self?.setViewingToolbarHidden(false) }
     }
 
     private func buildInspector() -> NSView {
@@ -692,7 +707,7 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         viewing.composition.displayTitle = "\(settings.canvas.rawValue) · \(Int(pixels.width)) × \(Int(pixels.height))"
     }
     /// Floating chrome reacts to the artwork actually beneath it.
-    private func updateCanvasOverlays() { updateHeaderOverlap(); updateCapsuleBackdrop() }
+    private func updateCanvasOverlays() { updateHeaderOverlap(); updateCapsuleBackdrop(); exportShimmer.relayout() }
     private func updateCapsuleBackdrop() {
         guard canvas.image != nil, !previewScroll.isHidden, !footer.isHidden, viewing.window != nil else { viewing.backdropLuminance = nil; return }
         viewing.backdropLuminance = canvas.artworkLuminance(under: canvas.convert(viewing.bounds, from: viewing))
@@ -785,59 +800,75 @@ final class MainWindowController: NSWindowController, NSMenuItemValidation {
         let backdrop: Data?
         do { backdrop = try CompositionRenderer.backgroundData(snapshot) } catch { showError(error.localizedDescription); return }
         cancellation = token; updateActions()
-        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 470, height: 240), styleMask: [.titled], backing: .buffered, defer: false)
-        panel.titleVisibility = .hidden
-        let count = label(L10n.tr("已完成 0 / \(inputs.count)"))
-        let current = label(L10n.tr("正在准备…"), size: 12, secondary: true); current.lineBreakMode = .byTruncatingMiddle
-        let bar = NSProgressIndicator(); bar.isIndeterminate = false; bar.minValue = 0; bar.maxValue = Double(inputs.count); bar.style = .bar
-        bar.widthAnchor.constraint(equalToConstant: 414).isActive = true
-        let cancel = ActionButton(L10n.tr("取消"))
-        cancel.target = self; cancel.action = #selector(cancelExportAction(_:)); cancel.keyEquivalent = "\u{1b}"
-        let notice = label("", size: 12, secondary: true); updateNotice = notice
-        let content = stack([label(L10n.tr("正在导出图片"), size: 16, weight: .semibold), count, bar, current, notice, cancel], spacing: 12)
-        content.alignment = .centerX; content.translatesAutoresizingMaskIntoConstraints = false; panel.contentView?.addSubview(content)
-        NSLayoutConstraint.activate([content.centerXAnchor.constraint(equalTo: panel.contentView!.centerXAnchor), content.centerYAnchor.constraint(equalTo: panel.contentView!.centerYAnchor)])
-        progressPanel = panel; window?.beginSheet(panel)
+        let thumbnails = inputs.map { input in itemIndices[input.id].map { items[$0].thumbnail } ?? nil }
+        exportedFiles = []; exportDirectory = nil
+        setViewingToolbarHidden(true)
+        // Export work starts only once the capsule has grown, so rendering never stutters the reshape.
+        exportCapsule.begin(total: inputs.count, thumbnail: thumbnails.compactMap { $0 }.first) { [weak self] in
+            guard let self else { return }
+            self.exportShimmer.start(on: self.canvas, preferences: self.exportCapsule.preferences)
+            self.runExport(inputs, directory: directory, names: names, date: date, snapshot: snapshot, backdrop: backdrop, token: token)
+        }
+    }
+    private func runExport(_ inputs: [ImageInput], directory: URL, names: [String], date: Date,
+                           snapshot: CompositionSettings, backdrop: Data?, token: CancellationToken) {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let result = Result {
                 try BatchExporter.runInNewDirectory(inputs: inputs, settings: RenderSettings(model: snapshot.phoneModel, orientation: snapshot.orientation), parentDirectory: directory, date: date, cancellation: token, outputNames: names, composition: snapshot, backgroundData: backdrop) { progress in
-                    DispatchQueue.main.async { count.stringValue = L10n.tr("已完成 \(progress.completed) / \(progress.total)"); current.stringValue = L10n.tr("正在处理：\(progress.currentName)"); bar.doubleValue = Double(progress.completed) }
+                    DispatchQueue.main.async {
+                        guard let self else { return }
+                        self.exportCapsule.update(completed: progress.completed)
+                        DockProgress.shared.show(Double(progress.completed) / Double(max(progress.total, 1)))
+                    }
                 }
             }
             DispatchQueue.main.async {
                 guard let self else { return }
-                self.window?.endSheet(panel); self.progressPanel = nil; self.cancellation = nil; self.updateActions()
-                self.updateNotice = nil
-                if self.quitAfterExport { NSApp.reply(toApplicationShouldTerminate: true); return }
+                self.cancellation = nil; self.updateActions()
+                DockProgress.shared.clear(); self.exportShimmer.stop()
+                if self.quitAfterExport { self.exportCapsule.hide(animated: false); NSApp.reply(toApplicationShouldTerminate: true); return }
                 switch result {
                 case .success(let output):
                     let report = output.report
-                    // Keep cancellation/failure/skip summaries visible before installing.
-                    // A wholly successful export can hand off directly without a blocking sheet.
-                    if report.failed == 0 && report.skipped == 0 && !report.cancelled,
-                       self.onExportFinished?() == true { return }
-                    self.showReport(report, directory: output.directory)
-                case .failure(let error): self.showError(error.localizedDescription)
+                    self.exportDirectory = output.directory
+                    self.exportedFiles = report.entries.filter { $0.status == .success }.map { URL(fileURLWithPath: $0.output) }
+                    self.exportCapsule.finish(ExportOutcome(report: report), folderName: output.directory.lastPathComponent)
+                    // Cancellation, failures and skips stay readable; a clean run may hand off to a pending update.
+                    if report.failed == 0 && report.skipped == 0 && !report.cancelled { _ = self.onExportFinished?() }
+                case .failure(let error):
+                    self.exportCapsule.hide(animated: false)
+                    self.showError(error.localizedDescription)
                 }
             }
         }
     }
-    @objc private func cancelExportAction(_ sender: NSButton) { cancelExport(); sender.isEnabled = false; sender.title = L10n.tr("正在停止…") }
+    #if FRALO_DEV
+    /// Workbench Preview only: exports the whole batch into `directory` without the save panel.
+    func previewExport(to directory: URL) {
+        guard !items.isEmpty, !isExporting else { return }
+        let date = Date(), inputs = items.map(\.input)
+        startExport(inputs, directory: directory, names: BatchExporter.outputNames(for: inputs, format: settings.outputFormat, date: date), date: date)
+    }
+    #endif
     func cancelExport() { cancellation?.cancel() }
     func requestQuitAfterExport() { quitAfterExport = true; cancelExport() }
-    func showPendingUpdate() { updateNotice?.stringValue = L10n.tr("导出结束后将安装更新并重启 Fralo") }
-    func clearPendingUpdate() { updateNotice?.stringValue = "" }
-    private func showReport(_ report: ExportReport, directory: URL) {
-        let alert = NSAlert(); alert.messageText = report.cancelled ? L10n.tr("导出已取消") : L10n.tr("导出完成")
-        alert.informativeText = L10n.tr("成功 \(report.succeeded) 张 · 跳过 \(report.skipped) 张 · 失败 \(report.failed) 张\n未处理 \(report.unprocessed) 张 · 用时 \(String(format: "%.2f", report.durationSeconds)) 秒")
-        alert.addButton(withTitle: L10n.tr("完成")); alert.addButton(withTitle: L10n.tr("打开输出文件夹"))
-        let issues = report.entries.filter { $0.status != .success }
-        if !issues.isEmpty {
-            let text = NSTextView(frame: NSRect(x: 0, y: 0, width: 430, height: 140)); text.isEditable = false; text.isSelectable = true; text.font = .systemFont(ofSize: 12)
-            text.string = issues.map { "\($0.input)：\($0.reason ?? $0.status.rawValue)" }.joined(separator: "\n")
-            let scroll = NSScrollView(frame: text.frame); scroll.documentView = text; ScrollContent.configure(scroll); alert.accessoryView = scroll
-        }
-        alert.beginSheetModal(for: window!) { response in if response == .alertSecondButtonReturn { NSWorkspace.shared.open(directory) } }
+    func showPendingUpdate() { exportCapsule.setPendingUpdate(L10n.tr("导出结束后将安装更新并重启 Fralo")) }
+    func clearPendingUpdate() { exportCapsule.setPendingUpdate("") }
+    private func revealExport() {
+        if exportedFiles.isEmpty { exportDirectory.map { NSWorkspace.shared.open($0) } }
+        else { NSWorkspace.shared.activateFileViewerSelecting(exportedFiles) }
+    }
+    /// The viewing toolbar gives its place to the export capsule, then takes it back.
+    /// Hidden (not just transparent) while the capsule stands in, so its controls take no clicks or focus.
+    private func setViewingToolbarHidden(_ hidden: Bool) {
+        if !hidden { viewing.isHidden = false }
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = exportCapsule.preferences.effectiveReduceMotion ? 0 : (hidden ? 0.12 : 0.2)
+            viewing.animator().alphaValue = hidden ? 0 : 1
+        }, completionHandler: { [weak self] in
+            guard let self, hidden, self.viewing.alphaValue == 0 else { return }
+            self.viewing.isHidden = true
+        })
     }
     /// Empty-batch transitions affect presentation, never the user's visibility preference:
     /// the list collapses while there is nothing to list, and the inspector stays available for presets.

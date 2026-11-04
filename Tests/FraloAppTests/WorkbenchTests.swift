@@ -178,6 +178,10 @@ final class WorkbenchTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let store = SettingsStore(url: root.appendingPathComponent("settings.json"))
         var settings = CompositionSettings(); settings.mode = .background; settings.format = .jpeg; settings.deviceOpacity = 0.5
+        // Use a stable composition with visible alpha to distinguish the raw image from its JPEG preview.
+        settings.background = .solid
+        settings.backgroundOpacity = 0.5
+        settings.backgroundShadow = .none
         try CompositionStore(legacy: store).save(settings)
         let board = NSPasteboard.withUniqueName(); defer { board.releaseGlobally() }
         let suite = "fralo-copy-\(UUID())"; let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -195,20 +199,35 @@ final class WorkbenchTests: XCTestCase {
         let data = try XCTUnwrap(board.data(forType: .png))
         let image = try ImageInput(data: data, name: "copied.png").decode()
         let expected = try CompositionRenderer.render(ImageInput(url: source), settings: settings)
-        let expectedData = try FrameRenderer.pngData(expected.image)
-        if data != expectedData {
-            // Preserve the original assertion and failing buffers, rather than losing a rare output discrepancy.
+        func rgba(_ image: CGImage) throws -> Data {
+            let bytesPerRow = image.width * 4
+            let colorSpace = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+            let layout = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
+            let bitmap = try XCTUnwrap(CGContext(data: nil, width: image.width, height: image.height,
+                                                bitsPerComponent: 8, bytesPerRow: bytesPerRow,
+                                                space: colorSpace, bitmapInfo: layout))
+            bitmap.setBlendMode(.copy)
+            bitmap.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            return Data(bytes: try XCTUnwrap(bitmap.data), count: image.height * bytesPerRow)
+        }
+        let actualPixels = try rgba(image)
+        let expectedPixels = try rgba(expected.image)
+        let dimensionsMatch = image.width == expected.image.width && image.height == expected.image.height
+        if !dimensionsMatch || actualPixels != expectedPixels {
+            // Preserve both images for diagnosis when the decoded output differs.
             let diagnosticRoot = ProcessInfo.processInfo.environment["FRALO_TEST_ARTIFACTS"].map { URL(fileURLWithPath: $0) } ?? FileManager.default.temporaryDirectory
             let diagnostics = diagnosticRoot.appendingPathComponent("fralo-copy-mismatch-\(UUID())")
             try FileManager.default.createDirectory(at: diagnostics, withIntermediateDirectories: true)
             try data.write(to: diagnostics.appendingPathComponent("copied.png"))
-            try expectedData.write(to: diagnostics.appendingPathComponent("expected.png"))
+            try FrameRenderer.pngData(expected.image).write(to: diagnostics.appendingPathComponent("expected.png"))
             try Data(contentsOf: source).write(to: diagnostics.appendingPathComponent("source.png"))
             try JSONEncoder().encode(settings).write(to: diagnostics.appendingPathComponent("settings.json"))
             print("[CopyMismatch] Failing buffers preserved at \(diagnostics.path)")
         }
-        XCTAssertEqual(data, expectedData, "Copy must use the raw composition even when the preview format is JPEG")
+        XCTAssertEqual(actualPixels, expectedPixels, "Copy must use the raw composition even when the preview format is JPEG")
         XCTAssertEqual(image.width, expected.image.width)
+        XCTAssertEqual(image.height, expected.image.height)
+        XCTAssertLessThan(actualPixels[3], 255, "Copy must preserve background transparency")
     }
 
     @MainActor func testFailedPreviewCanRecoverWithoutStaleBatchError() async throws {
