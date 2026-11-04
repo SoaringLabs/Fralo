@@ -96,25 +96,13 @@ Fralo 0.1.1 及以上版本可从 **Fralo → 检查更新…** 升级。应用�
 示例均使用 [`examples/`](examples) 中虚构的 *Field Notes* 界面，由
 [`scripts/generate-demo.swift`](scripts/generate-demo.swift) 生成，不含个人资料。
 
-## 用 AI Agent 批量出图
-
-如果你的版本包含 `fralo compose`，先在 Fralo 里调好构图，再将下面的指令复制给能在你的 Mac 上运行命令的编程 Agent。把示例目录换成你的实际路径。
-
-```text
-请用 Fralo 已保存的构图，为 ./screenshots 中的截图批量套框。
-先用 fralo guide 阅读离线指南。如果 PATH 中找不到 fralo，请使用
-/Applications/Fralo.app/Contents/MacOS/fralo。
-
-先用 compose 和 --output ./framed --app-settings --dry-run --json 预检。
-如果有失败项，请告诉我哪些输入需要处理并暂停。
-预检通过后，去掉 --dry-run 执行导出，并汇报成品路径、跳过的文件和失败项。
-```
-
 ## 命令行
 
-请使用包含 `compose` 的构建。若 `fralo` 已在 PATH 中，可直接使用命令名。下面的示例使用 App 内置的 CLI 路径。
+请使用包含 `fralo compose` 的版本。先在 Fralo 里用一张代表性的截图调好构图，再通过终端或编程 Agent 复用这套构图。把示例目录换成你的实际路径。
 
-先在 Fralo 里用一张代表性的截图调好构图，再到终端检查计划输出路径，确认后用同一套构图处理整个文件夹。
+### 在终端运行
+
+先预检，确认计划输出路径后再导出。如果 `fralo` 已在 PATH 中，可以用它替代 `"$FRALO"`。
 
 ```bash
 FRALO=/Applications/Fralo.app/Contents/MacOS/fralo
@@ -123,6 +111,17 @@ FRALO=/Applications/Fralo.app/Contents/MacOS/fralo
 ```
 
 `--app-settings` 读取最近一次保存的工作台设置。`--dry-run` 检查配置和输入，无需创建文件或目录。CLI 输出名为 `<原名>-fralo.png` 或 `.jpg`，默认跳过已有成品，可用 `--overwrite` 显式覆盖。
+
+### 用 AI Agent 批量出图
+
+把下面的指令复制给能在你的 Mac 上运行命令的编程 Agent。
+
+```text
+请用 Fralo 已保存的构图，把 ./screenshots 中的截图导出到 ./framed。
+先运行 fralo guide 阅读离线指南。需要时可使用 Fralo.app 内置的 CLI。
+先预检，有错误就暂停并汇报。预检通过后再导出，并汇报成品路径、
+跳过的文件和失败项。
+```
 
 ### 用配置文件复现示例
 
