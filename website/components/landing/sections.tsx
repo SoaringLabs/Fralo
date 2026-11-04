@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Image from "next/image"
-import { ChevronsLeftRightIcon, CopyIcon } from "lucide-react"
+import { CheckIcon, ChevronsLeftRightIcon, CopyIcon } from "lucide-react"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { downloadURL, repositoryURL, type RepositoryInfo } from "@/lib/repository"
@@ -31,16 +31,38 @@ const sectionBody = "m-0 text-[17px] leading-relaxed text-muted-foreground"
 const installCommand = "curl -fsSL https://fralo.app/install.sh | sh"
 const terminalInstallId = "terminal-install"
 
+function scrollToTerminalInstall(event: React.MouseEvent<HTMLAnchorElement>) {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
+
+  const target = document.getElementById(terminalInstallId)
+  if (!target) return
+
+  event.preventDefault()
+  const hash = event.currentTarget.hash
+  if (window.location.hash !== hash) window.history.pushState(null, "", hash)
+  target.focus({ preventScroll: true })
+  target.scrollIntoView({ behavior: "smooth" })
+}
+
 function TerminalInstall({ copy }: { copy: Dictionary["install"] }) {
-  const [status, setStatus] = React.useState("")
+  const [status, setStatus] = React.useState<"idle" | "copied" | "failed">("idle")
+  const resetStatus = React.useRef<number | undefined>(undefined)
+
+  React.useEffect(() => () => window.clearTimeout(resetStatus.current), [])
 
   async function copyCommand() {
     try {
       await navigator.clipboard.writeText(installCommand)
-      setStatus(copy.copied)
     } catch {
-      setStatus(copy.failed)
+      window.clearTimeout(resetStatus.current)
+      setStatus("failed")
+      return
     }
+
+    window.clearTimeout(resetStatus.current)
+    setStatus("copied")
+    resetStatus.current = window.setTimeout(() => setStatus("idle"), 2000)
   }
 
   return (
@@ -52,10 +74,12 @@ function TerminalInstall({ copy }: { copy: Dictionary["install"] }) {
       <div className="flex items-center gap-3 rounded-xl bg-bar py-2 pr-2 pl-4">
         <code lang="en" className="min-w-0 flex-1 font-mono [overflow-wrap:anywhere] select-all">{installCommand}</code>
         <Button type="button" variant="outline" size="icon-sm" className="size-11" aria-label={copy.copy} onClick={copyCommand}>
-          <CopyIcon aria-hidden="true" />
+          {status === "copied" ? <CheckIcon aria-hidden="true" className="text-primary" /> : <CopyIcon aria-hidden="true" />}
         </Button>
       </div>
-      <p role="status" className="m-0 text-muted-foreground empty:sr-only">{status}</p>
+      <p role="status" className={status === "failed" ? "m-0 text-muted-foreground" : "sr-only"}>
+        {status === "copied" ? copy.copied : status === "failed" ? copy.failed : ""}
+      </p>
     </div>
   )
 }
@@ -101,7 +125,7 @@ export function Hero({ dict }: { dict: Dictionary }) {
         </div>
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <Button asChild variant="link" size="sm" className="h-auto px-0 py-1 underline">
-            <a href={`#${terminalInstallId}`}>{dict.install.title}</a>
+            <a href={`#${terminalInstallId}`} onClick={scrollToTerminalInstall}>{dict.install.title}</a>
           </Button>
           <p className="m-0 text-[13px] text-muted-foreground">{dict.hero.meta}</p>
         </div>
