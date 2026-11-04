@@ -35,7 +35,7 @@ export function Inspector({
       aria-label={t.label}
       className={cn(
         settings.canvas === "dark" ? "theme-dark" : "theme-light",
-        "anim-late order-first grid w-full grid-cols-2 gap-x-3 gap-y-4 rounded-3xl p-4 text-foreground lg:sticky lg:top-6 lg:order-none lg:flex lg:w-auto lg:max-w-[290px] lg:flex-[1_1_260px] lg:flex-col lg:gap-[18px] lg:p-[18px]"
+        "anim-late order-first grid w-full grid-cols-2 gap-x-3 gap-y-4 rounded-3xl p-4 text-foreground lg:sticky lg:top-6 lg:order-none lg:mt-7 lg:flex lg:w-auto lg:max-w-[290px] lg:flex-[1_1_260px] lg:flex-col lg:gap-[18px] lg:p-[18px]"
       )}
     >
       <div className="col-span-2 hidden flex-col gap-0.5 lg:flex">

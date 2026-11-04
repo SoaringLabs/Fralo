@@ -22,28 +22,14 @@ function preferredLocale(request: NextRequest): Locale {
 }
 
 export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  const locale = preferredLocale(request)
+  if (locale === defaultLocale) return NextResponse.next()
 
-  // English is served at "/"; "/en" is only the internal route.
-  if (pathname === "/en" || pathname.startsWith("/en/")) {
-    const url = request.nextUrl.clone()
-    url.pathname = pathname.slice(3) || "/"
-    return NextResponse.redirect(url, 308)
-  }
-
-  if (pathname === "/") {
-    const locale = preferredLocale(request)
-    if (locale !== defaultLocale) {
-      const url = request.nextUrl.clone()
-      url.pathname = pathFor(locale)
-      return NextResponse.redirect(url, 307)
-    }
-    const url = request.nextUrl.clone()
-    url.pathname = `/${defaultLocale}`
-    return NextResponse.rewrite(url)
-  }
+  const url = request.nextUrl.clone()
+  url.pathname = pathFor(locale)
+  return NextResponse.redirect(url, 307)
 }
 
 export const config = {
-  matcher: ["/", "/en", "/en/:path*"],
+  matcher: "/",
 }

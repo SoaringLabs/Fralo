@@ -1,5 +1,5 @@
 import { cacheLife } from "next/cache"
-import { repository, type RepositoryInfo } from "./repository"
+import { downloadURL, repository, type RepositoryInfo } from "./repository"
 
 async function getJSON(path: string) {
   const headers: HeadersInit = { Accept: "application/vnd.github+json" }
@@ -10,16 +10,25 @@ async function getJSON(path: string) {
   return response.json()
 }
 
-/** Star count and latest release, refreshed daily. Missing values hide their UI instead of failing the page. */
+async function getLatestReleaseTag() {
+  const release = await getJSON(`repos/${repository}/releases/latest`).catch(() => null)
+  if (typeof release?.tag_name === "string" && release.tag_name) return release.tag_name
+
+  // The public download link can resolve a release even when the API is unavailable.
+  const response = await fetch(downloadURL, { redirect: "manual" })
+  const location = response.headers.get("location")
+  if (!location) return null
+  const target = new URL(location, downloadURL)
+  const tagPath = `/${repository}/releases/tag/`
+  if (target.origin !== new URL(downloadURL).origin || !target.pathname.startsWith(tagPath)) return null
+  return decodeURIComponent(target.pathname.slice(tagPath.length)) || null
+}
+
+/** Latest release, refreshed daily. */
 export async function getRepositoryInfo(): Promise<RepositoryInfo> {
   "use cache"
   cacheLife("days")
 
-  const [repo, release] = await Promise.allSettled([
-    getJSON(`repos/${repository}`),
-    getJSON(`repos/${repository}/releases/latest`),
-  ])
-  const stars = repo.status === "fulfilled" && typeof repo.value.stargazers_count === "number" ? repo.value.stargazers_count : null
-  const tag = release.status === "fulfilled" && typeof release.value.tag_name === "string" ? release.value.tag_name : null
-  return { stars, version: tag ? tag.replace(/^v/, "") : null }
+  const tag = await getLatestReleaseTag().catch(() => null)
+  return { version: tag ? tag.replace(/^v/, "") : null }
 }

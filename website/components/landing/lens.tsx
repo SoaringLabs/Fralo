@@ -47,6 +47,7 @@ export function WipeLens({ split, children }: { split: number; children: React.R
   }, [split])
 
   const refract = size && !reduceTransparency && !(isSafari() && size.width * size.height > safariSourceLimit)
+  // The library's separate shadow can drift while the framed page scales in.
   return (
     <div ref={setBox} className="absolute inset-0">
       {refract ? (
@@ -63,7 +64,7 @@ export function WipeLens({ split, children }: { split: number; children: React.R
           curvature={0.9}
           glow={0.2}
           edgeHighlight={0.5}
-          shadow="0 0 0 0.5px rgb(255 255 255 / 40%), 0 10px 26px rgb(0 0 0 / 28%)"
+          shadow={false}
           style={{ position: "absolute", inset: 0 }}
         >
           <div className="relative" style={{ width: size.width, height: size.height }}>

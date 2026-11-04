@@ -148,8 +148,12 @@
   }
   :is(:lang(zh-Hans), :lang(zh-Hant), :lang(ja)) .display { letter-spacing: 0; line-height: 1.18; }
   :is(:lang(zh-Hans), :lang(zh-Hant), :lang(ja)) .heading { letter-spacing: 0; line-height: 1.25; }
-  /* CJK headlines break between their phrases, so punctuation never starts a line. */
-  :is(:lang(zh-Hans), :lang(zh-Hant), :lang(ja)) .phrase { display: inline-block; }
+  /* Keep CJK phrases together when they fit. Allow strict line breaks within a wide phrase. */
+  :is(:lang(zh-Hans), :lang(zh-Hant), :lang(ja)) .phrase {
+    display: inline-block;
+    max-inline-size: 100%;
+    word-break: normal;
+  }
 
   /* Canvases behind the framed page. */
   .canvas-texture { background: #d9d3c9 url(/media/texture-warm.jpg) center / 900px repeat; }

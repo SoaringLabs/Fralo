@@ -33,7 +33,7 @@ for display in phone tablet browser; do
     browser) extra='"display":"browser","browser":"safari","browserAppearance":"light","windowRatio":"16:10"' ;;
   esac
   png=$(render "$display-clear" $display "{\"schemaVersion\":1,$extra,\"mode\":\"transparent\",\"transparentShadow\":\"soft\"}")
-  sips -Z 1600 "$png" --out "$out/$display-clear.png" >/dev/null
+  cp "$png" "$out/$display-clear.png"
 done
 
 # Canvas texture alone: the device is fully transparent.
@@ -44,10 +44,6 @@ sips -Z 1200 -s format jpeg -s formatOptions 82 "$png" --out "$out/texture-warm.
 png=$(render og browser "{\"schemaVersion\":1,\"display\":\"browser\",\"browser\":\"safari\",\"browserAppearance\":\"light\",\"windowRatio\":\"16:10\",\"mode\":\"background\",\"canvas\":\"16:9\",\"background\":\"gradient\",\"backgroundShadow\":\"soft\",\"deviceScale\":0.8,$colors}")
 sips -z 675 1200 -s format jpeg -s formatOptions 85 "$png" --out "$out/og.jpg" >/dev/null
 
-sips -Z 1600 "$repo/examples/01-today.png" --out "$out/phone-original.png" >/dev/null
+cp "$repo/examples/01-today.png" "$out/phone-original.png"
 cp "$repo/docs/assets/icon.png" "$out/icon.png"
-cp "$repo/docs/assets/workbench-en-light.png" "$out/workbench-en-light.png"
-cp "$repo/docs/assets/workbench-en-dark.png" "$out/workbench-en-dark.png"
-cp "$repo/docs/assets/workbench-light.png" "$out/workbench-zh-hans-light.png"
-cp "$repo/docs/assets/workbench-dark.png" "$out/workbench-zh-hans-dark.png"
 print "Rendered media into $out"

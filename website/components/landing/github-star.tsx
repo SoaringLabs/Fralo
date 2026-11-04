@@ -1,7 +1,6 @@
 import { StarIcon } from "lucide-react"
-import { cn } from "cn"
 import { Button } from "@/components/ui/button"
-import { formatStars, repositoryURL } from "@/lib/repository"
+import { repositoryURL } from "@/lib/repository"
 
 export function GitHubMark({ className }: { className?: string }) {
   return (
@@ -22,52 +21,26 @@ export function DownloadGlyph() {
 
 const starIcon = "size-3 transition-[fill,color,transform] group-hover:rotate-[-12deg] group-hover:scale-110 group-hover:fill-[#f5b400] group-hover:text-[#e0a100]"
 
-function label(stars: number | null) {
-  return stars === null ? "Star SoaringLabs/Fralo on GitHub" : `Star SoaringLabs/Fralo on GitHub, ${stars} ${stars === 1 ? "star" : "stars"}`
-}
+const starLabel = "Star SoaringLabs/Fralo on GitHub"
 
 /** The project's GitHub call to action. Always English, like GitHub's own UI. */
-export function GitHubStar({ stars, variant }: { stars: number | null; variant: "compact" | "large" | "dock" }) {
-  if (variant === "compact") {
-    return (
-      <Button asChild variant="outline" size="sm" className="group gap-0 overflow-hidden px-0 has-[>svg]:px-0">
-        <a href={repositoryURL} aria-label={label(stars)}>
-          <span className="flex items-center gap-1.5 pr-2.5 pl-[9px]">
-            <GitHubMark className="size-[15px]" />
-            Star
-          </span>
-          {stars !== null ? (
-            <span className="flex items-center gap-1 self-stretch px-2.5 font-medium tabular-nums shadow-[inset_1px_0_0_var(--border)]">
-              <StarIcon className={starIcon} strokeWidth={2.2} />
-              {formatStars(stars)}
-            </span>
-          ) : null}
-        </a>
-      </Button>
-    )
-  }
+export function GitHubStar({ variant }: { variant: "large" | "dock" }) {
   if (variant === "dock") {
     return (
       <Button asChild variant="ghost" size="sm" className="group rounded-full">
-        <a href={repositoryURL} aria-label={label(stars)}>
+        <a href={repositoryURL} aria-label={starLabel}>
           <GitHubMark className="size-[15px]" />
           <StarIcon className={starIcon} strokeWidth={2.2} />
-          {stars !== null ? <span className="tabular-nums">{formatStars(stars)}</span> : <span>Star</span>}
+          <span>Star</span>
         </a>
       </Button>
     )
   }
   return (
     <Button asChild variant="outline" size="lg" className="group">
-      <a href={repositoryURL} aria-label={label(stars)}>
+      <a href={repositoryURL} aria-label={starLabel}>
         <GitHubMark className="size-[17px]" />
         Star on GitHub
-        {stars !== null ? (
-          <span className={cn("ml-0.5 flex items-center gap-1 rounded-full bg-hover px-2 py-1 text-[13px] font-medium tabular-nums")}>
-            <StarIcon className={starIcon} strokeWidth={2.2} />
-            {formatStars(stars)}
-          </span>
-        ) : null}
       </a>
     </Button>
   )

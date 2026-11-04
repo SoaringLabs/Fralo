@@ -9,21 +9,27 @@ import { downloadURL, repositoryURL, type RepositoryInfo } from "@/lib/repositor
 import { format, type Locale } from "@/lib/i18n"
 import type { Dictionary } from "@/lib/dictionaries/en"
 import browserClear from "@/public/media/browser-clear.png"
+import icon from "@/public/media/icon.png"
 import phoneClear from "@/public/media/phone-clear.png"
 import phoneOriginal from "@/public/media/phone-original.png"
 import tabletClear from "@/public/media/tablet-clear.png"
 import workbenchEnDark from "@/public/media/workbench-en-dark.png"
 import workbenchEnLight from "@/public/media/workbench-en-light.png"
+import workbenchJaDark from "@/public/media/workbench-ja-dark.png"
+import workbenchJaLight from "@/public/media/workbench-ja-light.png"
 import workbenchZhHansDark from "@/public/media/workbench-zh-hans-dark.png"
 import workbenchZhHansLight from "@/public/media/workbench-zh-hans-light.png"
+import workbenchZhHantDark from "@/public/media/workbench-zh-hant-dark.png"
+import workbenchZhHantLight from "@/public/media/workbench-zh-hant-light.png"
 import { DownloadGlyph, GitHubStar } from "./github-star"
 import { WipeLens } from "./lens"
 import { Segmented } from "./segmented"
 import type { Appearance } from "./settings"
 
 const section = "border-t border-border px-[clamp(20px,5vw,72px)] py-24"
+const sectionBody = "m-0 text-[17px] leading-relaxed text-muted-foreground"
 
-/** Headline phrases; CJK lines break only between them, never before trailing punctuation. */
+/** Prefer breaking CJK headlines between phrases. */
 function Phrases({ phrases }: { phrases: string[] }) {
   return phrases.map((phrase) => (
     <span key={phrase} className="phrase">
@@ -32,9 +38,9 @@ function Phrases({ phrases }: { phrases: string[] }) {
   ))
 }
 
-function TwoLineHeading({ lines, className }: { lines: string[]; className?: string }) {
+function TwoLineHeading({ lines }: { lines: string[] }) {
   return (
-    <h2 className={cn("heading m-0 text-[clamp(28px,3.2vw,44px)] font-bold", className)}>
+    <h2 className="heading m-0 text-[clamp(28px,3.2vw,44px)] font-bold">
       {lines.map((line, index) => (
         <React.Fragment key={line}>
           {index > 0 ? <br /> : null}
@@ -45,10 +51,10 @@ function TwoLineHeading({ lines, className }: { lines: string[]; className?: str
   )
 }
 
-export function Hero({ dict, stars }: { dict: Dictionary; stars: number | null }) {
+export function Hero({ dict }: { dict: Dictionary }) {
   return (
     <section className="flex flex-wrap items-center gap-10 px-[clamp(20px,5vw,72px)] pt-[clamp(32px,5vw,72px)] pb-14">
-      <div className="flex max-w-[500px] flex-[1_1_340px] flex-col gap-[22px]">
+      <div className="flex min-w-0 max-w-[500px] flex-[1_1_340px] flex-col gap-[22px]">
         <h1 className="display m-0 text-[clamp(38px,4.6vw,62px)] font-bold">
           <Phrases phrases={dict.hero.title} />
         </h1>
@@ -60,7 +66,7 @@ export function Hero({ dict, stars }: { dict: Dictionary; stars: number | null }
               {dict.hero.cta}
             </a>
           </Button>
-          <GitHubStar stars={stars} variant="large" />
+          <GitHubStar variant="large" />
         </div>
         <p className="m-0 text-[13px] text-muted-foreground">{dict.hero.meta}</p>
       </div>
@@ -89,19 +95,20 @@ export function Compare({ dict }: { dict: Dictionary }) {
     <section className={cn(section, "reveal flex flex-wrap items-center gap-x-16 gap-y-10")}>
       <div className="flex max-w-[420px] flex-[1_1_300px] flex-col gap-3.5">
         <TwoLineHeading lines={dict.compare.title} />
-        <p className="m-0 text-[17px] leading-relaxed text-muted-foreground">{dict.compare.body}</p>
-        <p className="m-0 font-mono text-xs text-muted-foreground">01-today.png → 01-today-fralo.png · 1612 × 3132</p>
+        <p className={sectionBody}>{dict.compare.body}</p>
       </div>
       <div className="flex min-w-0 flex-[999_1_300px] justify-center pt-8">
         <div className="group/wipe relative aspect-[1612/3132] w-full max-w-[300px]">
           <WipeLens split={split}>
-            <Image
-              src={phoneOriginal}
-              alt=""
-              sizes="300px"
-              className="absolute shadow-[0_0_0_1px_var(--border)]"
-              style={{ left: `${screen.left * 100}%`, top: `${screen.top * 100}%`, width: `${screen.width * 100}%`, height: `${screen.height * 100}%` }}
-            />
+            <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - split}% 0 0)` }}>
+              <Image
+                src={phoneOriginal}
+                alt=""
+                sizes="300px"
+                className="absolute shadow-[0_0_0_1px_var(--border)]"
+                style={{ left: `${screen.left * 100}%`, top: `${screen.top * 100}%`, width: `${screen.width * 100}%`, height: `${screen.height * 100}%` }}
+              />
+            </div>
             <Image src={phoneClear} alt="" sizes="300px" className="absolute inset-0 size-full" style={{ clipPath: `inset(0 0 0 ${split}%)` }} />
             <span aria-hidden="true" className="absolute inset-y-0 -ml-px w-0.5 bg-ring" style={{ left: `${split}%` }} />
           </WipeLens>
@@ -182,7 +189,7 @@ export function Canvases({ dict, reduceMotion }: { dict: Dictionary; reduceMotio
     <section className={cn(section, "reveal flex flex-wrap items-center gap-x-14 gap-y-10")}>
       <div className="flex max-w-[420px] flex-[1_1_300px] flex-col gap-4">
         <TwoLineHeading lines={dict.canvases.title} />
-        <p className="m-0 text-[17px] leading-relaxed text-muted-foreground">{dict.canvases.body}</p>
+        <p className={sectionBody}>{dict.canvases.body}</p>
         <Segmented
           label={dict.canvases.group}
           className="self-start"
@@ -210,9 +217,15 @@ export function Canvases({ dict, reduceMotion }: { dict: Dictionary; reduceMotio
   )
 }
 
+const workbenchCaptures = {
+  en: { light: workbenchEnLight, dark: workbenchEnDark },
+  "zh-hans": { light: workbenchZhHansLight, dark: workbenchZhHansDark },
+  "zh-hant": { light: workbenchZhHantLight, dark: workbenchZhHantDark },
+  ja: { light: workbenchJaLight, dark: workbenchJaDark },
+} satisfies Record<Locale, Record<Appearance, typeof workbenchEnLight>>
+
 export function Workbench({ dict, locale, appearance }: { dict: Dictionary; locale: Locale; appearance: Appearance }) {
-  // Only Simplified Chinese has its own captures so far; other locales show the English UI.
-  const [light, dark] = locale === "zh-hans" ? [workbenchZhHansLight, workbenchZhHansDark] : [workbenchEnLight, workbenchEnDark]
+  const { light, dark } = workbenchCaptures[locale]
   return (
     <section className={cn(section, "reveal")}>
       <div className="relative">
@@ -234,8 +247,8 @@ export function Cli({ dict }: { dict: Dictionary }) {
   return (
     <section className={cn(section, "reveal flex flex-wrap items-center gap-x-14 gap-y-6")}>
       <div className="flex flex-[1_1_260px] flex-col gap-3">
-        <TwoLineHeading lines={dict.cli.title} className="text-[clamp(26px,2.8vw,38px)]" />
-        <p className="m-0 text-base leading-relaxed text-muted-foreground">{dict.cli.body}</p>
+        <TwoLineHeading lines={dict.cli.title} />
+        <p className={sectionBody}>{dict.cli.body}</p>
       </div>
       <pre lang="en" className="m-0 min-w-0 flex-[999_1_460px] overflow-x-auto rounded-xl bg-bar p-[22px] font-mono text-[13.5px] leading-[1.85]">
         <span className="text-muted-foreground">$ </span>
@@ -248,19 +261,36 @@ export function Cli({ dict }: { dict: Dictionary }) {
 }
 
 export function Closing({ dict, repository }: { dict: Dictionary; repository: RepositoryInfo }) {
+  const [recap, conclusion] = dict.closing.title
   return (
-    <section className="flex flex-wrap items-end justify-between gap-x-10 gap-y-6 border-t border-border px-[clamp(20px,5vw,72px)] pt-24 pb-24">
-      <h2 className="display m-0 text-[clamp(36px,4.6vw,64px)] font-bold">
-        <Phrases phrases={dict.closing.title} />
+    <section className="flex flex-col gap-11 border-t border-border px-[clamp(20px,5vw,72px)] pt-[clamp(72px,9vw,120px)] pb-[clamp(64px,8vw,104px)]">
+      {/* A two-tone sign-off: the recap phrases recede, the final phrase carries the weight. */}
+      <h2 className="display m-0 max-w-[15em] text-[clamp(30px,4.2vw,52px)] font-bold">
+        <span className="block text-[#8e8e93]">
+          <Phrases phrases={recap} />
+        </span>
+        <Phrases phrases={conclusion} />
       </h2>
-      <div className="flex flex-wrap items-center gap-2.5">
-        <Button asChild size="lg" className="group">
-          <a href={downloadURL}>
-            <DownloadGlyph />
-            {repository.version ? format(dict.closing.cta, { version: repository.version }) : dict.closing.ctaNoVersion}
-          </a>
-        </Button>
-        <GitHubStar stars={repository.stars} variant="large" />
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-6">
+        <div className="mr-auto flex items-center gap-3.5">
+          <Image src={icon} alt="" width={52} height={52} className="drop-shadow-[0_6px_12px_rgb(0_0_0/14%)]" />
+          <div>
+            <p className="m-0 flex items-baseline gap-2 text-base font-semibold">
+              Fralo
+              {repository.version ? <span className="text-[13px] font-normal tabular-nums text-muted-foreground">v{repository.version}</span> : null}
+            </p>
+            <p className="m-0 mt-0.5 text-[13px] text-muted-foreground">{dict.hero.meta}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button asChild size="lg" className="group">
+            <a href={downloadURL}>
+              <DownloadGlyph />
+              {dict.hero.cta}
+            </a>
+          </Button>
+          <GitHubStar variant="large" />
+        </div>
       </div>
     </section>
   )

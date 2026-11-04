@@ -92,7 +92,7 @@ export function Landing({ locale, dict, repository }: { locale: Locale; dict: Di
   ].join(" · ")
 
   return (
-    <div className="relative min-h-dvh overflow-clip px-3 pt-[clamp(18px,3.5vw,56px)] pb-[clamp(48px,6vw,96px)] sm:px-[clamp(12px,3.5vw,56px)]">
+    <div className="relative min-h-dvh overflow-clip px-3 pt-6 pb-8 sm:px-[clamp(12px,3.5vw,56px)] sm:pt-[clamp(18px,3.5vw,56px)] sm:pb-[clamp(48px,6vw,96px)]">
       <a
         href="#content"
         className="sr-only z-50 rounded-lg bg-background px-3 py-2 text-sm font-semibold text-foreground focus:not-sr-only focus:absolute focus:top-3 focus:left-3"
@@ -108,15 +108,18 @@ export function Landing({ locale, dict, repository }: { locale: Locale; dict: Di
           style={{ opacity: settings.canvas === canvas ? 1 : 0 }}
         />
       ))}
-      {(["top-3.5 left-3.5 border-t border-l origin-top-left", "top-3.5 right-3.5 border-t border-r origin-top-right", "bottom-3.5 left-3.5 border-b border-l origin-bottom-left", "right-3.5 bottom-3.5 border-r border-b origin-bottom-right"] as const).map((position) => (
-        <span key={position} aria-hidden="true" className={cn("anim-mark absolute size-6", position)} style={{ borderColor: outerInk }} />
-      ))}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-1.5 inset-y-2 sm:inset-3.5">
+        {(["top-0 left-0 border-t border-l origin-top-left", "top-0 right-0 border-t border-r origin-top-right", "bottom-0 left-0 border-b border-l origin-bottom-left", "right-0 bottom-0 border-r border-b origin-bottom-right"] as const).map((position) => (
+          <span key={position} className={cn("anim-mark absolute size-4 sm:size-6", position)} style={{ borderColor: outerInk }} />
+        ))}
+      </div>
 
       <div className="relative z-[1] mx-auto flex max-w-[1560px] flex-wrap items-start gap-7">
         <div className="flex min-w-0 flex-[999_1_640px] flex-col items-center">
+          {/* The ruler is 28px tall (16px line + 12px gap); the inspector drops by the same amount so it lines up with the window. */}
           <div
             aria-hidden="true"
-            className="anim-late mb-3 flex w-full items-center gap-2.5 font-mono text-[11px] transition-[max-width] duration-500 motion-reduce:transition-none"
+            className="anim-late mb-3 flex w-full items-center gap-2.5 font-mono text-[11px] leading-4 transition-[max-width] duration-500 motion-reduce:transition-none"
             style={{ maxWidth: windowWidth, color: outerInk }}
           >
             <span className="h-[9px] w-px" style={{ background: outerInk }} />
@@ -161,19 +164,13 @@ export function Landing({ locale, dict, repository }: { locale: Locale; dict: Di
             <main id="content">
               <nav aria-label="Fralo" className="flex flex-wrap items-center gap-x-3 gap-y-2.5 px-[clamp(20px,5vw,72px)] pt-[18px]">
                 <span className="mr-auto flex items-center gap-2.5 text-[15px] font-semibold">
-                  <Image src={icon} alt="" width={30} height={30} />
+                  <Image src={icon} alt="" width={36} height={36} />
                   Fralo
                 </span>
                 <LanguageSelect locale={locale} label={dict.language} container={windowElement} />
-                <span className="hidden sm:contents">
-                  <GitHubStar stars={repository.stars} variant="compact" />
-                </span>
-                <Button asChild variant="invert" size="sm">
-                  <a href={downloadURL}>{dict.download}</a>
-                </Button>
               </nav>
 
-              <Hero dict={dict} stars={repository.stars} />
+              <Hero dict={dict} />
               <Compare dict={dict} />
               <Canvases dict={dict} reduceMotion={reduceMotion} />
               <Workbench dict={dict} locale={locale} appearance={appearance} />
@@ -188,8 +185,8 @@ export function Landing({ locale, dict, repository }: { locale: Locale; dict: Di
                   Fralo{repository.version ? <span className="font-normal text-muted-foreground"> {repository.version}</span> : null}
                 </span>
                 <span aria-hidden="true" className="h-[18px] w-px bg-border" />
-                <GitHubStar stars={repository.stars} variant="dock" />
-                <Button asChild size="sm" className="group rounded-full">
+                <GitHubStar variant="dock" />
+                <Button asChild size="sm" className="group rounded-full has-[>svg]:pe-[11px]">
                   <a href={downloadURL}>
                     <DownloadGlyph />
                     {dict.download}
