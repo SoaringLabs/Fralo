@@ -31,7 +31,7 @@ Apple 说明：https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-u
 Paste this line into Terminal on an Apple silicon Mac. The script runs after the download succeeds.
 
 ```sh
-fralo_installer=$(/usr/bin/curl -qfsSL https://raw.githubusercontent.com/SoaringLabs/Fralo/main/scripts/install.sh) && /bin/bash -c "$fralo_installer"
+curl -fsSL https://fralo.app/install.sh | sh
 ```
 
 安装成功后验证 CLI / Verify the CLI after installation:
@@ -41,20 +41,24 @@ FRALO="$HOME/Applications/Fralo.app/Contents/MacOS/fralo"
 "$FRALO" --version
 ```
 
-默认安装最新稳定版。需要固定版本时，在安装命令末尾加 `-- --version 0.2.0`（替换成需要的版本）。
+默认安装最新稳定版。需要固定版本时，把末尾的 `sh` 换成 `sh -s -- --version 0.2.0`（替换成需要的版本）。
 脚本会校验 SHA-256、发布者签名和 Gatekeeper 评估结果，然后将同一个正式 DMG 里的 App
 复制到 `~/Applications/Fralo.app`。无需提权；不会打开 App，也不会更改 PATH 或覆盖该位置的现有 App。
 成功时标准输出只有 CLI 的绝对路径。Agent 可以使用它运行 `"$FRALO" guide`
 （支持 Agent CLI 的版本），无需先打开 App 创建配置。v0.2.0 的 CLI 请用 `"$FRALO" --help`。
 
-The script installs the latest stable release by default. Append `-- --version 0.2.0`
-(or the version you need) to the installer command to pin the release.
+The script installs the latest stable release by default. To pin the release,
+replace `sh` at the end with `sh -s -- --version 0.2.0` (or the version you need).
 It checks the SHA-256, publisher signature, and Gatekeeper assessment before
 copying the app from the same release DMG to `~/Applications/Fralo.app`.
 It needs no administrator access, launches no app, changes no PATH settings, and
 leaves any existing app at that location in place. On success, stdout contains
 only the absolute CLI path. On releases with the agent CLI, run `"$FRALO" guide`
 to get started without opening the app. For v0.2.0, use `"$FRALO" --help`.
+
+Agent 在 Bash 或 Zsh 自动化里可先启用 `set -o pipefail`，让入口下载失败时整条命令返回错误。
+For automation in Bash or Zsh, enable `set -o pipefail` so the command reports an error
+if the initial download fails.
 
 已有 Fralo 的用户可以继续使用其内置 CLI 和更新器。终端安装和拖拽安装可以位于不同目录，
 请使用你希望调用的那份 App 的 CLI 路径。
