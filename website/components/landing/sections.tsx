@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Image from "next/image"
-import { ChevronsLeftRightIcon } from "lucide-react"
+import { CheckIcon, ChevronsLeftRightIcon, CopyIcon } from "lucide-react"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { downloadURL, repositoryURL, type RepositoryInfo } from "@/lib/repository"
@@ -28,6 +28,61 @@ import type { Appearance } from "./settings"
 
 const section = "border-t border-border px-[clamp(20px,5vw,72px)] py-24"
 const sectionBody = "m-0 text-[17px] leading-relaxed text-muted-foreground"
+const installCommand = "curl -fsSL https://fralo.app/install.sh | sh"
+const terminalInstallId = "terminal-install"
+
+function scrollToTerminalInstall(event: React.MouseEvent<HTMLAnchorElement>) {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
+
+  const target = document.getElementById(terminalInstallId)
+  if (!target) return
+
+  event.preventDefault()
+  const hash = event.currentTarget.hash
+  if (window.location.hash !== hash) window.history.pushState(null, "", hash)
+  target.focus({ preventScroll: true })
+  target.scrollIntoView({ behavior: "smooth" })
+}
+
+function TerminalInstall({ copy }: { copy: Dictionary["install"] }) {
+  const [status, setStatus] = React.useState<"idle" | "copied" | "failed">("idle")
+  const resetStatus = React.useRef<number | undefined>(undefined)
+
+  React.useEffect(() => () => window.clearTimeout(resetStatus.current), [])
+
+  async function copyCommand() {
+    try {
+      await navigator.clipboard.writeText(installCommand)
+    } catch {
+      window.clearTimeout(resetStatus.current)
+      setStatus("failed")
+      return
+    }
+
+    window.clearTimeout(resetStatus.current)
+    setStatus("copied")
+    resetStatus.current = window.setTimeout(() => setStatus("idle"), 2000)
+  }
+
+  return (
+    <div className="flex min-w-0 flex-col gap-2 text-sm">
+      <div>
+        <h3 id={terminalInstallId} tabIndex={-1} className="m-0 scroll-mt-8 font-semibold">{copy.title}</h3>
+        <p className="m-0 mt-1 text-muted-foreground">{copy.body}</p>
+      </div>
+      <div className="flex items-center gap-3 rounded-xl bg-bar py-2 pr-2 pl-4">
+        <code lang="en" className="min-w-0 flex-1 font-mono [overflow-wrap:anywhere] select-all">{installCommand}</code>
+        <Button type="button" variant="outline" size="icon-sm" className="size-11" aria-label={copy.copy} onClick={copyCommand}>
+          {status === "copied" ? <CheckIcon aria-hidden="true" className="text-primary" /> : <CopyIcon aria-hidden="true" />}
+        </Button>
+      </div>
+      <p role="status" className={status === "failed" ? "m-0 text-muted-foreground" : "sr-only"}>
+        {status === "copied" ? copy.copied : status === "failed" ? copy.failed : ""}
+      </p>
+    </div>
+  )
+}
 
 /** Prefer breaking CJK headlines between phrases. */
 function Phrases({ phrases }: { phrases: string[] }) {
@@ -68,7 +123,12 @@ export function Hero({ dict }: { dict: Dictionary }) {
           </Button>
           <GitHubStar variant="large" />
         </div>
-        <p className="m-0 text-[13px] text-muted-foreground">{dict.hero.meta}</p>
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <Button asChild variant="link" size="sm" className="h-auto px-0 py-1 underline">
+            <a href={`#${terminalInstallId}`} onClick={scrollToTerminalInstall}>{dict.install.title}</a>
+          </Button>
+          <p className="m-0 text-[13px] text-muted-foreground">{dict.hero.meta}</p>
+        </div>
       </div>
       <div role="img" aria-label={dict.hero.devices} className="device-fan relative aspect-[5/4] min-w-0 flex-[999_1_440px]">
         <div className="device device-browser absolute top-[4%] right-0 w-[78%]" style={{ animationDelay: "0.55s" }}>
@@ -263,16 +323,15 @@ export function Cli({ dict }: { dict: Dictionary }) {
 export function Closing({ dict, repository }: { dict: Dictionary; repository: RepositoryInfo }) {
   const [recap, conclusion] = dict.closing.title
   return (
-    <section className="flex flex-col gap-11 border-t border-border px-[clamp(20px,5vw,72px)] pt-[clamp(72px,9vw,120px)] pb-[clamp(64px,8vw,104px)]">
-      {/* A two-tone sign-off: the recap phrases recede, the final phrase carries the weight. */}
-      <h2 className="display m-0 max-w-[15em] text-[clamp(30px,4.2vw,52px)] font-bold">
-        <span className="block text-[#8e8e93]">
-          <Phrases phrases={recap} />
-        </span>
-        <Phrases phrases={conclusion} />
-      </h2>
-      <div className="flex flex-wrap items-center gap-x-8 gap-y-6">
-        <div className="mr-auto flex items-center gap-3.5">
+    <section className="flex flex-wrap items-center gap-x-14 gap-y-9 border-t border-border px-[clamp(20px,5vw,72px)] pt-[clamp(72px,9vw,120px)] pb-[clamp(64px,8vw,104px)]">
+      <div className="flex min-w-0 flex-[1_1_390px] flex-col gap-6">
+        <h2 className="display m-0 max-w-[15em] text-[clamp(30px,4.2vw,52px)] font-bold">
+          <span className="block text-[#8e8e93]">
+            <Phrases phrases={recap} />
+          </span>
+          <Phrases phrases={conclusion} />
+        </h2>
+        <div className="flex items-center gap-3.5">
           <Image src={icon} alt="" width={52} height={52} className="drop-shadow-[0_6px_12px_rgb(0_0_0/14%)]" />
           <div>
             <p className="m-0 flex items-baseline gap-2 text-base font-semibold">
@@ -282,6 +341,8 @@ export function Closing({ dict, repository }: { dict: Dictionary; repository: Re
             <p className="m-0 mt-0.5 text-[13px] text-muted-foreground">{dict.hero.meta}</p>
           </div>
         </div>
+      </div>
+      <div className="flex min-w-0 flex-[1_1_440px] flex-col gap-5">
         <div className="flex flex-wrap items-center gap-2.5">
           <Button asChild size="lg" className="group">
             <a href={downloadURL}>
@@ -291,6 +352,7 @@ export function Closing({ dict, repository }: { dict: Dictionary; repository: Re
           </Button>
           <GitHubStar variant="large" />
         </div>
+        <TerminalInstall copy={dict.install} />
       </div>
     </section>
   )
