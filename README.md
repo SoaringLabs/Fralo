@@ -6,16 +6,18 @@
 
 # Fralo
 
-**Batch-frame screenshots into device mockups on your Mac. Import once, export once.**
+**Batch screenshot mockups for macOS. Set the style once and export the whole batch.**
 
 [![Latest release](https://img.shields.io/github/v/release/SoaringLabs/Fralo?label=release&color=0a84ff)](https://github.com/SoaringLabs/Fralo/releases/latest)
 [![CI](https://github.com/SoaringLabs/Fralo/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SoaringLabs/Fralo/actions/workflows/ci.yml)
 [![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey?logo=apple)](#requirements)
 [![Swift](https://img.shields.io/badge/Swift-5.10-F05138?logo=swift&logoColor=white)](Package.swift)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Contact @peekbomb on X](https://img.shields.io/badge/%40peekbomb-000000?logo=x&logoColor=white)](https://x.com/peekbomb)
 
 [**Download the macOS App**](https://github.com/SoaringLabs/Fralo/releases/latest) ·
 [**CLI quickstart**](#command-line-interface) ·
+[**AI agent**](#with-an-ai-agent) ·
 [Changelog](CHANGELOG.md) ·
 [Install guide](INSTALL.md) ·
 [Contributing](CONTRIBUTING.md)
@@ -27,97 +29,43 @@
   <img src="docs/assets/workbench-en-light.png" width="1200" alt="The complete English Fralo workbench with native window shadow, three generated Field Notes screenshots, an iPhone 18 Pro Max frame, and a warm background">
 </picture>
 
-Fralo is a native macOS app and command-line tool that puts your screenshots inside
-phone, tablet, and browser frames. Drop in a batch of PNG or JPEG screenshots, choose a
-device and a look once, check the preview, and export the whole batch as transparent PNGs
-or finished images on a background.
-
-Everything runs locally: no account, no upload, no analytics. The App and the CLI are
-built on the same Core Graphics rendering core.
+Make a consistent set of mockups for an App Store listing, release post, or documentation. Drop in PNG or JPEG screenshots, choose a phone, tablet, or browser frame, and preview the same composition across the batch. Export transparent PNGs or finished images with a background.
 
 ## Features
 
-- **Batch first.** Drag in files, a folder, or paste from the clipboard. Duplicates are
-  skipped, and every image in the batch shares one set of settings.
-- **Phone, tablet, and browser shells.** iPhone 18 Pro and Pro Max in portrait or landscape,
-  a tablet, and Safari or Chrome windows in 16:10, 16:9, or 4:3 with light or dark chrome.
-- **Transparent or on a background.** Export a cut-out device with alpha, or place it on a
-  1:1, 4:3, 16:9, 3:4, or 9:16 canvas over a solid color, a gradient, a preset texture, or
-  your own image.
-- **Direct composition.** Set device size, position, shadow, and opacity. Drag the device or
-  pan the background right in the preview, and nudge by 1 px with ⌥ and the arrow keys.
-- **Pixel-faithful output.** Phone frames are sized so native-resolution screenshots are
-  placed 1:1, without resampling. Rounded corners and the Dynamic Island are masked
-  automatically.
-- **PNG or JPEG.** Lossless PNG, smaller PNG presets, or JPEG with quality and fill color.
-- **Safe exports.** The App keeps existing files and adds a number when a name is taken.
-  Originals are preserved, exports can be canceled, and one failed image does not stop the batch.
-- **A real Mac app.** Native sidebar, toolbar, menus, keyboard shortcuts, undo and redo,
-  English, Simplified Chinese, Traditional Chinese, and Japanese, light and dark appearance,
-  and support for Reduce Motion, Reduce Transparency, and Increase Contrast.
-- **Scriptable.** A bundled `fralo` CLI renders batches without opening the App.
-- **Signed updates.** In-app updates through [Sparkle](https://sparkle-project.org), with
-  Ed25519-verified archives. Fralo checks GitHub once a day, never installs silently, and can
-  be set to check only on request.
+| What you want to do | What Fralo offers |
+| --- | --- |
+| Choose a frame | Use an iPhone 18 Pro, iPhone 18 Pro Max, or tablet in portrait or landscape. Safari and Chrome frames come in light or dark, with 16:10, 16:9, and 4:3 window ratios. |
+| Build a composition | Keep the frame transparent or place it on a 1:1, 4:3, 16:9, 3:4, or 9:16 canvas. Use a solid color, gradient, preset texture, or your own image. |
+| Fine-tune the layout | Drag the device or pan the background in the preview. Adjust size, shadow, and opacity, or hold ⌥ and press an arrow key to move the device by 1 px. |
+| Choose a format | Use lossless PNG, smaller PNG presets, or JPEG with adjustable quality and fill color. Transparent exports use PNG. |
+| Automate repeat work | The app and `fralo compose` share a renderer. Reuse the app's saved composition or supply a separate JSON recipe. |
 
-## Showcase
-
-| Warm preset | Gradient | Sage preset | Transparent PNG |
-| :---: | :---: | :---: | :---: |
-| <img src="docs/assets/background-1.jpg" width="200" alt="Phone frame on a warm textured background"> | <img src="docs/assets/background-2.jpg" width="200" alt="Phone frame on a peach-to-blue gradient"> | <img src="docs/assets/background-3.jpg" width="200" alt="Phone frame on a sage textured background"> | <img src="docs/assets/framed.png" width="140" alt="Transparent phone frame exported by the CLI"> |
-
-All examples use the fictional *Field Notes* screens in [`examples/`](examples), generated by
-[`scripts/generate-demo.swift`](scripts/generate-demo.swift). They contain no personal data.
+The workbench supports light and dark appearance, undo and redo, and the system settings for Reduce Motion, Reduce Transparency, and Increase Contrast.
 
 ## Installation
 
-### Download
+Download `Fralo-<version>-arm64.dmg` from the [latest release](https://github.com/SoaringLabs/Fralo/releases/latest). Open the disk image and drag Fralo into Applications. Release builds are signed with Developer ID and notarized by Apple. See the [install guide](INSTALL.md) for checksum verification, first launch, and uninstall steps.
 
-1. Download `Fralo-<version>-arm64.dmg` and `SHA256SUMS.txt` from the
-   [latest release](https://github.com/SoaringLabs/Fralo/releases/latest).
-2. Verify the download (optional, recommended):
-
-   ```bash
-   shasum -a 256 -c SHA256SUMS.txt
-   ```
-
-3. Open the DMG and drag **Fralo** to **Applications**.
-
-Release DMGs are signed with Developer ID and notarized by Apple. See [INSTALL.md](INSTALL.md)
-for first launch, updating, and uninstalling.
-
-### Updating
-
-Fralo 0.1.1 and later update in place: choose **Fralo → Check for Updates…**.
-Installing waits for any running export to finish. Fralo 0.1.0 has no updater; install the
-latest DMG once.
+This README describes the current source tree. See the [changelog](CHANGELOG.md) for changes by version.
 
 ### Requirements
 
-| | |
-| --- | --- |
-| macOS | 14 Sonoma or later (runtime-verified on macOS 27; older versions are build targets only) |
-| Hardware | Apple silicon. Intel builds are not published. |
-| Interface languages | English, Simplified Chinese, Traditional Chinese, Japanese |
+- **Mac:** Apple silicon.
+- **macOS:** Minimum deployment target is macOS 14 Sonoma. Runtime testing covers macOS 27. Earlier versions have yet to be verified.
+- **Languages:** English, Simplified Chinese, Traditional Chinese, and Japanese. Choose a language in **Fralo → Settings… → Appearance → Language**, or follow the system preference. Fralo falls back to English when no supported language matches.
+
+### Updating
+
+In Fralo 0.1.1 and later, choose **Fralo → Check for Updates…**. Fralo checks daily by default and can be set to check manually. Sparkle verifies update archives. Installation requires confirmation and waits for any active export to finish. If you use 0.1.0, install a newer DMG manually.
 
 ## Usage
 
-Choose **Fralo → Settings… → Appearance → Language** to change the interface language
-immediately. The default follows your macOS preferred languages; unsupported languages
-fall back to English.
+1. **Add screenshots.** Drag in PNG or JPEG files, choose files with ⌘O, import a folder with ⇧⌘O, or paste with ⌘V. Folder import scans the top level only.
+2. **Set up the composition.** Pick a frame and orientation, then choose transparent output or add a background. Use ⌘[ and ⌘] to check how the same settings look across the batch.
+3. **Export.** Press ⇧⌘E for the whole batch, ⌘E for the current image, or ⌘C to copy the current result at full resolution.
 
-1. **Add screenshots.** Drag PNG or JPEG files onto the window, press ⌘O to choose files,
-   ⇧⌘O to import a folder (top level only), or ⌘V to paste.
-2. **Pick a device.** Choose phone, tablet, or browser, then the model and orientation.
-   Screenshots must match the orientation you pick.
-3. **Choose a look.** Keep the output transparent, or switch to a background and set the
-   canvas, background, size, position, and shadow.
-4. **Check it.** Step through the batch with ⌘[ and ⌘], fit to window with ⌘0, or inspect
-   actual pixels with ⌘1.
-5. **Export.** ⇧⌘E exports the whole batch to a folder, ⌘E exports the current image, and
-   ⌘C copies the current result at full resolution.
-
-Both single-image and batch exports ask for a save location and create a new `fralo-YYYYMMDD-HHmmss` folder there for that export. A single-image export also lets you edit the filename. The App names files `fralo-<original-name>-YYYYMMDD-HHmmss.png` (or `.jpg`), using local time and one timestamp per export. Existing names receive `-2`, `-3`, and so on. All images from that export go inside the new folder; if its name is taken, a numbered folder is created instead. The completion dialog opens that folder. The CLI keeps its stable `<name>-fralo.png` names and explicit `--overwrite` behavior.
+Fralo creates a timestamped `fralo-YYYYMMDD-HHmmss` folder for each export and can open it when the export finishes. It adds a number when a name is taken, preserves originals, and continues the batch if an individual image fails. You can cancel a running export.
 
 <details>
 <summary><b>Keyboard shortcuts</b></summary>
@@ -139,170 +87,89 @@ Both single-image and batch exports ask for a save location and create a new `fr
 
 </details>
 
+## Showcase
+
+| Warm preset | Gradient | Sage preset | Transparent PNG |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/assets/background-1.jpg" width="200" alt="Phone frame on a warm textured background"> | <img src="docs/assets/background-2.jpg" width="200" alt="Phone frame on a peach-to-blue gradient"> | <img src="docs/assets/background-3.jpg" width="200" alt="Phone frame on a sage textured background"> | <img src="docs/assets/framed.png" width="103" alt="Transparent phone frame exported by the CLI"> |
+
+All examples use the fictional *Field Notes* screens in [`examples/`](examples), generated by
+[`scripts/generate-demo.swift`](scripts/generate-demo.swift). They contain no personal data.
+
 ## Command-line interface
 
-Turn screenshots into finished mockups from a terminal or an Agent. `fralo compose`
-uses the same renderer as the App for phone, tablet, and browser frames, with
-transparent PNG or background compositions in PNG or JPEG.
+Use a build that includes `fralo compose`. Set up a representative screenshot in Fralo, then reuse that saved composition for a batch from the terminal or a coding agent. Replace the example directories with your own paths.
 
-Use a build that includes `compose`. If `fralo` is outside your PATH, use the
-bundled executable at `/Applications/Fralo.app/Contents/MacOS/fralo`.
+### From the terminal
 
-### Set up the look in the App, export the batch from the terminal
-
-Open a representative screenshot in Fralo and adjust the frame, background,
-and layout in the preview. Once you're happy with the saved composition, point
-the CLI at the folder you want to render.
+Run the preflight first and review the planned output paths before exporting. If `fralo` is on your PATH, use it in place of `"$FRALO"`.
 
 ```bash
-fralo compose ./screenshots --output ./framed --app-settings --dry-run --json
-fralo compose ./screenshots --output ./framed --app-settings --json
+FRALO=/Applications/Fralo.app/Contents/MacOS/fralo
+"$FRALO" compose ./screenshots --output ./framed --app-settings --dry-run --json
+"$FRALO" compose ./screenshots --output ./framed --app-settings --json
 ```
 
-`--app-settings` reads the saved workbench settings at the start of each run.
-Preflight lists the planned output without creating files or directories.
+`--app-settings` reads the last saved workbench settings. `--dry-run` checks the configuration and inputs without creating files or folders. The CLI names outputs `<name>-fralo.png` or `.jpg` and skips existing outputs unless you pass `--overwrite`.
+
+### With an AI agent
+
+Copy this prompt into a coding agent that can run commands on your Mac.
+
+```text
+Use Fralo to export ./screenshots to ./framed with my saved composition.
+Read fralo guide first, using the CLI bundled in Fralo.app if needed.
+Preflight the batch and stop if there are errors. If it's ready, export it
+and report the output paths, skipped files, and any failures.
+```
 
 ### Reproduce the sample with a recipe
 
-Run these commands from the repository root to try a self-contained recipe.
+From the repository root, run these commands with the same `FRALO` variable.
 
 ```bash
-fralo example phone > phone.json
-fralo compose examples/01-today.png --output ./framed --config phone.json --dry-run --json
-fralo compose examples/01-today.png --output ./framed --config phone.json --json
+"$FRALO" example phone > phone.json
+"$FRALO" compose examples/01-today.png --output ./framed --config phone.json --json
 ```
 
 <p align="center">
   <img src="docs/assets/cli-compose.png" width="270" alt="Actual Fralo CLI output showing the Field Notes screenshot in an iPhone frame on a warm textured background">
 </p>
 
-The phone recipe exports the image shown here as `framed/01-today-fralo.png`
-on a 1350 × 2400 canvas.
+The example exports `framed/01-today-fralo.png` at 1350 × 2400 pixels.
 
-### From command to script
+### Scripting and discovery
 
-`--json` sends one structured report to stdout and keeps progress on stderr.
-Here are selected fields from a fresh export of the phone recipe above.
+`fralo guide` prints the offline guide. Use `fralo capabilities --json` to discover supported commands and formats, and `fralo schema --json` for configuration fields, defaults, and ranges. For batch results, `--json` reports each file's path, status, and any error code. Progress goes to stderr.
 
-```json
-{
-  "status": "completed",
-  "succeeded": 1,
-  "failed": 0,
-  "outputFormat": "png"
-}
-```
-
-Each entry includes the input, output path, and status. If one image fails,
-the batch can still export the others. Scripts can detect that with exit code
-`1` and use each failed entry's error code. Existing outputs are skipped by default.
-
-| Discover | Command |
-| --- | --- |
-| Offline guide and workflow | `fralo guide` |
-| Available commands and formats | `fralo capabilities --json` |
-| Configuration fields, defaults, and allowed values | `fralo schema --json` |
-
-### Hand the batch to an Agent
-
-> Read the offline guide with `fralo guide`. Use my saved App composition
-> to render `./screenshots` into `./framed`. Run preflight with
-> `--app-settings --dry-run --json` first. If it reports errors, tell me which
-> inputs need attention before exporting. Otherwise, export with
-> `--app-settings --json` and report the output paths, skipped files, and any
-> failures with their error codes.
-
-See the [full CLI guide](docs/cli.md) for all options, examples, and exit codes.
-
-<details>
-<summary><b>Legacy phone framing commands</b></summary>
-
-Use `fralo render` for the original transparent phone framing workflow.
-`fralo models` lists the six supported legacy iPhone models, and
-`fralo settings` shows the legacy configuration.
-
-```bash
-fralo render ./screenshots --output ./framed --model iphone-18-pro-max --json
-```
-
-</details>
+See the [CLI guide](docs/cli.md) for configuration, exit codes, and legacy `fralo render` compatibility.
 
 ## Privacy
 
-Screenshots are processed on your Mac and never leave it. The only network request is the
-update check to GitHub, which sends no screenshots and no system profile. You can turn
-automatic checks off from the Fralo menu.
+Fralo renders screenshots locally. It requires no account or image uploads and collects no usage analytics. The app checks GitHub for updates. You can turn off automatic checks in Settings.
+
+## Scope and limitations
+
+- Fralo uses original, parametric frames. Use Apple's own resources when you need official device artwork.
+- The workbench fits the whole screenshot without stretching it. Use screenshots that match the orientation you choose. Legacy `fralo render` has separate [cropping and aspect-ratio rules](docs/cli.md#legacy-compatibility).
+- Fralo handles framing and composition. Edit screenshot content, correct orientation, or add captions before importing.
 
 ## Building from source
 
-Requires macOS with Xcode 26.3 or later and Python 3.10 or later. Packaging the App icon
-needs Xcode 27's `actool`; the core library and CLI do not.
+Use Xcode 26.3 or later. Packaging a DMG also requires Python 3.10 or later, and compiling the layered app icon requires Xcode 27's `actool`.
 
 ```bash
 git clone https://github.com/SoaringLabs/Fralo.git
 cd Fralo
-
-# Test and build
 swift test --build-system native
 swift build --build-system native -c release
-
-# Package Fralo.app and a DMG into dist/
-python3 -m venv .venv
-.venv/bin/python -m pip install -r scripts/requirements-dmg.txt
-.venv/bin/python scripts/package.py --configuration release --dmg
-open dist/Fralo.app
 ```
 
-Local builds are ad-hoc signed and not notarized. The maintainer signing and release process
-is described in [docs/signing.md](docs/signing.md) and [docs/updates.md](docs/updates.md).
-
-To check for dependency and toolchain updates on demand (Python 3.10+, no extra packages):
-
-```bash
-python3 -B scripts/check_updates.py
-python3 -B scripts/check_updates.py --json
-```
-
-The read-only check compares locked Swift packages, pinned DMG tools and GitHub Actions,
-local Swift/Xcode/macOS SDK versions, and Xcode versions declared in CI with upstream
-stable releases. It links to upstream release information and reports query failures explicitly.
-Swift language mode, the package tools requirement and the minimum macOS target are shown
-as context. Apple Swift and upstream Swift versions may differ; a version difference alone
-does not establish compatibility or require migration. No files, dependencies, installations,
-or schedules are changed. Exit code `0` means all comparisons completed (updates may exist);
-`2` means at least one check failed or needs review. `--repo` selects another checkout;
-`--timeout` sets each HTTP request's timeout (default 15 seconds). GitHub queries are public;
-optionally set `GITHUB_TOKEN` or `GH_TOKEN` if rate-limited. Offline checks for the script:
-`python3 -B scripts/test_check_updates.py`.
-
-<details>
-<summary><b>Project layout</b></summary>
-
-| Path | Contents |
-| --- | --- |
-| [`Sources/FraloCore`](Sources/FraloCore) | Rendering, device geometry, settings, and batch export shared by the App and CLI |
-| [`Sources/FraloApp`](Sources/FraloApp) | The AppKit workbench, inspector, and Sparkle updater |
-| [`Sources/FraloDesignSystem`](Sources/FraloDesignSystem) | Shared native controls and surfaces |
-| [`Sources/FraloCLI`](Sources/FraloCLI) | The `fralo` command-line tool |
-| [`Tests`](Tests) | Core, App, and design-system tests |
-| [`scripts`](scripts) | Packaging, verification, demo generation, and preview launchers |
-
-</details>
-
-## Scope and limitations
-
-- Device frames are original, parametric drawings. They are not Apple's official frames or
-  photo-accurate templates, and no official Apple device artwork is included.
-- Screenshots are never stretched. The App always shows the whole screenshot inside the
-  device screen. The legacy `render` command fills the screen and allows up to 3% cropping; images whose aspect
-  ratio differs more than that are reported as failed.
-- Fralo does not edit screenshot content, correct orientation, or add captions.
+See the [install guide](INSTALL.md#源码构建) for DMG packaging and the [signing](docs/signing.md) and [update](docs/updates.md) guides for maintainer releases. Run `python3 -B scripts/check_updates.py --help` for dependency and toolchain check options.
 
 ## Contributing
 
-Bug reports and pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md)
-first, and use generated samples instead of personal screenshots in issues. CI runs the core
-tests, release build, CLI integration checks, and public-source checks on every pull request.
+Bug reports and pull requests are welcome. Read the [contributing guide](CONTRIBUTING.md) before submitting, and use the [generated screenshots](examples) to reproduce issues where possible.
 
 ## License
 
