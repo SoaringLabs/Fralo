@@ -18,7 +18,8 @@ export function pageMetadata(
   const languages = Object.fromEntries(
     locales.map((language) => [localeInfo[language].tag, siteUrlFor(pathForLocale(language))]),
   )
-  const image = siteUrlFor("/media/og.jpg")
+  // One preview per locale, rendered by scripts/render-media.sh (generate-og.swift).
+  const image = siteUrlFor(`/media/og-${locale}.jpg`)
 
   return {
     title,
@@ -37,7 +38,7 @@ export function pageMetadata(
       alternateLocale: locales
         .filter((language) => language !== locale)
         .map((language) => localeInfo[language].openGraph),
-      images: [{ url: image, width: 1200, height: 675, alt: siteName }],
+      images: [{ url: image, width: 2400, height: 1260, alt: siteName }],
     },
     twitter: {
       card: "summary_large_image",

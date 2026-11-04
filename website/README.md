@@ -38,7 +38,8 @@ Node 24 and the pnpm version in `package.json` are expected.
 
 `pnpm media` builds the repository's `fralo` CLI and renders the phone, tablet and Safari
 exports at full resolution from the fictional Field Notes screens. It also generates the
-canvas texture and social preview.
+canvas texture and one social preview per locale (`og-<locale>.jpg`, drawn by
+`scripts/generate-og.swift` from the hero copy in `lib/dictionaries/`).
 
 The workbench images are native 2× Mac window captures with the same Field Notes inputs
 in the transparent composition. To refresh them, follow the capture steps in
