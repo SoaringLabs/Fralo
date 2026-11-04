@@ -26,6 +26,13 @@
 - 将带动态值的完整句子放入翻译调用，保留各语言一致的编号占位符；用户文件名、持久化键和设备标识保持原值。
 - 交付前运行 `python3 -B scripts/check_localizations.py` 与相关测试，并检查英文、日文长文案在最小窗口中的布局。
 
+## 官网（website/）
+
+- `website/` 是独立构建的 Next.js 官网，部署时 Vercel 的 Root Directory 设为 `website`；它不进入 App 包，也不使用 `FraloLocalization`。开发说明见 [website/README.md](website/README.md)。
+- 官网语种与 App 一致，四种语言文案在 `website/lib/dictionaries/` 中同步维护；设置项等用语与 App 的 `Localizable.strings` 保持一致。GitHub 相关按钮（如 Star on GitHub）保持英文。
+- 官网展示的导出图由 `website/scripts/render-media.sh` 用仓库自带的 CLI 重新生成，不手工修图；App 界面或外框变化后同步更新截图与导出图。
+- 改动官网后在 `website/` 运行 `pnpm lint`、`pnpm typecheck` 和 `pnpm build`，并按上方 Apple HIG 一节检查浅色/深色、减少动态效果、降低透明度、增强对比度、键盘焦点和 375 px 宽度。
+
 ## 发版更新说明
 
 - 准备版本、生成 appcast 或创建 GitHub Release 前，必须阅读并执行 [四语更新说明流程](docs/updates.md#四语更新说明)。从同一份版本化变更清单生成 English、简体中文、繁体中文、日语四份 Markdown，校对后记录当前内容摘要，通过 `python3 -B scripts/release_notes.py check-all` 才可继续。
