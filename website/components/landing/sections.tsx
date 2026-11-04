@@ -28,6 +28,32 @@ import type { Appearance } from "./settings"
 
 const section = "border-t border-border px-[clamp(20px,5vw,72px)] py-24"
 const sectionBody = "m-0 text-[17px] leading-relaxed text-muted-foreground"
+const installCommand = "curl -fsSL https://fralo.app/install.sh | sh"
+
+function TerminalInstall({ copy }: { copy: Dictionary["install"] }) {
+  const [status, setStatus] = React.useState("")
+
+  async function copyCommand() {
+    try {
+      await navigator.clipboard.writeText(installCommand)
+      setStatus(copy.copied)
+    } catch {
+      setStatus(copy.failed)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 text-[13px]">
+      <h2 className="m-0 font-semibold">{copy.title}</h2>
+      <p className="m-0 text-muted-foreground">{copy.body}</p>
+      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-bar px-3 py-2">
+        <code lang="en" className="min-w-0 flex-auto font-mono [overflow-wrap:anywhere] select-all">{installCommand}</code>
+        <Button type="button" variant="outline" size="sm" onClick={copyCommand}>{copy.copy}</Button>
+      </div>
+      <p role="status" className="m-0 text-muted-foreground empty:sr-only">{status}</p>
+    </div>
+  )
+}
 
 /** Prefer breaking CJK headlines between phrases. */
 function Phrases({ phrases }: { phrases: string[] }) {
@@ -69,6 +95,7 @@ export function Hero({ dict }: { dict: Dictionary }) {
           <GitHubStar variant="large" />
         </div>
         <p className="m-0 text-[13px] text-muted-foreground">{dict.hero.meta}</p>
+        <TerminalInstall copy={dict.install} />
       </div>
       <div role="img" aria-label={dict.hero.devices} className="device-fan relative aspect-[5/4] min-w-0 flex-[999_1_440px]">
         <div className="device device-browser absolute top-[4%] right-0 w-[78%]" style={{ animationDelay: "0.55s" }}>

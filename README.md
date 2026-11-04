@@ -47,7 +47,15 @@ The workbench supports light and dark appearance, undo and redo, and the system 
 
 Download `Fralo-<version>-arm64.dmg` from the [latest release](https://github.com/SoaringLabs/Fralo/releases/latest). Open the disk image and drag Fralo into Applications. Release builds are signed with Developer ID and notarized by Apple. See the [install guide](INSTALL.md) for checksum verification, first launch, and uninstall steps.
 
-For a terminal or coding agent, use the [shell installer](INSTALL.md#从终端安装--install-from-terminal). It installs the same release in `~/Applications` and prints the bundled CLI path. No GUI or administrator access is needed.
+### Install from Terminal
+
+On an Apple silicon Mac, paste this command into Terminal:
+
+```sh
+curl -fsSL https://fralo.app/install.sh | sh
+```
+
+The script installs the same release in `~/Applications` and prints the bundled CLI path. See the [install guide](INSTALL.md#从终端安装--install-from-terminal) to pin a version or verify the CLI.
 
 This README describes the current source tree. See the [changelog](CHANGELOG.md) for changes by version.
 

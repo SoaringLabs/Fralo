@@ -8,6 +8,13 @@ export const en = {
   url: "fralo.app",
   language: "Language",
   download: "Download",
+  install: {
+    title: "Install from Terminal",
+    body: "Paste this command into Terminal. It installs Fralo and prints the CLI path.",
+    copy: "Copy command",
+    copied: "Command copied.",
+    failed: "Couldn’t copy the command. Select it and copy it manually.",
+  },
   hero: {
     title: ["Frame your designs"],
     lead: "Fralo adds the same phone, tablet, or browser frame to a whole set of screenshots. Use them on your App Store page, in a release post, or wherever you need them.",

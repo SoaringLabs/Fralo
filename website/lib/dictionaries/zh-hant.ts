@@ -10,6 +10,13 @@ export const zhHant: Dictionary = {
   url: "fralo.app/zh-hant",
   language: "語言",
   download: "下載",
+  install: {
+    title: "從終端機安裝",
+    body: "將這行指令貼到終端機。安裝完成後會顯示 CLI 路徑。",
+    copy: "複製指令",
+    copied: "已複製指令。",
+    failed: "無法複製。請選取指令後手動複製。",
+  },
   hero: {
     title: ["為您的設計加上外框"],
     lead: "Fralo 能替整組截圖套上同一款手機、平板或瀏覽器外框，用在 App Store 產品頁面、版本公告，或任何需要配圖的地方。",

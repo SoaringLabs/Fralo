@@ -10,6 +10,13 @@ export const zhHans: Dictionary = {
   url: "fralo.app/zh-hans",
   language: "语言",
   download: "下载",
+  install: {
+    title: "从终端安装",
+    body: "将这条命令粘贴到终端。安装完成后会显示 CLI 路径。",
+    copy: "复制命令",
+    copied: "已复制命令。",
+    failed: "复制失败，请选中命令后手动复制。",
+  },
   hero: {
     title: ["为您的设计套上外壳"],
     lead: "Fralo 能给一整组截图套上同样的手机、平板或浏览器外壳，放到 App Store 页面、发布文章或任何你需要的地方里。",
