@@ -43,10 +43,10 @@ function TerminalInstall({ copy }: { copy: Dictionary["install"] }) {
   }
 
   return (
-    <div className="flex flex-col gap-2 text-[13px]">
-      <h2 className="m-0 font-semibold">{copy.title}</h2>
+    <div id="terminal-install" className="flex w-full max-w-2xl scroll-mt-6 flex-col gap-2 text-sm">
+      <h3 className="m-0 text-base font-semibold">{copy.title}</h3>
       <p className="m-0 text-muted-foreground">{copy.body}</p>
-      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-bar px-3 py-2">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl bg-bar px-4 py-3">
         <code lang="en" className="min-w-0 flex-auto font-mono [overflow-wrap:anywhere] select-all">{installCommand}</code>
         <Button type="button" variant="outline" size="sm" onClick={copyCommand}>{copy.copy}</Button>
       </div>
@@ -95,7 +95,6 @@ export function Hero({ dict }: { dict: Dictionary }) {
           <GitHubStar variant="large" />
         </div>
         <p className="m-0 text-[13px] text-muted-foreground">{dict.hero.meta}</p>
-        <TerminalInstall copy={dict.install} />
       </div>
       <div role="img" aria-label={dict.hero.devices} className="device-fan relative aspect-[5/4] min-w-0 flex-[999_1_440px]">
         <div className="device device-browser absolute top-[4%] right-0 w-[78%]" style={{ animationDelay: "0.55s" }}>
@@ -319,6 +318,7 @@ export function Closing({ dict, repository }: { dict: Dictionary; repository: Re
           <GitHubStar variant="large" />
         </div>
       </div>
+      <TerminalInstall copy={dict.install} />
     </section>
   )
 }
