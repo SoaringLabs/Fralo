@@ -25,6 +25,42 @@ CLI 位于 App 的 Contents/MacOS，许可证、开发者信息和本说明位�
 
 Apple 说明：https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac
 
+## 从终端安装 / Install from terminal
+
+在 Apple 芯片 Mac 上，先下载脚本。可在运行前打开脚本检查内容。
+On an Apple silicon Mac, download the script first. You can inspect it before running it.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/SoaringLabs/Fralo/main/scripts/install.sh -o fralo-install.sh
+```
+
+下载成功后运行 / After the download succeeds, run:
+
+```sh
+FRALO=$(/bin/bash ./fralo-install.sh) && "$FRALO" --version
+```
+
+默认安装最新稳定版。需要固定版本时，在脚本命令末尾加 `--version 0.2.0`（替换成需要的版本）。
+脚本会校验 SHA-256、发布者签名和 Gatekeeper 评估结果，然后将同一个正式 DMG 里的 App
+复制到 `~/Applications/Fralo.app`。无需提权；不会打开 App，也不会更改 PATH 或覆盖该位置的现有 App。
+成功时标准输出只有 CLI 的绝对路径。Agent 可以使用它运行 `"$FRALO" guide`
+（支持 Agent CLI 的版本），无需先打开 App 创建配置。v0.2.0 的 CLI 请用 `"$FRALO" --help`。
+
+The script installs the latest stable release by default. Append `--version 0.2.0`
+(or the version you need) to the installer command to pin the release.
+It checks the SHA-256, publisher signature, and Gatekeeper assessment before
+copying the app from the same release DMG to `~/Applications/Fralo.app`.
+It needs no administrator access, launches no app, changes no PATH settings, and
+leaves any existing app at that location in place. On success, stdout contains
+only the absolute CLI path. On releases with the agent CLI, run `"$FRALO" guide`
+to get started without opening the app. For v0.2.0, use `"$FRALO" --help`.
+
+已有 Fralo 的用户可以继续使用其内置 CLI 和更新器。终端安装和拖拽安装可以位于不同目录，
+请使用你希望调用的那份 App 的 CLI 路径。
+If you already have Fralo, you can keep using its bundled CLI and in-app updater.
+Terminal and drag-and-drop installs can live in different folders; use the CLI
+path for the copy you intend to run.
+
 ## 第一次使用
 
 拖入 PNG / JPEG → 选择设备、机型和方向 → 选择透明或带背景 → 检查预览 → 导出全部。
@@ -42,15 +78,14 @@ Apple 说明：https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-u
 
 ## CLI
 
-安装 App 后，在终端运行：
-"/Applications/Fralo.app/Contents/MacOS/fralo" --help
-
-也可以将 App 包内的 fralo 单独复制到自己的 PATH，项目不会自动改动 PATH。
+使用安装脚本输出的 CLI 路径，或在拖拽安装后运行
+`"/Applications/Fralo.app/Contents/MacOS/fralo" --help`。
+CLI 会从 App 包读取配套资源；建议直接调用包内的可执行文件。
 设置文件位于 ~/Library/Application Support/Fralo/。
 
 ## 卸载
 
-退出 Fralo，再将 Applications 中的 Fralo.app 移到废纸篓。
+退出 Fralo，再将 Applications（终端安装时为 `~/Applications`）中的 Fralo.app 移到废纸篓。
 设置保存在 ~/Library/Application Support/Fralo/，是否保留由你决定。
 
 ## 源码构建

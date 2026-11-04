@@ -47,6 +47,8 @@
 
 从[最新版本](https://github.com/SoaringLabs/Fralo/releases/latest)下载 `Fralo-<版本>-arm64.dmg`，打开后将 Fralo 拖入「应用程序」文件夹。正式安装包经 Developer ID 签名和 Apple 公证。校验下载、首次启动及卸载步骤见[安装指南](INSTALL.md)。
 
+在终端或让编码 Agent 安装时，可以用[安装脚本](INSTALL.md#从终端安装--install-from-terminal)。它将同一个正式版本安装到 `~/Applications`，并输出内置 CLI 的路径，无需打开界面或使用管理员权限。
+
 本文说明当前源码中的功能。各版本的变化见[更新记录](CHANGELOG.md)。
 
 ### 系统要求
@@ -102,10 +104,10 @@ Fralo 0.1.1 及以上版本可从 **Fralo → 检查更新…** 升级。应用�
 
 ### 在终端运行
 
-先预检，确认计划输出路径后再导出。如果 `fralo` 已在 PATH 中，可以用它替代 `"$FRALO"`。
+先预检，确认计划输出路径后再导出。可以沿用安装脚本输出的 `FRALO` 路径；拖拽安装则用下方默认路径。如果 `fralo` 已在 PATH 中，可以用它替代 `"$FRALO"`。
 
 ```bash
-FRALO=/Applications/Fralo.app/Contents/MacOS/fralo
+FRALO=${FRALO:-/Applications/Fralo.app/Contents/MacOS/fralo}
 "$FRALO" compose ./screenshots --output ./framed --app-settings --dry-run --json
 "$FRALO" compose ./screenshots --output ./framed --app-settings --json
 ```

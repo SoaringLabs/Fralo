@@ -47,6 +47,8 @@ The workbench supports light and dark appearance, undo and redo, and the system 
 
 Download `Fralo-<version>-arm64.dmg` from the [latest release](https://github.com/SoaringLabs/Fralo/releases/latest). Open the disk image and drag Fralo into Applications. Release builds are signed with Developer ID and notarized by Apple. See the [install guide](INSTALL.md) for checksum verification, first launch, and uninstall steps.
 
+For a terminal or coding agent, use the [shell installer](INSTALL.md#从终端安装--install-from-terminal). It installs the same release in `~/Applications` and prints the bundled CLI path. No GUI or administrator access is needed.
+
 This README describes the current source tree. See the [changelog](CHANGELOG.md) for changes by version.
 
 ### Requirements
@@ -102,10 +104,10 @@ Use a build that includes `fralo compose`. Set up a representative screenshot in
 
 ### From the terminal
 
-Run the preflight first and review the planned output paths before exporting. If `fralo` is on your PATH, use it in place of `"$FRALO"`.
+Run the preflight first and review the planned output paths before exporting. Keep the `FRALO` path returned by the terminal installer, or use the path for a drag-and-drop install shown below. If `fralo` is on your PATH, use it in place of `"$FRALO"`.
 
 ```bash
-FRALO=/Applications/Fralo.app/Contents/MacOS/fralo
+FRALO=${FRALO:-/Applications/Fralo.app/Contents/MacOS/fralo}
 "$FRALO" compose ./screenshots --output ./framed --app-settings --dry-run --json
 "$FRALO" compose ./screenshots --output ./framed --app-settings --json
 ```

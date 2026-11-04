@@ -5,8 +5,10 @@ source checkout is needed. macOS 14 or later is required.
 
 ## Find the executable
 
-The installed App includes `/Applications/Fralo.app/Contents/MacOS/fralo`.
-Use that absolute path in place of `fralo` below if it is not on your PATH.
+The [terminal installer](https://github.com/SoaringLabs/Fralo/blob/main/INSTALL.md#从终端安装--install-from-terminal) prints
+the absolute CLI path after installing to `~/Applications`. If you installed
+by dragging Fralo to Applications, use `/Applications/Fralo.app/Contents/MacOS/fralo`.
+Use the absolute path in place of `fralo` below if it is not on your PATH.
 Fralo never edits PATH. After a source build, use the path returned by
 `swift build --build-system native -c release --show-bin-path` followed by `/fralo`.
 A copied standalone CLI still prints its guide, examples and schema. Rendering
