@@ -49,7 +49,9 @@ in the transparent composition. To refresh them, follow the capture steps in
 
 On Vercel, set the project's Root Directory to `website`. Optional environment variables:
 
-- `SITE_URL`: canonical origin for metadata. Defaults to the Vercel production domain.
+- `SITE_URL`: public origin for canonical links, sharing cards and the sitemap. Defaults to
+  `https://fralo.app`. Set it only to override the public origin, without any path or query;
+  use the same public origin in production and previews.
 - `GITHUB_TOKEN`: raises the GitHub API rate limit when fetching the star count and release.
 - `FRALO_GA_MEASUREMENT_ID`: optional GA4 measurement ID (`G-…`), read at build time. Leave unset to ship without website analytics or a consent prompt. Use a dedicated website property with no advertising destinations or features, and disable enhanced measurement if only page views are needed.
 
@@ -57,3 +59,10 @@ The footer links to the localized **Privacy & settings** page in either configur
 analytics is configured, Fralo keeps the Google tag out of the document until the visitor allows
 analytics. The decision is stored locally and shared by all language routes on that origin.
 Changing it to decline disables the tag and expires its Fralo analytics cookies.
+
+After deploying, check that the public origin serves `/robots.txt` and `/sitemap.xml`, and
+that the sitemap URLs return `200` without a language cookie or `Accept-Language` header.
+The sitemap lists the four homepages and four privacy pages; their HTML links each language
+to its equivalents. Confirm that production has no `noindex` and that Vercel preview URLs
+return `X-Robots-Tag: noindex`. Submit the production sitemap in Google Search Console once
+the domain is verified there.
