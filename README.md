@@ -110,6 +110,26 @@ All examples use the fictional *Field Notes* screens in [`examples/`](examples),
 
 Use a build that includes `fralo compose`. Set up a representative screenshot in Fralo, then reuse that saved composition for a batch from the terminal or a coding agent. Replace the example directories with your own paths.
 
+### Command quick reference
+
+The examples below use `fralo` as shorthand. If it is outside your PATH, use
+the CLI path printed by the installer or the bundled path shown in the next section.
+
+```text
+fralo compose INPUT... --output DIR   # Frame and export screenshots
+fralo config --app                    # Print the app's last saved composition as JSON
+fralo config --defaults               # Print the default composition as JSON
+fralo example phone                   # Print a phone recipe (also: tablet, browser)
+fralo capabilities --json             # List supported commands, devices, and formats
+fralo schema --json                   # Show configuration fields, defaults, and ranges
+fralo guide                           # Read the full offline guide
+fralo --help                          # Show command-line usage
+fralo --version                       # Show the installed CLI version
+```
+
+For existing scripts, `render`, `models`, and `settings` remain available.
+See [legacy compatibility](docs/cli.md#legacy-compatibility) for their behavior.
+
 ### From the terminal
 
 Run the preflight first and review the planned output paths before exporting. Keep the `FRALO` path returned by the terminal installer, or use the path for a drag-and-drop install shown below. If `fralo` is on your PATH, use it in place of `"$FRALO"`.
@@ -148,11 +168,11 @@ From the repository root, run these commands with the same `FRALO` variable.
 
 The example exports `framed/01-today-fralo.png` at 1350 × 2400 pixels.
 
-### Scripting and discovery
+### Scripting
 
-`fralo guide` prints the offline guide. Use `fralo capabilities --json` to discover supported commands and formats, and `fralo schema --json` for configuration fields, defaults, and ranges. For batch results, `--json` reports each file's path, status, and any error code. Progress goes to stderr.
+For batch results, `--json` reports each file's path, status, and any error code. Progress goes to stderr.
 
-See the [CLI guide](docs/cli.md) for configuration, exit codes, and legacy `fralo render` compatibility.
+See the [CLI guide](docs/cli.md) for configuration, report fields, and exit codes.
 
 ## Privacy
 

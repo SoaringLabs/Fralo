@@ -110,6 +110,24 @@ Fralo 0.1.1 及以上版本可从 **Fralo → 检查更新…** 升级。应用�
 
 请使用包含 `fralo compose` 的版本。先在 Fralo 里用一张代表性的截图调好构图，再通过终端或编程 Agent 复用这套构图。把示例目录换成你的实际路径。
 
+### 命令速查
+
+下方用 `fralo` 简写。如果它不在 PATH 中，请使用安装脚本输出的 CLI 路径，或下一节的 App 内置路径。
+
+```text
+fralo compose INPUT... --output DIR   # 为截图套框并导出
+fralo config --app                    # 输出 App 最近保存的构图配置（JSON）
+fralo config --defaults               # 输出默认构图配置（JSON）
+fralo example phone                   # 输出手机示例配置（也可用 tablet 或 browser）
+fralo capabilities --json             # 列出支持的命令、设备和格式
+fralo schema --json                   # 查看配置字段、默认值和取值范围
+fralo guide                           # 阅读完整离线指南
+fralo --help                          # 查看命令行用法
+fralo --version                       # 查看已安装的 CLI 版本
+```
+
+已有脚本仍可使用 `render`、`models` 和 `settings`。具体行为见[旧版兼容说明](docs/cli.md#legacy-compatibility)。
+
 ### 在终端运行
 
 先预检，确认计划输出路径后再导出。可以沿用安装脚本输出的 `FRALO` 路径；拖拽安装则用下方默认路径。如果 `fralo` 已在 PATH 中，可以用它替代 `"$FRALO"`。
@@ -148,11 +166,11 @@ FRALO=${FRALO:-/Applications/Fralo.app/Contents/MacOS/fralo}
 
 示例输出为 `framed/01-today-fralo.png`，尺寸为 1350 × 2400 像素。
 
-### 脚本集成与能力查询
+### 脚本集成
 
-`fralo guide` 提供离线指南。`fralo capabilities --json` 列出支持的命令和格式，`fralo schema --json` 给出配置字段、默认值和取值范围。批量处理时用 `--json` 获取各文件的输出路径、状态及错误码。进度写到标准错误。
+批量处理时用 `--json` 获取各文件的输出路径、状态及错误码。进度写到标准错误。
 
-配置、退出码和旧版 `fralo render` 的兼容说明见 [CLI 指南](docs/cli.md)。
+配置、结果字段和退出码见 [CLI 指南](docs/cli.md)。
 
 ## 隐私
 
