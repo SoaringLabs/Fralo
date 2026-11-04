@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Image from "next/image"
-import { ChevronsLeftRightIcon } from "lucide-react"
+import { ChevronsLeftRightIcon, CopyIcon } from "lucide-react"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 import { downloadURL, repositoryURL, type RepositoryInfo } from "@/lib/repository"
@@ -31,7 +31,8 @@ const sectionBody = "m-0 text-[17px] leading-relaxed text-muted-foreground"
 const installCommand = "curl -fsSL https://fralo.app/install.sh | sh"
 const terminalInstallId = "terminal-install"
 
-function TerminalInstall({ copy }: { copy: Dictionary["install"] }) {
+export function TerminalInstall({ dict }: { dict: Dictionary }) {
+  const copy = dict.install
   const [status, setStatus] = React.useState("")
 
   async function copyCommand() {
@@ -44,15 +45,24 @@ function TerminalInstall({ copy }: { copy: Dictionary["install"] }) {
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-2 text-sm">
-      <h3 id={terminalInstallId} tabIndex={-1} className="m-0 scroll-mt-8 text-base font-semibold">{copy.title}</h3>
-      <p className="m-0 text-muted-foreground">{copy.body}</p>
-      <div className="flex flex-wrap items-center gap-3 rounded-xl bg-bar px-4 py-3">
-        <code lang="en" className="min-w-0 flex-auto font-mono [overflow-wrap:anywhere] select-all">{installCommand}</code>
-        <Button type="button" variant="outline" size="sm" onClick={copyCommand}>{copy.copy}</Button>
+    <section
+      aria-labelledby={terminalInstallId}
+      className="flex flex-wrap items-center gap-x-14 gap-y-5 border-t border-border px-[clamp(20px,5vw,72px)] py-[clamp(40px,6vw,72px)]"
+    >
+      <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-2.5">
+        <h2 id={terminalInstallId} tabIndex={-1} className="heading m-0 scroll-mt-8 text-[clamp(24px,3vw,36px)] font-bold">{copy.title}</h2>
+        <p className={sectionBody}>{copy.body}</p>
       </div>
-      <p role="status" className="m-0 text-muted-foreground empty:sr-only">{status}</p>
-    </div>
+      <div className="flex min-w-0 flex-[999_1_460px] flex-col gap-2 text-sm">
+        <div className="flex items-center gap-3 rounded-xl bg-bar py-2 pr-2 pl-4">
+          <code lang="en" className="min-w-0 flex-1 font-mono [overflow-wrap:anywhere] select-all">{installCommand}</code>
+          <Button type="button" variant="outline" size="icon-sm" className="size-11" aria-label={copy.copy} onClick={copyCommand}>
+            <CopyIcon aria-hidden="true" />
+          </Button>
+        </div>
+        <p role="status" className="m-0 text-muted-foreground empty:sr-only">{status}</p>
+      </div>
+    </section>
   )
 }
 
@@ -282,15 +292,12 @@ export function Cli({ dict }: { dict: Dictionary }) {
         <TwoLineHeading lines={dict.cli.title} />
         <p className={sectionBody}>{dict.cli.body}</p>
       </div>
-      <div className="flex min-w-0 flex-[999_1_460px] flex-col gap-4">
-        <TerminalInstall copy={dict.install} />
-        <pre lang="en" className="m-0 min-w-0 overflow-x-auto rounded-xl bg-bar p-[22px] font-mono text-[13.5px] leading-[1.85]">
-          <span className="text-muted-foreground">$ </span>
-          <span className="typed">fralo compose ./screenshots --output ./framed --app-settings --json</span>
-          {"\n"}
-          <span className="typed-after text-muted-foreground">{'  "status": "completed",\n  "succeeded": 12,\n  "failed": 0'}</span>
-        </pre>
-      </div>
+      <pre lang="en" className="m-0 min-w-0 flex-[999_1_460px] overflow-x-auto rounded-xl bg-bar p-[22px] font-mono text-[13.5px] leading-[1.85]">
+        <span className="text-muted-foreground">$ </span>
+        <span className="typed">fralo compose ./screenshots --output ./framed --app-settings --json</span>
+        {"\n"}
+        <span className="typed-after text-muted-foreground">{'  "status": "completed",\n  "succeeded": 12,\n  "failed": 0'}</span>
+      </pre>
     </section>
   )
 }

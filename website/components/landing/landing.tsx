@@ -15,7 +15,7 @@ import { DownloadGlyph, GitHubStar } from "./github-star"
 import { Glass } from "./glass"
 import { Inspector } from "./inspector"
 import { LanguageSelect } from "./language-select"
-import { Canvases, Cli, Closing, Compare, Footer, Hero, Workbench } from "./sections"
+import { Canvases, Cli, Closing, Compare, Footer, Hero, TerminalInstall, Workbench } from "./sections"
 import { canvases, useMediaQuery, useSettings } from "./settings"
 
 const windowShadows = {
@@ -186,6 +186,7 @@ export function Landing({ locale, dict, repository, analyticsEnabled }: {
               <Compare dict={dict} />
               <Canvases dict={dict} reduceMotion={reduceMotion} />
               <Workbench dict={dict} locale={locale} appearance={appearance} />
+              <TerminalInstall dict={dict} />
               <Cli dict={dict} />
               <Closing dict={dict} repository={repository} />
               <Footer dict={dict} privacyHref={privacyPath(locale)} />
