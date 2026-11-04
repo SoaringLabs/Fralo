@@ -29,6 +29,7 @@ import type { Appearance } from "./settings"
 const section = "border-t border-border px-[clamp(20px,5vw,72px)] py-24"
 const sectionBody = "m-0 text-[17px] leading-relaxed text-muted-foreground"
 const installCommand = "curl -fsSL https://fralo.app/install.sh | sh"
+const terminalInstallId = "terminal-install"
 
 function TerminalInstall({ copy }: { copy: Dictionary["install"] }) {
   const [status, setStatus] = React.useState("")
@@ -43,8 +44,8 @@ function TerminalInstall({ copy }: { copy: Dictionary["install"] }) {
   }
 
   return (
-    <div id="terminal-install" className="flex w-full max-w-2xl scroll-mt-6 flex-col gap-2 text-sm">
-      <h3 className="m-0 text-base font-semibold">{copy.title}</h3>
+    <div className="flex min-w-0 flex-col gap-2 text-sm">
+      <h3 id={terminalInstallId} tabIndex={-1} className="m-0 scroll-mt-8 text-base font-semibold">{copy.title}</h3>
       <p className="m-0 text-muted-foreground">{copy.body}</p>
       <div className="flex flex-wrap items-center gap-3 rounded-xl bg-bar px-4 py-3">
         <code lang="en" className="min-w-0 flex-auto font-mono [overflow-wrap:anywhere] select-all">{installCommand}</code>
@@ -94,7 +95,12 @@ export function Hero({ dict }: { dict: Dictionary }) {
           </Button>
           <GitHubStar variant="large" />
         </div>
-        <p className="m-0 text-[13px] text-muted-foreground">{dict.hero.meta}</p>
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <Button asChild variant="link" size="sm" className="h-auto px-0 py-1 underline">
+            <a href={`#${terminalInstallId}`}>{dict.install.title}</a>
+          </Button>
+          <p className="m-0 text-[13px] text-muted-foreground">{dict.hero.meta}</p>
+        </div>
       </div>
       <div role="img" aria-label={dict.hero.devices} className="device-fan relative aspect-[5/4] min-w-0 flex-[999_1_440px]">
         <div className="device device-browser absolute top-[4%] right-0 w-[78%]" style={{ animationDelay: "0.55s" }}>
@@ -276,12 +282,15 @@ export function Cli({ dict }: { dict: Dictionary }) {
         <TwoLineHeading lines={dict.cli.title} />
         <p className={sectionBody}>{dict.cli.body}</p>
       </div>
-      <pre lang="en" className="m-0 min-w-0 flex-[999_1_460px] overflow-x-auto rounded-xl bg-bar p-[22px] font-mono text-[13.5px] leading-[1.85]">
-        <span className="text-muted-foreground">$ </span>
-        <span className="typed">fralo compose ./screenshots --output ./framed --app-settings --json</span>
-        {"\n"}
-        <span className="typed-after text-muted-foreground">{'  "status": "completed",\n  "succeeded": 12,\n  "failed": 0'}</span>
-      </pre>
+      <div className="flex min-w-0 flex-[999_1_460px] flex-col gap-4">
+        <TerminalInstall copy={dict.install} />
+        <pre lang="en" className="m-0 min-w-0 overflow-x-auto rounded-xl bg-bar p-[22px] font-mono text-[13.5px] leading-[1.85]">
+          <span className="text-muted-foreground">$ </span>
+          <span className="typed">fralo compose ./screenshots --output ./framed --app-settings --json</span>
+          {"\n"}
+          <span className="typed-after text-muted-foreground">{'  "status": "completed",\n  "succeeded": 12,\n  "failed": 0'}</span>
+        </pre>
+      </div>
     </section>
   )
 }
@@ -318,7 +327,6 @@ export function Closing({ dict, repository }: { dict: Dictionary; repository: Re
           <GitHubStar variant="large" />
         </div>
       </div>
-      <TerminalInstall copy={dict.install} />
     </section>
   )
 }
