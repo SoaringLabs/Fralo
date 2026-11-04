@@ -17,6 +17,7 @@
 
 [**下载 macOS App**](https://github.com/SoaringLabs/Fralo/releases/latest) ·
 [**CLI 快速上手**](#命令行) ·
+[**AI Agent**](#用-ai-agent-批量出图) ·
 [更新记录](CHANGELOG.md) ·
 [安装说明](INSTALL.md) ·
 [贡献指南](CONTRIBUTING.md)
@@ -29,6 +30,18 @@
 </picture>
 
 为 App Store 页面、发布文章或文档准备成组的截图展示图。导入 PNG 或 JPEG 截图，选好手机、平板或浏览器外框，用同一套构图逐张预览，再批量导出透明 PNG 或带背景的成品。
+
+## 功能
+
+| 你想做什么 | Fralo 提供什么 |
+| --- | --- |
+| 选合适的展示外框 | iPhone 18 Pro、iPhone 18 Pro Max 和平板支持横竖屏。Safari 和 Chrome 外框支持浅色、深色及 16:10、16:9、4:3 窗口比例。 |
+| 搭配画布和背景 | 保留透明背景，或将设备放在 1:1、4:3、16:9、3:4、9:16 画布上。背景可选纯色、渐变、预设纹理或自选图片。 |
+| 在预览中微调构图 | 直接拖动设备或平移背景，调整大小、阴影和不透明度。按住 ⌥ 再按方向键可按 1 px 微调设备。 |
+| 选择输出格式 | 可用无损 PNG、体积更小的 PNG 预设，或可调质量和底色的 JPEG。透明成品使用 PNG。 |
+| 把重复工作交给终端 | App 和 `fralo compose` 共用渲染器。可复用 App 保存的构图，也可用独立的 JSON 配置。 |
+
+工作台支持浅色和深色外观、撤销与重做，以及系统的减少动态效果、降低透明度和增强对比度设置。
 
 ## 安装
 
@@ -74,26 +87,28 @@ Fralo 0.1.1 及以上版本可从 **Fralo → 检查更新…** 升级。应用�
 
 </details>
 
-## 功能
-
-| 你想做什么 | Fralo 提供什么 |
-| --- | --- |
-| 选合适的展示外框 | iPhone 18 Pro、iPhone 18 Pro Max 和平板支持横竖屏。Safari 和 Chrome 外框支持浅色、深色及 16:10、16:9、4:3 窗口比例。 |
-| 搭配画布和背景 | 保留透明背景，或将设备放在 1:1、4:3、16:9、3:4、9:16 画布上。背景可选纯色、渐变、预设纹理或自选图片。 |
-| 在预览中微调构图 | 直接拖动设备或平移背景，调整大小、阴影和不透明度。按住 ⌥ 再按方向键可按 1 px 微调设备。 |
-| 选择输出格式 | 可用无损 PNG、体积更小的 PNG 预设，或可调质量和底色的 JPEG。透明成品使用 PNG。 |
-| 把重复工作交给终端 | App 和 `fralo compose` 共用渲染器。可复用 App 保存的构图，也可用独立的 JSON 配置。 |
-
-工作台支持浅色和深色外观、撤销与重做，以及系统的减少动态效果、降低透明度和增强对比度设置。
-
 ## 示例
 
 | 暖灰预设 | 渐变 | 灰绿预设 | 透明 PNG |
 | :---: | :---: | :---: | :---: |
-| <img src="docs/assets/background-1.jpg" width="200" alt="暖灰纹理背景上的手机外框"> | <img src="docs/assets/background-2.jpg" width="200" alt="桃色到蓝色渐变背景上的手机外框"> | <img src="docs/assets/background-3.jpg" width="200" alt="灰绿纹理背景上的手机外框"> | <img src="docs/assets/framed.png" width="140" alt="CLI 导出的透明手机外框"> |
+| <img src="docs/assets/background-1.jpg" width="200" alt="暖灰纹理背景上的手机外框"> | <img src="docs/assets/background-2.jpg" width="200" alt="桃色到蓝色渐变背景上的手机外框"> | <img src="docs/assets/background-3.jpg" width="200" alt="灰绿纹理背景上的手机外框"> | <img src="docs/assets/framed.png" width="103" alt="CLI 导出的透明手机外框"> |
 
 示例均使用 [`examples/`](examples) 中虚构的 *Field Notes* 界面，由
 [`scripts/generate-demo.swift`](scripts/generate-demo.swift) 生成，不含个人资料。
+
+## 用 AI Agent 批量出图
+
+如果你的版本包含 `fralo compose`，先在 Fralo 里调好构图，再将下面的指令复制给能在你的 Mac 上运行命令的编程 Agent。把示例目录换成你的实际路径。
+
+```text
+请用 Fralo 已保存的构图，为 ./screenshots 中的截图批量套框。
+先用 fralo guide 阅读离线指南。如果 PATH 中找不到 fralo，请使用
+/Applications/Fralo.app/Contents/MacOS/fralo。
+
+先用 compose 和 --output ./framed --app-settings --dry-run --json 预检。
+如果有失败项，请告诉我哪些输入需要处理并暂停。
+预检通过后，去掉 --dry-run 执行导出，并汇报成品路径、跳过的文件和失败项。
+```
 
 ## 命令行
 
@@ -124,11 +139,9 @@ FRALO=/Applications/Fralo.app/Contents/MacOS/fralo
 
 示例输出为 `framed/01-today-fralo.png`，尺寸为 1350 × 2400 像素。
 
-### 在脚本或 Agent 中使用
+### 脚本集成与能力查询
 
 `fralo guide` 提供离线指南。`fralo capabilities --json` 列出支持的命令和格式，`fralo schema --json` 给出配置字段、默认值和取值范围。批量处理时用 `--json` 获取各文件的输出路径、状态及错误码。进度写到标准错误。
-
-> 请先阅读 `fralo guide`，用我在 Fralo 里保存的构图处理 `./screenshots`。先用 `--app-settings --dry-run --json` 预检。预检通过后导出到 `./framed`，汇报输出路径、跳过的文件和失败原因。
 
 配置、退出码和旧版 `fralo render` 的兼容说明见 [CLI 指南](docs/cli.md)。
 
