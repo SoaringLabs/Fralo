@@ -54,12 +54,16 @@ On Vercel, set the project's Root Directory to `website`. Optional environment v
   `https://fralo.app`. Set it only to override the public origin, without any path or query;
   use the same public origin in production and previews.
 - `GITHUB_TOKEN`: raises the GitHub API rate limit when fetching the star count and release.
-- `FRALO_GA_MEASUREMENT_ID`: optional GA4 measurement ID (`G-…`), read at build time. Leave unset to ship without website analytics or a consent prompt. Use a dedicated website property with no advertising destinations or features, and disable enhanced measurement if only page views are needed.
+- `FRALO_POSTHOG_PROJECT_TOKEN`: PostHog's public project token (`phc_…`), read at build time.
+- `FRALO_POSTHOG_HOST`: the project's ingestion endpoint, either `https://us.i.posthog.com`
+  or `https://eu.i.posthog.com`.
 
-The footer links to the localized **Privacy & settings** page in either configuration. When
-analytics is configured, Fralo keeps the Google tag out of the document until the visitor allows
-analytics. The decision is stored locally and shared by all language routes on that origin.
-Changing it to decline disables the tag and expires its Fralo analytics cookies.
+Set both variables for production to enable analytics. The footer links to the localized
+**Privacy & settings** page with or without analytics. When enabled, Fralo loads PostHog only
+after the visitor allows analytics and remembers their choice across languages. Declining or
+withdrawing stops collection. Only the four landing pages send page views, with a random
+browser identifier and the referring site. Session replay, interaction autocapture and
+person profiles are disabled.
 
 After deploying, check that the public origin serves `/robots.txt` and `/sitemap.xml`, and
 that the sitemap URLs return `200` without a language cookie or `Accept-Language` header.
