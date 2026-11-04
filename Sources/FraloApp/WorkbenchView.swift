@@ -37,10 +37,13 @@ final class WorkbenchView: NSView {
         // obstruction belongs in our fixed viewing budget; hover must not re-fit art.
         window.map { $0.frame.height - $0.contentLayoutRect.height } ?? region.safeAreaInsets.top
     }
+    /// The floating band for the viewing toolbar (and the export capsule it becomes), centred
+    /// clear of the window edge; Fit keeps artwork above it.
+    static let viewingControlsHeight: CGFloat = 96
     /// The viewport remains full width. These are document/viewing margins only;
     /// the inspector floats above the same scrolling canvas as the toolbar.
     var viewingInsets: NSEdgeInsets {
-        NSEdgeInsets(top: headerHeight + 12, left: 24, bottom: 76,
+        NSEdgeInsets(top: headerHeight + 12, left: 24, bottom: Self.viewingControlsHeight,
                      right: 24 + (Self.inspectorWidth + Self.inspectorInset) * inspectorReveal)
     }
     private let region = WorkspaceRegion()

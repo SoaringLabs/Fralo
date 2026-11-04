@@ -20,6 +20,13 @@ releases may include breaking changes; they are marked **Breaking** below.
 - The View › Appearance submenu and the Fralo › Check for Updates Automatically
   (Daily) menu item moved into Settings, so each preference has one place to change
   it. Existing choices carry over.
+- Exporting now happens on the stage: the viewing toolbar turns into a glass capsule
+  whose neutral liquid fills as images export, beside a thumbnail of the batch. The
+  count and time remaining show beneath the title, and the × button or Esc stops the run. A clean run ends with a brief highlight
+  and Show in Finder, which selects the exported files, then settles back into the
+  toolbar; skipped, failed, or cancelled images open a card that lists each reason.
+  The viewing toolbar sits a little higher, and Fit leaves room for it. The Dock icon
+  shows progress while Fralo is in the background.
 
 ## 0.2.0 — 2026-11-01
 
