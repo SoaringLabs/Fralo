@@ -13,6 +13,7 @@
 [![平台](https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey?logo=apple)](#系统要求)
 [![Swift](https://img.shields.io/badge/Swift-5.10-F05138?logo=swift&logoColor=white)](Package.swift)
 [![许可：MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![在 X 上联系 @peekbomb](https://img.shields.io/badge/%40peekbomb-000000?logo=x&logoColor=white)](https://x.com/peekbomb)
 
 [**下载 macOS App**](https://github.com/SoaringLabs/Fralo/releases/latest) ·
 [**CLI 快速上手**](#命令行) ·

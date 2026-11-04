@@ -13,6 +13,7 @@
 [![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey?logo=apple)](#requirements)
 [![Swift](https://img.shields.io/badge/Swift-5.10-F05138?logo=swift&logoColor=white)](Package.swift)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Contact @peekbomb on X](https://img.shields.io/badge/%40peekbomb-000000?logo=x&logoColor=white)](https://x.com/peekbomb)
 
 [**Download the macOS App**](https://github.com/SoaringLabs/Fralo/releases/latest) ·
 [**CLI quickstart**](#command-line-interface) ·
