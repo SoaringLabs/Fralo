@@ -113,6 +113,7 @@ export function PrivacyControls({ copy, policyHref }: { copy: Copy; policyHref?:
   // page the same controls remain available so a previous decision can be changed.
   const choice = useSyncExternalStore(subscribe, getChoice, () => undefined)
   const heading = useId()
+  const Heading = policyHref ? "h2" : "h3"
 
   if (policyHref && choice !== null) return null
 
@@ -131,7 +132,7 @@ export function PrivacyControls({ copy, policyHref }: { copy: Copy; policyHref?:
           <ShieldCheckIcon aria-hidden="true" className="size-[19px]" />
         </span>
         <div className="min-w-0 grow">
-          <h2 id={heading} className="text-start text-[15px] font-semibold">{copy.analyticsTitle}</h2>
+          <Heading id={heading} className="text-start text-[15px] font-semibold">{copy.analyticsTitle}</Heading>
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
             {copy.analyticsSummary}
             {policyHref && <> <a href={policyHref} className="privacy-link">{copy.link}</a></>}

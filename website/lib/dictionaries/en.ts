@@ -70,7 +70,11 @@ export const en = {
   privacy: {
     link: "Privacy & settings",
     home: "Back to Fralo",
-    intro: "Fralo processes your screenshots on your Mac. This page explains the separate privacy choices for the website.",
+    intro: "How Fralo for Mac and this website handle your data.",
+    appTitle: "Fralo for Mac",
+    appProcessing: "Fralo processes your screenshots and saves your exports on your Mac. The app requires no account, does not upload images, and does not collect usage analytics.",
+    appUpdates: "Fralo uses Sparkle to check GitHub for updates. You can turn off automatic checks in Fralo Settings under Updates and still check manually.",
+    websiteTitle: "Fralo website",
     analyticsTitle: "Optional website analytics",
     analyticsSummary: "If you allow it, Google Analytics uses cookies to measure visits and interactions. Your choice does not affect downloads or site features.",
     allow: "Allow analytics",

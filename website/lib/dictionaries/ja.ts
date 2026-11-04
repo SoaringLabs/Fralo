@@ -72,7 +72,11 @@ export const ja: Dictionary = {
   privacy: {
     link: "プライバシーと設定",
     home: "Fralo に戻る",
-    intro: "Fralo はスクリーンショットをお使いの Mac 上で処理します。このページでは、ウェブサイトのプライバシー設定について説明します。",
+    intro: "Mac 版 Fralo とこのウェブサイトでのデータの取り扱いについて説明します。",
+    appTitle: "Mac 版 Fralo",
+    appProcessing: "Fralo はスクリーンショットをお使いの Mac 上で処理し、書き出したファイルも Mac に保存します。アカウントは不要で、画像のアップロードやアプリの利用状況の収集は行いません。",
+    appUpdates: "Fralo は Sparkle を使って GitHub でアップデートを確認します。Fralo の設定にある「アップデート」で自動確認をオフにしても、手動で確認できます。",
+    websiteTitle: "Fralo ウェブサイト",
     analyticsTitle: "任意のアクセス解析",
     analyticsSummary: "許可すると、Google Analytics が Cookie を使ってサイトの閲覧や操作を計測します。どちらを選んでも、ダウンロードやサイトの機能は利用できます。",
     allow: "解析を許可",

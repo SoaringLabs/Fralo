@@ -72,7 +72,11 @@ export const zhHant: Dictionary = {
   privacy: {
     link: "隱私與設定",
     home: "返回 Fralo",
-    intro: "Fralo 在你的 Mac 上處理截圖。這裡說明官網如何使用瀏覽器儲存空間，以及你可以做哪些隱私選擇。",
+    intro: "了解 Fralo Mac 應用程式和官網如何處理你的資料。",
+    appTitle: "Fralo Mac 應用程式",
+    appProcessing: "Fralo 在你的 Mac 上處理截圖並儲存匯出的檔案。應用程式無需帳號，不會上傳圖片，也不收集應用程式使用統計。",
+    appUpdates: "Fralo 透過 Sparkle 向 GitHub 檢查更新。你可以在 Fralo 設定的「更新」中關閉自動檢查，之後仍可手動檢查。",
+    websiteTitle: "Fralo 官網",
     analyticsTitle: "選用的網站分析",
     analyticsSummary: "如果你允許，Google Analytics 會使用 Cookie 統計網站瀏覽及互動情況。你的選擇不會影響下載或網站功能。",
     allow: "允許分析",
