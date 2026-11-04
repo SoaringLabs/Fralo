@@ -2,7 +2,7 @@ import type { Viewport } from "next"
 import { notFound } from "next/navigation"
 import { hasLocale, localeInfo, locales } from "@/lib/i18n"
 import { WebsiteAnalytics } from "@/components/privacy"
-import { analyticsMeasurementId } from "@/lib/privacy"
+import { websiteAnalyticsConfig } from "@/lib/privacy"
 import "../globals.css"
 
 export function generateStaticParams() {
@@ -19,12 +19,12 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children, params }: LayoutProps<"/[lang]">) {
   const { lang } = await params
   if (!hasLocale(lang)) notFound()
-  const measurementId = analyticsMeasurementId()
+  const analytics = websiteAnalyticsConfig()
   return (
     <html lang={localeInfo[lang].tag}>
       <body>
         {children}
-        {measurementId && <WebsiteAnalytics id={measurementId} />}
+        {analytics && <WebsiteAnalytics {...analytics} />}
       </body>
     </html>
   )

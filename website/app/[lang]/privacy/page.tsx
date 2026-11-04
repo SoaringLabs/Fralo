@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { PrivacyControls } from "@/components/privacy"
 import { getDictionary, hasLocale, pathFor } from "@/lib/i18n"
-import { analyticsMeasurementId, privacyPath } from "@/lib/privacy"
+import { websiteAnalyticsConfig, privacyPath } from "@/lib/privacy"
 import { pageMetadata, siteName } from "@/lib/seo"
 
 export async function generateMetadata({ params }: PageProps<"/[lang]/privacy">): Promise<Metadata> {
@@ -19,7 +19,7 @@ export default async function PrivacyPage({ params }: PageProps<"/[lang]/privacy
   const { lang } = await params
   if (!hasLocale(lang)) notFound()
   const { privacy } = getDictionary(lang)
-  const analyticsEnabled = Boolean(analyticsMeasurementId())
+  const analyticsEnabled = Boolean(websiteAnalyticsConfig())
 
   return (
     <div className="privacy-page min-h-dvh bg-background text-foreground">
@@ -43,7 +43,7 @@ export default async function PrivacyPage({ params }: PageProps<"/[lang]/privacy
                   <h3 className="text-start font-semibold">{privacy.analyticsDetailsTitle}</h3>
                   <p className="mt-2 leading-relaxed text-muted-foreground">
                     {privacy.analyticsDetails}{" "}
-                    <a href="https://policies.google.com/privacy" className="privacy-link">{privacy.googlePolicy}</a>
+                    <a href="https://posthog.com/privacy" className="privacy-link">{privacy.analyticsPolicy}</a>
                   </p>
                 </section>
               </>
