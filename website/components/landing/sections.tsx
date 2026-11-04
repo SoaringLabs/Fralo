@@ -297,16 +297,20 @@ export function Closing({ dict, repository }: { dict: Dictionary; repository: Re
 }
 
 export function Footer({ dict, privacyHref }: { dict: Dictionary; privacyHref: string }) {
+  const linkClass = "hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-ring"
   return (
     <footer className="flex flex-wrap gap-x-6 gap-y-2 border-t border-border px-[clamp(20px,5vw,72px)] pt-6 pb-24 text-[13px] text-muted-foreground">
-      <span className="mr-auto">SoaringLabs · {dict.footer.license}</span>
-      <a href={`${repositoryURL}/blob/main/CHANGELOG.md`} className="hover:text-foreground">
+      <span className="mr-auto">
+        <a href="https://github.com/SoaringLabs" className={linkClass}>SoaringLabs</a>
+        {" · "}{dict.footer.license}
+      </span>
+      <a href={`${repositoryURL}/blob/main/CHANGELOG.md`} className={linkClass}>
         {dict.footer.changelog}
       </a>
-      <a href={privacyHref} className="privacy-link">
+      <a href={privacyHref} className={linkClass}>
         {dict.privacy.link}
       </a>
-      <a href={repositoryURL} className="hover:text-foreground">
+      <a href={repositoryURL} className={linkClass}>
         GitHub
       </a>
     </footer>
