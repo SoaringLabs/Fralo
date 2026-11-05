@@ -58,6 +58,8 @@ export function WebsiteAnalytics({ token, host }: { token: string; host: string 
                 distinct_id: properties.distinct_id,
                 $session_id: properties.$session_id,
                 $cookieless_mode: properties.$cookieless_mode,
+                // Required for the cookieless hash; PostHog removes it before storage.
+                $raw_user_agent: properties.$raw_user_agent,
                 $current_url: properties.$current_url,
                 $host: properties.$host,
                 $pathname: properties.$pathname,
