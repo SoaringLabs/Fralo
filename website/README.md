@@ -58,12 +58,12 @@ On Vercel, set the project's Root Directory to `website`. Optional environment v
 - `FRALO_POSTHOG_HOST`: the project's ingestion endpoint, either `https://us.i.posthog.com`
   or `https://eu.i.posthog.com`.
 
-Set both variables for production to enable analytics. The footer links to the localized
-**Privacy & settings** page with or without analytics. When enabled, Fralo loads PostHog only
-after the visitor allows analytics and remembers their choice across languages. Declining or
-withdrawing stops collection. Only the four landing pages send page views, with a random
-browser identifier and the referring site. Session replay, interaction autocapture and
-person profiles are disabled.
+Set both variables for production and enable cookieless tracking and IP discard in the PostHog
+project settings. With analytics configured, the four landing pages send page views and the
+referring site by default. Visitors who previously declined remain excluded. PostHog estimates
+daily visitors without storing analytics cookies or browser identifiers. Session replay,
+interaction autocapture, and person profiles are disabled. The footer links to the localized
+**Privacy & settings** page, which describes analytics when configured.
 
 After deploying, check that the public origin serves `/robots.txt` and `/sitemap.xml`, and
 that the sitemap URLs return `200` without a language cookie or `Accept-Language` header.

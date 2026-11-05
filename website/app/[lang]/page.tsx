@@ -2,7 +2,6 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { Landing } from "@/components/landing/landing"
 import { getRepositoryInfo } from "@/lib/github"
-import { websiteAnalyticsConfig } from "@/lib/privacy"
 import { defaultLocale, getDictionary, hasLocale, pathFor } from "@/lib/i18n"
 import { pageMetadata, siteName, siteUrlFor } from "@/lib/seo"
 
@@ -30,7 +29,7 @@ export default async function Page({ params }: PageProps<"/[lang]">) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteData).replace(/</g, "\\u003c") }}
         />
       )}
-      <Landing locale={lang} dict={getDictionary(lang)} repository={repository} analyticsEnabled={Boolean(websiteAnalyticsConfig())} />
+      <Landing locale={lang} dict={getDictionary(lang)} repository={repository} />
     </>
   )
 }

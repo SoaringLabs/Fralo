@@ -1,7 +1,7 @@
 import type { Viewport } from "next"
 import { notFound } from "next/navigation"
 import { hasLocale, localeInfo, locales } from "@/lib/i18n"
-import { WebsiteAnalytics } from "@/components/privacy"
+import { WebsiteAnalytics } from "@/components/website-analytics"
 import { websiteAnalyticsConfig } from "@/lib/privacy"
 import "../globals.css"
 
