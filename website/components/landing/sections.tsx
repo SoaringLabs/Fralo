@@ -110,7 +110,7 @@ export function Hero({ dict }: { dict: Dictionary }) {
   return (
     <section className="flex flex-wrap items-center gap-10 px-[clamp(20px,5vw,72px)] pt-[clamp(32px,5vw,72px)] pb-14">
       <div className="flex min-w-0 max-w-[500px] flex-[1_1_340px] flex-col gap-[22px]">
-        <h1 id="fralo-hero-title" tabIndex={-1} className="display m-0 text-[clamp(38px,4.6vw,62px)] font-bold">
+        <h1 className="display m-0 text-[clamp(38px,4.6vw,62px)] font-bold">
           <Phrases phrases={dict.hero.title} />
         </h1>
         <p className="m-0 text-lg leading-relaxed text-muted-foreground">{dict.hero.lead}</p>

@@ -4,7 +4,6 @@ import * as React from "react"
 import Image from "next/image"
 import { ChevronLeftIcon, ChevronRightIcon, LockIcon, PanelLeftIcon, PlusIcon, ShareIcon } from "lucide-react"
 import { cn } from "cn"
-import { PrivacyControls } from "@/components/privacy"
 import { privacyPath } from "@/lib/privacy"
 import { Button } from "@/components/ui/button"
 import { downloadURL, type RepositoryInfo } from "@/lib/repository"
@@ -26,11 +25,10 @@ const windowShadows = {
 
 const exportFolder = "fralo-20261104-101500"
 
-export function Landing({ locale, dict, repository, analyticsEnabled }: {
+export function Landing({ locale, dict, repository }: {
   locale: Locale
   dict: Dictionary
   repository: RepositoryInfo
-  analyticsEnabled: boolean
 }) {
   const [settings, update] = useSettings()
   const systemDark = useMediaQuery("(prefers-color-scheme: dark)")
@@ -177,11 +175,6 @@ export function Landing({ locale, dict, repository, analyticsEnabled }: {
                 <LanguageSelect locale={locale} label={dict.language} container={windowElement} />
               </nav>
 
-              {analyticsEnabled && (
-                <div className="mx-[clamp(20px,5vw,72px)] mt-4 empty:hidden">
-                  <PrivacyControls copy={dict.privacy} policyHref={privacyPath(locale)} />
-                </div>
-              )}
               <Hero dict={dict} />
               <Compare dict={dict} />
               <Canvases dict={dict} reduceMotion={reduceMotion} />

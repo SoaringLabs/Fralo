@@ -286,14 +286,6 @@
     border-radius: 2px;
   }
 
-  .privacy-choice {
-    flex: 1 1 8.5rem;
-    min-height: 44px;
-    height: auto;
-    padding-block: 0.5rem;
-    white-space: normal;
-  }
-
   @media (prefers-color-scheme: dark) {
     .privacy-page {
       --background: #1c1c1e;
@@ -309,7 +301,6 @@
   }
 
   @media (prefers-contrast: more) {
-    .privacy-card,
     .privacy-page {
       --border: var(--foreground);
       --muted-foreground: var(--foreground);

@@ -1,6 +1,5 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
-import { PrivacyControls } from "@/components/privacy"
 import { getDictionary, hasLocale, pathFor } from "@/lib/i18n"
 import { websiteAnalyticsConfig, privacyPath } from "@/lib/privacy"
 import { pageMetadata, siteName } from "@/lib/seo"
@@ -37,21 +36,18 @@ export default async function PrivacyPage({ params }: PageProps<"/[lang]/privacy
           <h2 id="website-privacy" className="text-start text-xl font-semibold">{privacy.websiteTitle}</h2>
           <div className="mt-4 space-y-6">
             {analyticsEnabled && (
-              <>
-                <PrivacyControls copy={privacy} />
-                <section>
-                  <h3 className="text-start font-semibold">{privacy.analyticsDetailsTitle}</h3>
-                  <p className="mt-2 leading-relaxed text-muted-foreground">
-                    {privacy.analyticsDetails}{" "}
-                    <a href="https://posthog.com/privacy" className="privacy-link">{privacy.analyticsPolicy}</a>
-                  </p>
-                </section>
-              </>
+              <section>
+                <h3 className="text-start font-semibold">{privacy.analyticsTitle}</h3>
+                <p className="mt-2 leading-relaxed text-muted-foreground">
+                  {privacy.analyticsDetails}{" "}
+                  <a href="https://posthog.com/privacy" className="privacy-link">{privacy.analyticsPolicy}</a>
+                </p>
+              </section>
             )}
             <section>
               <h3 className="text-start font-semibold">{privacy.storageTitle}</h3>
               <p className="mt-2 leading-relaxed text-muted-foreground">
-                {privacy.storageDetails}{analyticsEnabled && ` ${privacy.choiceStorage}`}
+                {privacy.storageDetails}
               </p>
             </section>
             <section>
