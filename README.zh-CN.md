@@ -56,7 +56,9 @@
 curl -fsSL https://fralo.app/install.sh | sh
 ```
 
-脚本将同一个正式版本安装到 `~/Applications`，并输出内置 CLI 的路径。固定版本和验证 CLI 的步骤见[安装指南](INSTALL.md#从终端安装--install-from-terminal)。
+安装后可直接运行 `fralo --version` 或 `fralo --help`。脚本将 App 安装到 `~/Applications`，
+并在 `/usr/local/bin` 注册命令；该目录须已在 PATH 中，写入时可能需要管理员密码。
+已有该位置的官方 App 会复用，不覆盖其他来源的同名命令。无需提权的自定义目录、固定版本及卸载步骤见[安装指南](INSTALL.md#从终端安装--install-from-terminal)。
 
 本文说明当前源码中的功能。各版本的变化见[更新记录](CHANGELOG.md)。
 
@@ -113,7 +115,7 @@ Fralo 0.1.1 及以上版本可从 **Fralo → 检查更新…** 升级。应用�
 
 ### 命令速查
 
-下方用 `fralo` 简写。如果它不在 PATH 中，请使用安装脚本输出的 CLI 路径，或下一节的 App 内置路径。
+通过终端脚本安装后可直接使用下方的 `fralo` 命令。仅通过 DMG 拖拽安装不会创建终端命令，请使用下一节的 App 内置路径。
 
 ```text
 fralo compose INPUT... --output DIR   # 为截图套框并导出
@@ -131,10 +133,10 @@ fralo --version                       # 查看已安装的 CLI 版本
 
 ### 在终端运行
 
-先预检，确认计划输出路径后再导出。可以沿用安装脚本输出的 `FRALO` 路径；拖拽安装则用下方默认路径。如果 `fralo` 已在 PATH 中，可以用它替代 `"$FRALO"`。
+先预检，确认计划输出路径后再导出。脚本安装后，下例直接调用 `fralo`；仅通过 DMG 安装时，请先设置 `FRALO=/Applications/Fralo.app/Contents/MacOS/fralo`。
 
 ```bash
-FRALO=${FRALO:-/Applications/Fralo.app/Contents/MacOS/fralo}
+FRALO=${FRALO:-fralo}
 "$FRALO" compose ./screenshots --output ./framed --app-settings --dry-run --json
 "$FRALO" compose ./screenshots --output ./framed --app-settings --json
 ```

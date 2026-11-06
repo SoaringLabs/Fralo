@@ -8,11 +8,15 @@ source checkout is needed. macOS 14 or later is required.
 
 ## Find the executable
 
-The [terminal installer](https://github.com/SoaringLabs/Fralo/blob/main/INSTALL.md#从终端安装--install-from-terminal) prints
-the absolute CLI path after installing to `~/Applications`. If you installed
-by dragging Fralo to Applications, use `/Applications/Fralo.app/Contents/MacOS/fralo`.
-Use the absolute path in place of `fralo` below if it is not on your PATH.
-Fralo never edits PATH. After a source build, use the path returned by
+The [terminal installer](https://github.com/SoaringLabs/Fralo/blob/main/INSTALL.md#从终端安装--install-from-terminal)
+installs the app to `~/Applications` and a `fralo` launcher to `/usr/local/bin`, so
+commands below work directly. The command directory must already be on PATH;
+writing the default directory may require an administrator password. Use
+`--bin-dir` for another directory already on PATH. The installer never edits shell
+profiles and still prints the absolute bundled CLI path for automation.
+If you installed only by dragging Fralo to Applications, replace `fralo` below
+with `/Applications/Fralo.app/Contents/MacOS/fralo`; DMG installation does not
+register a shell command. After a source build, use the path returned by
 `swift build --build-system native -c release --show-bin-path` followed by `/fralo`.
 A copied standalone CLI still prints its guide, examples and schema. Rendering
 with built-in image backgrounds additionally needs the matching

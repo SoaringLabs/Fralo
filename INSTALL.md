@@ -34,27 +34,53 @@ Paste this line into Terminal on an Apple silicon Mac. The script runs after the
 curl -fsSL https://fralo.app/install.sh | sh
 ```
 
-安装成功后验证 CLI / Verify the CLI after installation:
+安装成功后，当前终端可直接使用 / After a successful installation, run directly:
 
 ```sh
-FRALO="$HOME/Applications/Fralo.app/Contents/MacOS/fralo"
-"$FRALO" --version
+fralo --version
+fralo --help
 ```
 
-默认安装最新稳定版。需要固定版本时，把末尾的 `sh` 换成 `sh -s -- --version 0.2.0`（替换成需要的版本）。
-脚本会校验 SHA-256、发布者签名和 Gatekeeper 评估结果，然后将同一个正式 DMG 里的 App
-复制到 `~/Applications/Fralo.app`。无需提权；不会打开 App，也不会更改 PATH 或覆盖该位置的现有 App。
-成功时标准输出只有 CLI 的绝对路径。Agent 可以使用它运行 `"$FRALO" guide`
-（支持 Agent CLI 的版本），无需先打开 App 创建配置。v0.2.0 的 CLI 请用 `"$FRALO" --help`。
+首次安装默认下载最新稳定版。脚本校验 SHA-256、发布者签名和 Gatekeeper，再把正式 DMG 中的
+App 复制到 `~/Applications/Fralo.app`。它还会在 `/usr/local/bin/fralo` 安装命令入口；写入该目录
+可能要求管理员密码，只有命令入口操作会提权。`/usr/local/bin` 必须已在 PATH 中，否则脚本会
+在安装前报错并说明处理方式，不会声称命令已就绪。脚本不会修改 shell 配置或自动打开 App。
 
-The script installs the latest stable release by default. To pin the release,
-replace `sh` at the end with `sh -s -- --version 0.2.0` (or the version you need).
-It checks the SHA-256, publisher signature, and Gatekeeper assessment before
-copying the app from the same release DMG to `~/Applications/Fralo.app`.
-It needs no administrator access, launches no app, changes no PATH settings, and
-leaves any existing app at that location in place. On success, stdout contains
-only the absolute CLI path. On releases with the agent CLI, run `"$FRALO" guide`
-to get started without opening the app. For v0.2.0, use `"$FRALO" --help`.
+已有 `~/Applications/Fralo.app` 时，会先验证它，再为该版本补装命令，不替换或升级 App；
+更新仍使用应用内更新器。需要固定版本时，使用 `sh -s -- --version 0.3.1`，现有 App
+版本不匹配则拒绝安装。已有其他来源的同名命令也会报错，不覆盖。
+
+The first installation downloads the latest stable release, verifies its checksum,
+publisher signature and Gatekeeper assessment, and copies the app to
+`~/Applications/Fralo.app`. It also installs `/usr/local/bin/fralo`; writing this
+command may request an administrator password. Only the launcher operation elevates.
+The directory must already be on PATH; otherwise installation stops with guidance.
+The script never edits shell profiles or launches the GUI.
+
+An existing official app at `~/Applications/Fralo.app` is verified and reused to
+add the command. Re-running the script does not upgrade or replace it; use the
+in-app updater. To pin a version, use `sh -s -- --version 0.3.1`. A different
+installed version or an unrelated existing `fralo` command stops installation.
+
+无需管理员权限的安装方式 / Install into a user-owned command directory:
+
+```sh
+mkdir -p "$HOME/.local/bin"
+export PATH="$HOME/.local/bin:$PATH"
+curl -fsSL https://fralo.app/install.sh | sh -s -- --bin-dir "$HOME/.local/bin"
+fralo --version
+```
+
+如需让新终端也能找到自定义目录，请自行将上面的 PATH 设置加入对应的 shell 配置。
+For future terminals, add that PATH setting to your shell profile yourself.
+
+命令入口调用 App 内的 CLI，保留配套资源；同路径更新 App 后，CLI 随之更新。
+App 被移动或删除后，命令会提示重新安装。成功时标准输出仍只有包内 CLI 的绝对路径，
+以便既有自动化继续使用；安装进度和命令就绪信息写入标准错误。
+The launcher executes the bundled CLI with its matching resources. Updating the app
+at the same path updates the CLI too. Moving or deleting the app produces a repair
+message. Success stdout remains the single absolute bundled CLI path for existing
+automation; progress and readiness messages go to stderr.
 
 Agent 在 Bash 或 Zsh 自动化里可先启用 `set -o pipefail`，让入口下载失败时整条命令返回错误。
 For automation in Bash or Zsh, enable `set -o pipefail` so the command reports an error
@@ -83,12 +109,25 @@ path for the copy you intend to run.
 
 ## CLI
 
-使用安装脚本输出的 CLI 路径，或在拖拽安装后运行
+通过脚本安装后可直接运行 `fralo --help`，也可使用脚本输出的 CLI 路径。
+仅通过 DMG 拖拽安装不会创建终端命令入口，请运行
 `"/Applications/Fralo.app/Contents/MacOS/fralo" --help`。
-CLI 会从 App 包读取配套资源；建议直接调用包内的可执行文件。
+CLI 会从 App 包读取配套资源；请保留完整 App，不要单独复制或软链接 CLI。
 设置文件位于 ~/Library/Application Support/Fralo/。
 
 ## 卸载
+
+如果通过脚本装过命令入口，先移除它 / Remove a script-installed launcher first:
+
+```sh
+curl -fsSL https://fralo.app/install.sh | sh -s -- --uninstall-cli
+```
+
+自定义目录需同时传入 `--bin-dir "$HOME/.local/bin"`。该操作只删除与本安装器生成内容一致的
+入口，保留 App 和设置；默认目录可能需要管理员密码。
+For a custom directory, also pass `--bin-dir "$HOME/.local/bin"`. This removes only
+this installer's matching launcher, preserving the app and settings. The default
+directory may require an administrator password.
 
 退出 Fralo，再将 Applications（终端安装时为 `~/Applications`）中的 Fralo.app 移到废纸篓。
 设置保存在 ~/Library/Application Support/Fralo/，是否保留由你决定。
