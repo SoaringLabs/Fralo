@@ -7,26 +7,26 @@ releases may include breaking changes; they are marked **Breaking** below.
 
 ## Unreleased
 
+## 0.3.0 — 2026-11-06
+
+Four-language support, full composition automation, and a more polished native workbench.
+
+### Added
+
+- Use Fralo in English, Simplified Chinese, Traditional Chinese, or Japanese, including menus, settings, and error messages.
+- Automate full phone, tablet, and browser compositions with the new compose CLI. Discover capabilities, export configurations, validate a batch with dry-run, and read structured JSON results. Offline guides, schemas, and examples are included; legacy render commands remain available.
+- Install the signed, notarized app to ~/Applications from the terminal and locate its bundled CLI. See the installation guide for the command and version pinning.
+
 ### Changed
 
-- Settings (⌘,) is now a System Settings–style window with Appearance and Updates
-  categories. Choose the App appearance from thumbnails, and turn daily update checks
-  on or off next to the current version, the last check time, and Check Now.
-- Choose Fralo's interface language in Settings › Appearance; Fralo switches
-  immediately and keeps your batch. It is the same setting as Fralo's language in
-  System Settings › General › Language & Region.
-- Search Settings from the sidebar (⌘F): matching categories stay listed and matching
-  settings are highlighted, in your language or in English.
-- The View › Appearance submenu and the Fralo › Check for Updates Automatically
-  (Daily) menu item moved into Settings, so each preference has one place to change
-  it. Existing choices carry over.
-- Exporting now happens on the stage: the viewing toolbar turns into a glass capsule
-  whose neutral liquid fills as images export, beside a thumbnail of the batch. The
-  count and time remaining show beneath the title, and the × button or Esc stops the run. A clean run ends with a brief highlight
-  and Show in Finder, which selects the exported files, then settles back into the
-  toolbar; skipped, failed, or cancelled images open a card that lists each reason.
-  The viewing toolbar sits a little higher, and Fit leaves room for it. The Dock icon
-  shows progress while Fralo is in the background.
+- Settings now uses a System Settings–style sidebar with Appearance and Updates pages, thumbnail appearance choices, interface language selection, and searchable settings (⌘F). Language changes apply immediately while preserving your batch.
+- Follow export progress directly on the canvas and in the Dock. The progress capsule shows the batch, count, and time remaining; stop with × or Esc. Successful exports offer Show in Finder, while skipped, failed, or cancelled items show a detailed result card.
+- Each app export creates its own timestamped folder and timestamped image names. Name collisions receive numeric suffixes to preserve existing files. CLI output naming and overwrite behavior stay the same.
+- Refined hover feedback, toolbar help, empty previews, loading indicators, and export settings groups. Browser frames now share a consistent rounded outline, and the app icon is better centered.
+
+### Fixed
+
+- Pasting now respects the focused control: text fields receive text, and unrelated settings controls no longer import clipboard images into the workbench.
 
 ## 0.2.0 — 2026-11-01
 
