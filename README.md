@@ -56,7 +56,12 @@ On an Apple silicon Mac, paste this command into Terminal:
 curl -fsSL https://fralo.app/install.sh | sh
 ```
 
-The script installs the same release in `~/Applications` and prints the bundled CLI path. See the [install guide](INSTALL.md#从终端安装--install-from-terminal) to pin a version or verify the CLI.
+After installation, run `fralo --version` or `fralo --help` directly. The script installs
+the app in `~/Applications` and its command launcher in `/usr/local/bin`, which must
+already be on PATH. The launcher may request an administrator password. An existing
+official app in `~/Applications` is reused; unrelated commands are never overwritten. See the
+[install guide](INSTALL.md#从终端安装--install-from-terminal) for a user-owned command
+directory, pinned versions and uninstall steps.
 
 This README describes the current source tree. See the [changelog](CHANGELOG.md) for changes by version.
 
@@ -113,8 +118,8 @@ Use a build that includes `fralo compose`. Set up a representative screenshot in
 
 ### Command quick reference
 
-The examples below use `fralo` as shorthand. If it is outside your PATH, use
-the CLI path printed by the installer or the bundled path shown in the next section.
+The terminal installer makes `fralo` available directly. A DMG drag-and-drop install
+does not create a shell command; use its bundled path shown in the next section.
 
 ```text
 fralo compose INPUT... --output DIR   # Frame and export screenshots
@@ -133,10 +138,12 @@ See [legacy compatibility](docs/cli.md#legacy-compatibility) for their behavior.
 
 ### From the terminal
 
-Run the preflight first and review the planned output paths before exporting. Keep the `FRALO` path returned by the terminal installer, or use the path for a drag-and-drop install shown below. If `fralo` is on your PATH, use it in place of `"$FRALO"`.
+Run the preflight first and review the planned output paths before exporting. After
+terminal installation, the following commands use `fralo` directly. For a DMG-only
+install, set `FRALO=/Applications/Fralo.app/Contents/MacOS/fralo` first.
 
 ```bash
-FRALO=${FRALO:-/Applications/Fralo.app/Contents/MacOS/fralo}
+FRALO=${FRALO:-fralo}
 "$FRALO" compose ./screenshots --output ./framed --app-settings --dry-run --json
 "$FRALO" compose ./screenshots --output ./framed --app-settings --json
 ```

@@ -101,6 +101,8 @@ jobs:
           name: fralo-output-diagnostics
           path: ${{ runner.temp }}/fralo-test-artifacts
           if-no-files-found: ignore
+      - name: Terminal installer and launcher checks
+        run: python3 -B scripts/test_install.py
       - name: Preview process handoff tests
         run: python3 -B scripts/test_stop_preview_processes.py
       - name: Build App and CLI
