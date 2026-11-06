@@ -15,6 +15,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Contact @peekbomb on X](https://img.shields.io/badge/%40peekbomb-000000?logo=x&logoColor=white)](https://x.com/peekbomb)
 
+[**Website**](https://fralo.app) ·
 [**Download the macOS App**](https://github.com/SoaringLabs/Fralo/releases/latest) ·
 [**CLI quickstart**](#command-line-interface) ·
 [**AI agent**](#with-an-ai-agent) ·

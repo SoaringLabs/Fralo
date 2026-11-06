@@ -185,7 +185,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showAbout(_ sender: Any?) {
         let credits = NSMutableAttributedString(string: L10n.tr("开发者：\(FraloInfo.developer)\n维护者：Ethan (@Peek-A-Booo)\nMIT 开源许可\n"))
-        let organization = NSAttributedString(string: "Soaring Labs on GitHub", attributes: [.link: URL(string: FraloInfo.homepage)!])
+        credits.append(NSAttributedString(string: FraloInfo.homepage, attributes: [.link: URL(string: FraloInfo.homepage)!]))
+        credits.append(NSAttributedString(string: "\n"))
+        let organization = NSAttributedString(string: "Soaring Labs on GitHub", attributes: [.link: URL(string: FraloInfo.developerHomepage)!])
         credits.append(organization)
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "Fralo",
