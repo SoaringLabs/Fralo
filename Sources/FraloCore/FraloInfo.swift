@@ -1,7 +1,7 @@
 /// Public release identity shared by the App, CLI, and packaging script.
 public enum FraloInfo {
-    public static let version = "0.3.0"
-    public static let build = "4"
+    public static let version = "0.3.1"
+    public static let build = "5"
     public static let developer = "Soaring Labs"
     public static let homepage = "https://fralo.app"
     public static let developerHomepage = "https://github.com/SoaringLabs"

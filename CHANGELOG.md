@@ -7,6 +7,16 @@ releases may include breaking changes; they are marked **Breaking** below.
 
 ## Unreleased
 
+## 0.3.1 — 2026-11-06
+
+### Added
+
+- The About window links to [fralo.app](https://fralo.app), alongside the developer's GitHub link.
+
+### Changed
+
+- The English and Chinese README navigation and bundled developer information include the official website.
+
 ## 0.3.0 — 2026-11-06
 
 Four-language support, full composition automation, and a more polished native workbench.
