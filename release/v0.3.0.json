@@ -1,0 +1,102 @@
+{
+  "version": "0.3.0",
+  "summary": {
+    "en": "Four-language support, full composition automation, and a more polished native workbench.",
+    "zh-Hans": "四语支持、完整构图自动化，以及更顺手的原生工作台。",
+    "zh-Hant": "四語支援、完整構圖自動化，以及更順手的原生工作區。",
+    "ja": "4 言語への対応、構図作成の自動化、ネイティブワークスペースの改善。"
+  },
+  "changes": [
+    {
+      "id": "four-languages",
+      "type": "added",
+      "text": {
+        "en": "Use Fralo in English, Simplified Chinese, Traditional Chinese, or Japanese, including menus, settings, and error messages.",
+        "zh-Hans": "界面、菜单、设置和错误提示现已支持 English、简体中文、繁体中文和日语。",
+        "zh-Hant": "介面、選單、設定和錯誤提示現已支援 English、簡體中文、繁體中文和日文。",
+        "ja": "メニュー、設定、エラーメッセージを含め、英語・簡体字中国語・繁体字中国語・日本語に対応しました。"
+      }
+    },
+    {
+      "id": "agent-cli",
+      "type": "added",
+      "text": {
+        "en": "Automate full phone, tablet, and browser compositions with the new compose CLI. Discover capabilities, export configurations, validate a batch with dry-run, and read structured JSON results. Offline guides, schemas, and examples are included; legacy render commands remain available.",
+        "zh-Hans": "新增 compose 命令，可自动化生成手机、平板和浏览器构图，查询能力、导出配置、预检批次并读取结构化 JSON 结果。随包提供离线指南、配置结构和示例，原有 render 命令继续可用。",
+        "zh-Hant": "新增 compose 指令，可自動化產生手機、平板和瀏覽器構圖，查詢功能、匯出設定、預先檢查批次並讀取結構化 JSON 結果。隨附離線指南、設定結構和範例，原有 render 指令繼續可用。",
+        "ja": "新しい compose CLI で、スマートフォン・タブレット・ブラウザの構図を自動生成できます。機能の確認、設定の書き出し、dry-run による事前確認、JSON 形式の結果に対応。オフラインガイド、スキーマ、サンプルを同梱し、従来の render コマンドも引き続き利用できます。"
+      }
+    },
+    {
+      "id": "terminal-install",
+      "type": "added",
+      "text": {
+        "en": "Install the signed, notarized app to ~/Applications from the terminal and locate its bundled CLI. See the installation guide for the command and version pinning.",
+        "zh-Hans": "可通过终端将签名并公证的应用安装到 ~/Applications，并获取内置 CLI 路径；命令和固定版本方法见安装指南。",
+        "zh-Hant": "可透過終端機將已簽署並公證的 App 安裝至 ~/Applications，並取得內建 CLI 路徑；指令與指定版本的方法請見安裝指南。",
+        "ja": "ターミナルから署名・公証済みのアプリを ~/Applications にインストールし、同梱 CLI の場所を確認できます。コマンドとバージョン指定方法はインストールガイドをご覧ください。"
+      }
+    },
+    {
+      "id": "native-settings",
+      "type": "changed",
+      "text": {
+        "en": "Settings now uses a System Settings–style sidebar with Appearance and Updates pages, thumbnail appearance choices, interface language selection, and searchable settings (⌘F). Language changes apply immediately while preserving your batch.",
+        "zh-Hans": "设置窗口采用系统设置式侧栏，集中管理外观和更新，支持外观缩略图、界面语言选择和搜索（⌘F）。切换语言立即生效，并保留当前批次。",
+        "zh-Hant": "設定視窗採用系統設定式側邊欄，集中管理外觀與更新，支援外觀縮圖、介面語言選擇和搜尋（⌘F）。切換語言立即生效，並保留目前批次。",
+        "ja": "設定を「外観」「アップデート」のサイドバー形式に刷新しました。外観のサムネイル、表示言語の選択、設定の検索（⌘F）に対応。言語の変更はバッチを保持したまま即座に反映されます。"
+      }
+    },
+    {
+      "id": "export-progress",
+      "type": "changed",
+      "text": {
+        "en": "Follow export progress directly on the canvas and in the Dock. The progress capsule shows the batch, count, and time remaining; stop with × or Esc. Successful exports offer Show in Finder, while skipped, failed, or cancelled items show a detailed result card.",
+        "zh-Hans": "导出进度直接显示在画布和 Dock 中。进度胶囊展示批次、数量和剩余时间，可用 × 或 Esc 停止。成功后可在访达中查看；跳过、失败或取消的项目会显示详细结果卡片。",
+        "zh-Hant": "匯出進度直接顯示於畫布和 Dock。進度膠囊顯示批次、數量與剩餘時間，可用 × 或 Esc 停止。成功後可在 Finder 中顯示；略過、失敗或取消的項目會顯示詳細結果卡片。",
+        "ja": "書き出しの進捗をキャンバスと Dock に表示します。進捗カプセルでバッチ、件数、残り時間を確認し、× または Esc で停止できます。成功時は Finder で表示でき、スキップ・失敗・キャンセルがある場合は詳細な結果カードを表示します。"
+      }
+    },
+    {
+      "id": "export-folders",
+      "type": "changed",
+      "text": {
+        "en": "Each app export creates its own timestamped folder and timestamped image names. Name collisions receive numeric suffixes to preserve existing files. CLI output naming and overwrite behavior stay the same.",
+        "zh-Hans": "应用每次导出都会创建独立的时间戳文件夹，图片名称也带同一时间戳；重名时追加数字，保留已有文件。CLI 的命名和覆盖规则保持不变。",
+        "zh-Hant": "App 每次匯出都會建立獨立的時間戳記資料夾，圖片名稱也帶有相同時間戳記；名稱重複時附加數字，保留既有檔案。CLI 的命名與覆寫規則維持不變。",
+        "ja": "アプリからの書き出しごとに、日時付きの専用フォルダと画像名を作成します。同名の場合は連番を付け、既存ファイルを保持します。CLI のファイル名と上書き動作は従来どおりです。"
+      }
+    },
+    {
+      "id": "workbench-polish",
+      "type": "changed",
+      "text": {
+        "en": "Refined hover feedback, toolbar help, empty previews, loading indicators, and export settings groups. Browser frames now share a consistent rounded outline, and the app icon is better centered.",
+        "zh-Hans": "优化悬停反馈、工具栏提示、空预览、加载指示和导出设置分组；浏览器外框统一为圆角轮廓，应用图标也重新居中。",
+        "zh-Hant": "改善游標停留回饋、工具列提示、空白預覽、載入指示與匯出設定分組；瀏覽器外框統一為圓角輪廓，App 圖示也重新置中。",
+        "ja": "ホバー時の反応、ツールバーのヒント、空のプレビュー、読み込み表示、書き出し設定のグループを改善しました。ブラウザフレームの角丸を統一し、アプリアイコンの配置も中央に調整しました。"
+      }
+    },
+    {
+      "id": "paste-focus",
+      "type": "fixed",
+      "text": {
+        "en": "Pasting now respects the focused control: text fields receive text, and unrelated settings controls no longer import clipboard images into the workbench.",
+        "zh-Hans": "粘贴操作现在遵循当前焦点：文本框接收文本，在设置中的其他控件上粘贴不再意外将剪贴板图片导入工作台。",
+        "zh-Hant": "貼上操作現在遵循目前焦點：文字欄位接收文字，在設定中的其他控制項上貼上不再意外將剪貼簿圖片匯入工作區。",
+        "ja": "ペースト時にフォーカス中のコントロールを正しく扱うよう修正しました。テキスト欄には文字を貼り付け、設定内の無関係なコントロールからクリップボード画像が誤って読み込まれることを防ぎます。"
+      }
+    },
+    {
+      "id": "requirements",
+      "type": "notes",
+      "text": {
+        "en": "Requires macOS 14 or later on Apple silicon. Update from Fralo 0.1.1 or 0.2.0 using Fralo → Check for Updates…; 0.1.0 users and new users must install the DMG.",
+        "zh-Hans": "需要搭载 Apple 芯片的 Mac 和 macOS 14 或更高版本。0.1.1、0.2.0 用户可通过「Fralo → 检查更新…」升级；0.1.0 用户和新用户需下载安装 DMG。",
+        "zh-Hant": "需要搭載 Apple 晶片的 Mac 與 macOS 14 或更新版本。0.1.1、0.2.0 使用者可透過「Fralo → 檢查更新…」升級；0.1.0 使用者與新使用者需下載安裝 DMG。",
+        "ja": "Apple シリコン搭載 Mac と macOS 14 以降が必要です。0.1.1・0.2.0 からは「Fralo → アップデートを確認…」で更新できます。0.1.0 をお使いの方と新規ユーザーは DMG をインストールしてください。"
+      }
+    }
+  ],
+  "reviewed_sha256": "121756aa5df234811c0b20eff289a8fddf85fedefb12d2cc61fa84dab2e3cf01"
+}
