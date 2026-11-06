@@ -1,0 +1,32 @@
+{
+  "version": "0.3.1",
+  "summary": {
+    "en": "Quick access to Fralo's official website.",
+    "zh-Hans": "在应用内直接访问 Fralo 官网。",
+    "zh-Hant": "在 App 內直接前往 Fralo 官網。",
+    "ja": "アプリから Fralo の公式サイトにアクセスできます。"
+  },
+  "changes": [
+    {
+      "id": "official-website-in-about",
+      "type": "added",
+      "text": {
+        "en": "Added [fralo.app](https://fralo.app) to the About window, alongside the developer's GitHub link.",
+        "zh-Hans": "在「关于 Fralo」窗口中新增 [fralo.app](https://fralo.app) 官网链接，并保留开发者 GitHub 入口。",
+        "zh-Hant": "在「關於 Fralo」視窗中新增 [fralo.app](https://fralo.app) 官網連結，並保留開發者 GitHub 入口。",
+        "ja": "「Fraloについて」ウインドウに公式サイト [fralo.app](https://fralo.app) へのリンクを追加しました。開発者の GitHub リンクも引き続き利用できます。"
+      }
+    },
+    {
+      "id": "official-website-in-docs",
+      "type": "changed",
+      "text": {
+        "en": "Updated the English and Chinese README navigation and bundled developer information with the official website.",
+        "zh-Hans": "在中英文 README 导航和随包开发者信息中补充官网入口。",
+        "zh-Hant": "在中英文 README 導覽和隨附的開發者資訊中補充官網入口。",
+        "ja": "英語・中国語の README のナビゲーションと、同梱の開発者情報に公式サイトへのリンクを追加しました。"
+      }
+    }
+  ],
+  "reviewed_sha256": "ee9bce1e326514e1557475c55c3790e130e5cd94000364b40697cae010851eb3"
+}
