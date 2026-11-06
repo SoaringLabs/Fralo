@@ -59,7 +59,7 @@ App 的 `Contents/Resources/Sparkle-LICENSE` 保留 Sparkle 及其依赖的完�
        python3 scripts/prepare_update.py \
          --archive dist/Fralo-0.3.0-arm64.dmg --previous-build 3
 
-   脚本先检查 `release/v当前版本.json`、四份生成的 Markdown、四语 GitHub 正文
+   脚本先检查 `release/v当前版本.json`、四份生成的 Markdown、中英双语 GitHub 正文
    及校对摘要，随后才读取签名凭据并只读挂载最终 DMG，核对其版本、项目、公钥和更新地址与当前源码一致，
    拒绝未递增的 build、未公证的 DMG 和非 Developer ID 应用。
    使用 Sparkle 官方工具生成最低系统/CPU 要求及包签名，嵌入四种语言的更新说明，
@@ -80,7 +80,10 @@ DMG、公钥或安装包内容变化后，必须重新签名/公证/生成更新
 
 后续版本必须使用同一份变更清单生成 English、简体中文、繁体中文、日语说明。
 `release/v版本.json` 是源文件；`v版本.en.md`、`v版本.zh-Hans.md`、
-`v版本.zh-Hant.md`、`v版本.ja.md` 和四语 GitHub 正文 `v版本.md` 均由脚本生成。
+`v版本.zh-Hant.md`、`v版本.ja.md` 和中英双语 GitHub 正文 `v版本.md` 均由脚本生成。
+GitHub 正文顶部展示 Fralo 图标、名称、简介和官网入口，下方仅展示 English、简体中文；
+图标使用对应版本标签下的 `docs/assets/icon.png` 绝对地址，发布时该标签必须包含此资源。
+四份独立语言说明和 appcast 内嵌四语说明的生成、校验逻辑保持不变。
 CI 在仓库必需的 `core-and-cli` 检查内校验当前 App 版本以及所有新增版本；
 已发布的 0.1.0、0.1.1、0.2.0 单语历史保留，
 不把后续版本自动列入例外。即使当前 App 尚未升版，新增单语发布文件也会被拒绝。
@@ -95,7 +98,7 @@ CI 在仓库必需的 `core-and-cli` 检查内校验当前 App 版本以及所�
    `breaking` 或 `notes`。仅写用户可见且已有证据的变化，额外说明安装要求或不兼容变更。
    翻译可以辅助生成，四种语言需核对同义、范围、版本号和注意事项；不在用户打开更新窗口时翻译。
 
-3. 生成四语文件和 GitHub 正文，逐份校对。直接修改生成文件会使校验失败，应修改 JSON 再生成：
+3. 生成四语文件和中英双语 GitHub 正文，逐份校对。直接修改生成文件会使校验失败，应修改 JSON 再生成：
 
        python3 -B scripts/release_notes.py render 0.3.0
 

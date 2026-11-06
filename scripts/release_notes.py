@@ -8,7 +8,8 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 LANGUAGES = ("en", "zh-Hans", "zh-Hant", "ja")
-LANGUAGE_NAMES = ("English", "简体中文", "繁體中文", "日本語")
+# GitHub presentation is independent of the four required localized changelogs.
+GITHUB_LANGUAGES = (("en", "English"), ("zh-Hans", "简体中文"))
 # Already published before this policy; new versions never inherit this exemption.
 LEGACY_VERSIONS = frozenset(("0.1.0", "0.1.1", "0.2.0"))
 VERSION = r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
@@ -96,8 +97,17 @@ def generated_files(source):
     version = source["version"]
     notes = render_notes(source)
     files = {f"v{version}.{language}.md": text for language, text in notes.items()}
-    body = [f"# Fralo {version}"]
-    for language, name in zip(LANGUAGES, LANGUAGE_NAMES):
+    body = [
+        '<div align="center">',
+        f'<img src="https://raw.githubusercontent.com/SoaringLabs/Fralo/v{version}/docs/assets/icon.png" '
+        'width="128" height="128" alt="Fralo app icon">',
+        f"# Fralo {version}",
+        "Batch screenshot mockups for macOS. Set the style once and export the whole batch.",
+        "[Website](https://fralo.app) · [GitHub](https://github.com/SoaringLabs/Fralo)",
+        "</div>",
+        "---",
+    ]
+    for language, name in GITHUB_LANGUAGES:
         text = notes[language].split("\n", 2)[2].strip()
         text = re.sub(r"^## ", "### ", text, flags=re.M)
         body.extend((f"## {name}", text))
@@ -173,7 +183,7 @@ def main():
         if args.command == "render":
             for name, text in generated_files(source).items():
                 (args.directory / name).write_text(text, encoding="utf-8")
-            print("Generated four localized Markdown files and one multilingual GitHub Release body.")
+            print("Generated four localized Markdown files and one English/Simplified Chinese GitHub Release body.")
         elif args.command == "mark-reviewed":
             check_generated(args.directory, source)
             source["reviewed_sha256"] = content_digest(source)

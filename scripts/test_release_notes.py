@@ -2,6 +2,7 @@
 import copy
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -50,9 +51,27 @@ class ReleaseNotesTests(unittest.TestCase):
             for change in self.source["changes"]:
                 self.assertEqual(text.count(change["text"][language]), 1)
         body = (self.directory / "v9.9.9.md").read_text(encoding="utf-8")
-        for summary in self.source["summary"].values():
-            self.assertIn(summary, body)
+        self.assertEqual(re.findall(r"^## (.+)$", body, re.M), ["English", "简体中文"])
+        for language in LANGUAGES:
+            if language in ("en", "zh-Hans"):
+                self.assertIn(self.source["summary"][language], body)
+                for change in self.source["changes"]:
+                    self.assertIn(change["text"][language], body)
+            else:
+                self.assertNotIn(self.source["summary"][language], body)
+                for change in self.source["changes"]:
+                    self.assertNotIn(change["text"][language], body)
         self.assertEqual(check_all(self.directory, "9.9.9"), 1)
+
+    def test_github_body_includes_versioned_branding_before_changelog(self):
+        body = generated_files(self.source)["v9.9.9.md"]
+        self.assertTrue(body.startswith('<div align="center">\n'))
+        self.assertIn('src="https://raw.githubusercontent.com/SoaringLabs/Fralo/v9.9.9/docs/assets/icon.png"', body)
+        self.assertIn('width="128" height="128" alt="Fralo app icon"', body)
+        self.assertIn("# Fralo 9.9.9", body)
+        self.assertIn("Batch screenshot mockups for macOS.", body)
+        self.assertIn("[Website](https://fralo.app)", body)
+        self.assertIn("</div>\n\n---\n\n## English", body)
 
     def test_missing_empty_placeholder_and_extra_translations_are_rejected(self):
         for location in ("summary", "change"):
