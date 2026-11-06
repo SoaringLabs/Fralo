@@ -61,7 +61,9 @@ cli="$app/Contents/MacOS/fralo"
 
 # A real invocation of the bundled executable preserves Bundle.main resource lookup.
 # A symlink can print --version but fail when rendering bundled backgrounds.
-launcher_text() {
+launcher_text() (
+    # Keep ownership comparison stable for non-ASCII HOME paths across locales.
+    export LC_ALL=C
     printf '#!/bin/bash\n# Fralo CLI launcher v1\ncli=%q\n' "$cli"
     cat <<'EOF'
 if [[ ! -x $cli ]]; then
@@ -70,7 +72,7 @@ if [[ ! -x $cli ]]; then
 fi
 exec "$cli" "$@"
 EOF
-}
+)
 ours() {
     [[ -f $launcher && ! -L $launcher ]] &&
         /usr/bin/cmp -s "$launcher" <(launcher_text)

@@ -179,6 +179,15 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual((self.app / 'Contents/MacOS/fralo').read_bytes(), before)
         self.assertNotIn('curl', [c[0] for c in self.calls()])
 
+    def test_reinstall_and_uninstall_recognize_launcher_across_locales(self):
+        self.install(env=dict(self.env, LC_ALL='en_US.UTF-8'))
+        original = self.launcher.read_bytes()
+        self.install(env=dict(self.env, LC_ALL='C'))
+        self.assertEqual(self.launcher.read_bytes(), original)
+        self.command('--version')
+        self.install('--uninstall-cli', env=dict(self.env, LC_ALL='C'))
+        self.assertFalse(self.launcher.exists())
+
     def test_argument_bytes_exit_code_and_exec_signal_delivery(self):
         self.install()
         arguments = ['compose', "input 空格 ' $x.png", '--output', 'two words', '', '*']
