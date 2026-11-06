@@ -3,6 +3,14 @@ import XCTest
 @testable import FraloDesignSystem
 
 final class BatchRowHoverTests: XCTestCase {
+    // A command-line XCTest process must finish AppKit launch before testing
+    // animation frames in a hidden window, including when this suite runs first.
+    @MainActor private static let app: NSApplication = {
+        let app = NSApplication.shared
+        app.finishLaunching()
+        return app
+    }()
+
     @MainActor private final class KeyWindow: NSWindow {
         var simulatedKey = true
         var simulatedPointer = NSPoint(x: -100, y: -100)
@@ -11,7 +19,7 @@ final class BatchRowHoverTests: XCTestCase {
     }
 
     @MainActor private func scene(compact: Bool = false) throws -> (KeyWindow, BatchList, NSTableView, BatchSelectionRow) {
-        _ = NSApplication.shared
+        _ = Self.app
         let window = KeyWindow(contentRect: NSRect(x: 0, y: 0, width: 260, height: 400),
                                styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
