@@ -169,7 +169,7 @@ export function Landing({ locale, dict, repository }: {
             <main id="content">
               <nav aria-label="Fralo" className="flex flex-wrap items-center gap-x-3 gap-y-2.5 px-[clamp(20px,5vw,72px)] pt-[18px]">
                 <span className="mr-auto flex items-center gap-2.5 text-[15px] font-semibold">
-                  <Image src={icon} alt="" width={36} height={36} />
+                  <Image src={icon} alt="" width={36} height={36} loading="eager" fetchPriority="high" />
                   Fralo
                 </span>
                 <LanguageSelect locale={locale} label={dict.language} container={windowElement} />
@@ -181,7 +181,7 @@ export function Landing({ locale, dict, repository }: {
               <Workbench dict={dict} locale={locale} appearance={appearance} />
               <Cli dict={dict} />
               <Closing dict={dict} repository={repository} />
-              <Footer dict={dict} privacyHref={privacyPath(locale)} />
+              <Footer dict={dict} locale={locale} privacyHref={privacyPath(locale)} />
             </main>
             <div className="pointer-events-none sticky bottom-0 z-10 flex h-0 items-start justify-center">
               <Glass data-shown={dockShown} aria-hidden={!dockShown} inert={!dockShown} className="dock pointer-events-auto flex items-center gap-1.5 rounded-full py-1.5 pr-1.5 pl-2.5 text-foreground">

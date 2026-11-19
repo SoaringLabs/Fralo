@@ -3,18 +3,30 @@ import { notFound } from "next/navigation"
 import { Landing } from "@/components/landing/landing"
 import { getRepositoryInfo } from "@/lib/github"
 import { defaultLocale, getDictionary, hasLocale, pathFor } from "@/lib/i18n"
-import { pageMetadata, siteName, siteUrlFor } from "@/lib/seo"
+import { pageMetadata, publisherData, siteName, siteUrlFor } from "@/lib/seo"
 
 export async function generateMetadata({ params }: PageProps<"/[lang]">): Promise<Metadata> {
   const { lang } = await params
-  return hasLocale(lang) ? pageMetadata(lang, pathFor, getDictionary(lang).meta) : {}
+  if (!hasLocale(lang)) return {}
+  const google = process.env.FRALO_GOOGLE_SITE_VERIFICATION?.trim()
+  return {
+    ...pageMetadata(lang, pathFor, getDictionary(lang).meta),
+    verification: google ? { google } : undefined,
+  }
 }
 
 const websiteData = {
   "@context": "https://schema.org",
-  "@type": "WebSite",
-  name: siteName,
-  url: siteUrlFor("/"),
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": siteUrlFor("/#website"),
+      name: siteName,
+      url: siteUrlFor("/"),
+      publisher: { "@id": publisherData["@id"] },
+    },
+    publisherData,
+  ],
 }
 
 export default async function Page({ params }: PageProps<"/[lang]">) {

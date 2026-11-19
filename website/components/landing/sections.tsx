@@ -5,8 +5,9 @@ import Image from "next/image"
 import { CheckIcon, ChevronsLeftRightIcon, CopyIcon } from "lucide-react"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
-import { downloadURL, repositoryURL, type RepositoryInfo } from "@/lib/repository"
+import { downloadURL, publisherName, publisherURL, repositoryURL, type RepositoryInfo } from "@/lib/repository"
 import { format, type Locale } from "@/lib/i18n"
+import { screenshotGuidePath } from "@/lib/guide"
 import type { Dictionary } from "@/lib/dictionaries/en"
 import browserClear from "@/public/media/browser-clear.png"
 import icon from "@/public/media/icon.png"
@@ -131,14 +132,14 @@ export function Hero({ dict }: { dict: Dictionary }) {
         </div>
       </div>
       <div role="img" aria-label={dict.hero.devices} className="device-fan relative aspect-[5/4] min-w-0 flex-[999_1_440px]">
-        <div className="device device-browser absolute top-[4%] right-0 w-[78%]" style={{ animationDelay: "0.55s" }}>
-          <Image src={browserClear} alt="" preload sizes="(min-width: 1200px) 560px, 70vw" className="h-auto w-full drop-shadow-[0_20px_30px_rgb(0_0_0/18%)]" style={{ "--float": "8s" } as React.CSSProperties} />
+        <div className="device device-browser absolute top-[4%] right-0 w-[78%]">
+          <Image src={browserClear} alt="" loading="eager" sizes="(min-width: 1200px) 560px, (max-width: 639px) 65vw, 70vw" className="h-auto w-full drop-shadow-[0_20px_30px_rgb(0_0_0/18%)]" style={{ "--float": "8s" } as React.CSSProperties} />
         </div>
-        <div className="device device-tablet absolute bottom-[7%] left-[3%] w-[58%]" style={{ animationDelay: "0.7s" }}>
-          <Image src={tabletClear} alt="" preload sizes="(min-width: 1200px) 420px, 55vw" className="h-auto w-full drop-shadow-[0_24px_34px_rgb(0_0_0/22%)]" style={{ "--float": "7s", "--float-delay": "-2s" } as React.CSSProperties} />
+        <div className="device device-tablet absolute bottom-[7%] left-[3%] w-[58%]">
+          <Image src={tabletClear} alt="" sizes="(min-width: 1200px) 420px, (max-width: 639px) 48vw, 55vw" className="h-auto w-full drop-shadow-[0_24px_34px_rgb(0_0_0/22%)]" style={{ "--float": "7s", "--float-delay": "-2s" } as React.CSSProperties} />
         </div>
-        <div className="device device-phone absolute bottom-0 left-[56%] w-[22%]" style={{ animationDelay: "0.85s" }}>
-          <Image src={phoneClear} alt="" preload sizes="(min-width: 1200px) 160px, 22vw" className="h-auto w-full drop-shadow-[0_28px_36px_rgb(0_0_0/28%)]" style={{ "--float": "6s", "--float-delay": "-4s" } as React.CSSProperties} />
+        <div className="device device-phone absolute bottom-0 left-[56%] w-[22%]">
+          <Image src={phoneClear} alt="" sizes="(min-width: 1200px) 160px, (max-width: 639px) 18vw, 22vw" className="h-auto w-full drop-shadow-[0_28px_36px_rgb(0_0_0/28%)]" style={{ "--float": "6s", "--float-delay": "-4s" } as React.CSSProperties} />
         </div>
       </div>
     </section>
@@ -285,13 +286,10 @@ const workbenchCaptures = {
 } satisfies Record<Locale, Record<Appearance, typeof workbenchEnLight>>
 
 export function Workbench({ dict, locale, appearance }: { dict: Dictionary; locale: Locale; appearance: Appearance }) {
-  const { light, dark } = workbenchCaptures[locale]
+  const screenshot = workbenchCaptures[locale][appearance]
   return (
     <section className={cn(section, "reveal")}>
-      <div className="relative">
-        <Image src={light} alt={dict.workbench.alt} sizes="(min-width: 1240px) 1100px, 92vw" className="h-auto w-full transition-opacity duration-600" style={{ opacity: appearance === "dark" ? 0 : 1 }} />
-        <Image src={dark} alt="" sizes="(min-width: 1240px) 1100px, 92vw" className="absolute inset-0 size-full transition-opacity duration-600" style={{ opacity: appearance === "dark" ? 1 : 0 }} />
-      </div>
+      <Image src={screenshot} alt={dict.workbench.alt} sizes="(min-width: 1240px) 1100px, 92vw" className="h-auto w-full" />
       <div className="mt-9 grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-x-10 gap-y-6">
         {dict.workbench.notes.map(([title, body]) => (
           <p key={title} className="m-0 text-base leading-relaxed">
@@ -358,16 +356,19 @@ export function Closing({ dict, repository }: { dict: Dictionary; repository: Re
   )
 }
 
-export function Footer({ dict, privacyHref }: { dict: Dictionary; privacyHref: string }) {
+export function Footer({ dict, locale, privacyHref }: { dict: Dictionary; locale: Locale; privacyHref: string }) {
   const linkClass = "hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-ring"
   return (
     <footer className="flex flex-wrap gap-x-6 gap-y-2 border-t border-border px-[clamp(20px,5vw,72px)] pt-6 pb-24 text-[13px] text-muted-foreground">
       <span className="mr-auto">
-        <a href="https://github.com/SoaringLabs" className={linkClass}>SoaringLabs</a>
+        <a href={publisherURL} className={linkClass}>{publisherName}</a>
         {" · "}{dict.footer.license}
       </span>
       <a href={`${repositoryURL}/blob/main/CHANGELOG.md`} className={linkClass}>
         {dict.footer.changelog}
+      </a>
+      <a href={screenshotGuidePath(locale)} className={linkClass}>
+        {dict.guide.link}
       </a>
       <a href={privacyHref} className={linkClass}>
         {dict.privacy.link}

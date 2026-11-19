@@ -50,7 +50,7 @@ for lang in en zh-hans zh-hant ja; do
     const tag = { en: "en", "zh-hans": "zh-Hans", "zh-hant": "zh-Hant", ja: "ja" }[lang]
     const d = (await import(`${website}/lib/dictionaries/${lang}.ts`))[name]
     const footer = `${d.hero.meta.split(" · ")[0]} · ${d.url}`
-    const copy = { lang: tag, headline: d.hero.title, subtitle: d.meta.title.replace(/^Fralo · /, ""), footer }
+    const copy = { lang: tag, headline: d.hero.title, subtitle: d.hero.devices, footer }
     ;(await import("node:fs")).writeFileSync(file, JSON.stringify(copy))
   ' "$website" "$lang" "$work/og-$lang.json"
   swift "$website/scripts/generate-og.swift" "$work/og-$lang.png" "$work/og-$lang.json" "$out" >/dev/null

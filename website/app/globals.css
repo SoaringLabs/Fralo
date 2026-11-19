@@ -163,17 +163,17 @@
   .canvas-layer { transition: opacity 0.7s ease; }
 
   /* Entrance: the page settles into its frame, then marks and tools appear. */
-  @keyframes settle { from { transform: scale(1.045); opacity: 0; border-radius: 0; } }
+  @keyframes settle { from { transform: scale(0.99); } }
   @keyframes fade-up { from { opacity: 0; transform: translateY(8px); } }
   @keyframes draw-mark { from { opacity: 0; transform: scale(0.3); } }
-  @keyframes rise { from { opacity: 0; transform: translateY(60px); } }
+  @keyframes rise { from { transform: translateY(12px); } }
   @keyframes float { 50% { transform: translateY(-8px); } }
   @keyframes flash { 15% { opacity: 0.85; } to { opacity: 0; } }
   @keyframes toast-in { from { opacity: 0; transform: translateY(10px) scale(0.97); } }
     @keyframes reveal { from { opacity: 0; transform: translateY(36px); } }
   @keyframes type { from { width: 0; } }
 
-  .anim-settle { animation: settle 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .anim-settle { animation: settle 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
   .anim-late { animation: fade-up 0.8s ease 0.7s both; }
   .anim-mark { animation: draw-mark 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.5s both; }
   .anim-flash { animation: flash 0.7s ease-out both; }
@@ -186,7 +186,7 @@
   .dock[data-shown="false"] { opacity: 0; translate: 0 20px; scale: 0.94; pointer-events: none; visibility: hidden; transition-property: opacity, translate, scale, visibility; transition-delay: 0s, 0s, 0s, 0.45s; }
 
   .device-fan .device {
-    animation: rise 1s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation: rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
     transition: translate 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), rotate 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   .device-fan .device img { animation: float var(--float, 7s) ease-in-out var(--float-delay, 0s) infinite; }
@@ -274,20 +274,20 @@
 }
 
 @layer components {
-  .privacy-link {
+  .document-link {
     color: var(--foreground);
     text-decoration: underline;
     text-underline-offset: 0.2em;
   }
 
-  .privacy-link:focus-visible {
+  .document-link:focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 3px;
     border-radius: 2px;
   }
 
   @media (prefers-color-scheme: dark) {
-    .privacy-page {
+    .document-page {
       --background: #1c1c1e;
       --foreground: #f2f2f7;
       --card: #242426;
@@ -301,7 +301,7 @@
   }
 
   @media (prefers-contrast: more) {
-    .privacy-page {
+    .document-page {
       --border: var(--foreground);
       --muted-foreground: var(--foreground);
     }

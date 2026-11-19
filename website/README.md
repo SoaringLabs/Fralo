@@ -54,6 +54,8 @@ On Vercel, set the project's Root Directory to `website`. Optional environment v
   `https://fralo.app`. Set it only to override the public origin, without any path or query;
   use the same public origin in production and previews.
 - `GITHUB_TOKEN`: raises the GitHub API rate limit when fetching the star count and release.
+- `FRALO_GOOGLE_SITE_VERIFICATION`: Search Console HTML verification value. Set it in
+  production to render the verification tag on the homepages.
 - `FRALO_POSTHOG_PROJECT_TOKEN`: PostHog's public project token (`phc_…`), read at build time.
 - `FRALO_POSTHOG_HOST`: the project's ingestion endpoint, either `https://us.i.posthog.com`
   or `https://eu.i.posthog.com`.
@@ -67,7 +69,8 @@ interaction autocapture, and person profiles are disabled. The footer links to t
 
 After deploying, check that the public origin serves `/robots.txt` and `/sitemap.xml`, and
 that the sitemap URLs return `200` without a language cookie or `Accept-Language` header.
-The sitemap lists the four homepages and four privacy pages; their HTML links each language
-to its equivalents. Confirm that production has no `noindex` and that Vercel preview URLs
+The sitemap lists the home, privacy settings and App Store screenshot guide for each of the
+four languages. Their HTML links each language to its equivalents. Confirm that production
+has no `noindex` and that Vercel preview URLs
 return `X-Robots-Tag: noindex`. Submit the production sitemap in Google Search Console once
 the domain is verified there.

@@ -1,8 +1,8 @@
 export const en = {
   meta: {
-    title: "Fralo · Batch-frame screenshots into device mockups on your Mac",
+    title: "Fralo · Batch Screenshot Mockups for Mac",
     description:
-      "Fralo is a free, open-source Mac app that puts a whole folder of screenshots into phone, tablet and browser frames, transparent or on a background. Everything stays on your Mac.",
+      "Batch-frame screenshots for App Store listings and more. Add phone, tablet or browser frames and export transparent PNGs with a free Mac app.",
   },
   skip: "Skip to content",
   url: "fralo.app",
@@ -16,21 +16,21 @@ export const en = {
     failed: "Couldn’t copy the command. Select it and copy it manually.",
   },
   hero: {
-    title: ["Frame your designs"],
-    lead: "Fralo adds the same phone, tablet, or browser frame to a whole set of screenshots. Use them on your App Store page, in a release post, or wherever you need them.",
+    title: ["Batch-frame your screenshots"],
+    lead: "Turn a folder of screenshots into matching phone, tablet or browser mockups on your Mac. Export transparent PNGs or place them on a custom background for an App Store listing or release post.",
     cta: "Download for Mac",
     meta: "Free and open source · macOS 14+ · Apple silicon",
     devices: "Phone, tablet and Safari window exports",
   },
   compare: {
-    title: ["See how it looks framed"],
-    body: "Drag to see the difference",
+    title: ["Screenshot before and after framing"],
+    body: "Drag the slider to compare the original app screenshot with the same screen inside a phone frame.",
     original: "Original",
     framed: "Framed",
     label: "Compare the original and framed versions",
   },
   canvases: {
-    title: ["Make the canvas your own"],
+    title: ["Custom canvases and transparent PNGs"],
     body: "Place the device on a preset canvas, customize the background, or export just the device on a transparent background.",
     group: "Canvas ratio",
     none: "None",
@@ -52,6 +52,22 @@ export const en = {
   },
   closing: {
     title: [["Frames, canvases, export."], ["One Mac app is all it takes."]],
+  },
+  guide: {
+    link: "App Store screenshot guide",
+    title: "How to frame App Store screenshots on Mac",
+    intro: "Use Fralo to turn a folder of app screenshots into a consistent set of device mockups. Set the frame and layout once, preview the batch, then export each screenshot as its own image.",
+    originalAlt: "Field Notes app screenshot before framing",
+    framedAlt: "The same Field Notes screenshot inside a phone frame",
+    caption: "The original screenshot and the same screen framed with Fralo.",
+    steps: [
+      ["Capture the screens you want to show", "Use your actual app screens and capture a portrait or landscape set for each device family. Put the key feature first and keep the app interface readable at thumbnail size."],
+      ["Apply one frame to the batch", "Drag the screenshots or their folder into Fralo. Choose a phone or tablet frame and set the canvas, background, and position. Click through the batch in the live preview before exporting."],
+      ["Export for the final use", "Choose a canvas with a background for finished images, or transparent PNG for a mockup you’ll place in another design. Fralo saves the exports to a new folder and keeps the originals intact."],
+    ],
+    uploadTitle: "Before uploading to App Store Connect",
+    uploadBody: "Check every exported image against Apple’s accepted dimensions for the target device and make sure it shows your app in use. Use the original screenshot or finish the layout in an editor if your export needs a different size.",
+    specs: "Apple’s screenshot specifications",
   },
   inspector: {
     label: "Fralo inspector for this page",

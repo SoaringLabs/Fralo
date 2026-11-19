@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { defaultLocale, localeInfo, locales, type Locale } from "./i18n"
+import { publisherName, publisherURL } from "./repository"
 
 const siteURL = new URL(process.env.SITE_URL?.trim() || "https://fralo.app")
 if (!["http:", "https:"].includes(siteURL.protocol) || siteURL.href !== `${siteURL.origin}/`) {
@@ -8,6 +9,13 @@ if (!["http:", "https:"].includes(siteURL.protocol) || siteURL.href !== `${siteU
 
 export const siteName = "Fralo"
 export const siteUrlFor = (path: string) => new URL(path, siteURL).href
+
+export const publisherData = {
+  "@type": "Organization",
+  "@id": siteUrlFor("/#publisher"),
+  name: publisherName,
+  url: publisherURL,
+}
 
 export function pageMetadata(
   locale: Locale,

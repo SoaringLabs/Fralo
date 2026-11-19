@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { LiquidGlass, type LiquidGlassHandle } from "liquid-glass-web-react"
 import { useMediaQuery } from "./settings"
 
 // Liquid glass that refracts live content in every browser (liquid-glass-web-react): the SVG
@@ -39,21 +38,34 @@ function useSize(element: HTMLElement | null) {
 export function WipeLens({ split, children }: { split: number; children: React.ReactNode }) {
   const reduceTransparency = useMediaQuery("(prefers-reduced-transparency: reduce)")
   const [box, setBox] = React.useState<HTMLDivElement | null>(null)
+  const [glass, setGlass] = React.useState<Pick<typeof import("liquid-glass-web-react"), "LiquidGlass"> | null>(null)
   const size = useSize(box)
-  const lens = React.useRef<LiquidGlassHandle>(null)
-  const [initial] = React.useState(split / 100)
+  const eligible = Boolean(size && !reduceTransparency && !(isSafari() && size.width * size.height > safariSourceLimit))
   React.useEffect(() => {
-    lens.current?.setPosition(split / 100, 0.5)
-  }, [split])
+    if (!box || !eligible || glass) return
+    let cancelled = false
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return
+      observer.disconnect()
+      // Keep the original comparison usable while the enhancement loads or if it fails.
+      void import("liquid-glass-web-react").then((module) => {
+        if (!cancelled) setGlass(module)
+      }).catch(() => {})
+    }, { rootMargin: "160px" })
+    observer.observe(box)
+    return () => {
+      cancelled = true
+      observer.disconnect()
+    }
+  }, [box, eligible, glass])
 
-  const refract = size && !reduceTransparency && !(isSafari() && size.width * size.height > safariSourceLimit)
+  const LiquidGlass = eligible ? glass?.LiquidGlass : undefined
   // The library's separate shadow can drift while the framed page scales in.
   return (
     <div ref={setBox} className="absolute inset-0">
-      {refract ? (
+      {LiquidGlass && size ? (
         <LiquidGlass
-          ref={lens}
-          x={initial}
+          x={split / 100}
           y={0.5}
           width={76}
           height={76}
