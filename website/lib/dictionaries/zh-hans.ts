@@ -4,7 +4,7 @@ export const zhHans: Dictionary = {
   meta: {
     title: "Fralo · 在 Mac 上批量给截图套框",
     description:
-      "Fralo 是一款免费开源的 Mac 应用，把一整个文件夹的截图一次性放进手机、平板和浏览器外框，导出透明 PNG 或带背景的成品图。全部在你的 Mac 上完成。",
+      "免费开源的 Mac 截图套框工具。批量为截图添加手机、平板或浏览器外壳，导出透明 PNG 或带背景的 App Store 展示图。",
   },
   skip: "跳到正文",
   url: "fralo.app/zh-hans",
@@ -18,21 +18,21 @@ export const zhHans: Dictionary = {
     failed: "复制失败，请选中命令后手动复制。",
   },
   hero: {
-    title: ["为您的设计套上外壳"],
-    lead: "Fralo 能给一整组截图套上同样的手机、平板或浏览器外壳，放到 App Store 页面、发布文章或任何你需要的地方里。",
+    title: ["批量给截图套框"],
+    lead: "在 Mac 上给一整个文件夹的截图套上统一的手机、平板或浏览器外壳。导出透明 PNG，或搭配自定义背景，用于 App Store 产品页和版本发布文章。",
     cta: "下载 Mac 版",
     meta: "免费开源 · macOS 14 及以上 · Apple 芯片",
     devices: "手机、平板和 Safari 窗口的导出图",
   },
   compare: {
-    title: ["瞧瞧带框后的样子"],
-    body: "拖动看看它们的不同",
+    title: ["截图套框前后对比"],
+    body: "拖动滑块，对比应用原始截图和套上手机外壳后的效果。",
     original: "原图",
     framed: "加框后",
     label: "对比原图和加框后的截图",
   },
   canvases: {
-    title: ["自定义画布，尽在你的掌握"],
+    title: ["自定义画布与透明 PNG"],
     body: "你可以把设备放到预设或任意自定义画布上，也可以只导出设备本身，背景透明。",
     group: "画布比例",
     none: "无",
@@ -54,6 +54,22 @@ export const zhHans: Dictionary = {
   },
   closing: {
     title: [["外壳、画布、导出，"], ["一个 Mac 应用", "就够了。"]],
+  },
+  guide: {
+    link: "App Store 截图制作指南",
+    title: "如何在 Mac 上批量给 App Store 截图套框",
+    intro: "用 Fralo 把一整个文件夹的应用截图做成风格统一的设备展示图。外壳和布局设置一次即可，预览整组效果后，每张截图会单独导出。",
+    originalAlt: "套框前的 Field Notes 应用截图",
+    framedAlt: "套上手机外壳后的同一张 Field Notes 截图",
+    caption: "左侧是应用原始截图，右侧是 Fralo 套框后的效果。",
+    steps: [
+      ["截取要展示的应用界面", "使用应用的真实界面，按设备类型分别准备横版或竖版截图。把主要功能放在第一张，确保缩成缩略图后依然能看清界面。"],
+      ["为整组截图套上同款外壳", "将截图或整个文件夹拖入 Fralo。选择手机或平板外壳，设置画布、背景和位置。导出前在实时预览中逐张检查效果。"],
+      ["按使用场景导出", "需要直接使用的成品图时，选择带背景的画布。需要在设计软件里继续排版时，导出透明 PNG。Fralo 会把成品存到新文件夹，并保留原图。"],
+    ],
+    uploadTitle: "上传到 App Store Connect 前",
+    uploadBody: "逐张确认导出尺寸符合 Apple 对目标设备的要求，画面也要展示应用的实际使用场景。如果导出尺寸不符，可以使用原始截图，或在编辑器里完成最后的排版。",
+    specs: "Apple 截图规格",
   },
   inspector: {
     label: "Fralo 检查器（作用于本页）",

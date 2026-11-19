@@ -4,7 +4,7 @@ export const zhHant: Dictionary = {
   meta: {
     title: "Fralo · 在 Mac 上批次為截圖套框",
     description:
-      "Fralo 是一款免費開源的 Mac App，把一整個資料夾的截圖一次放進手機、平板和瀏覽器外框，輸出透明 PNG 或含背景的成品圖。全部在你的 Mac 上完成。",
+      "免費開源的 Mac 截圖套框工具。批次為截圖加上手機、平板或瀏覽器外框，輸出透明 PNG 或含背景的 App Store 展示圖。",
   },
   skip: "跳到內容",
   url: "fralo.app/zh-hant",
@@ -18,21 +18,21 @@ export const zhHant: Dictionary = {
     failed: "無法複製。請選取指令後手動複製。",
   },
   hero: {
-    title: ["為您的設計加上外框"],
-    lead: "Fralo 能替整組截圖套上同一款手機、平板或瀏覽器外框，用在 App Store 產品頁面、版本公告，或任何需要配圖的地方。",
+    title: ["批次為截圖套框"],
+    lead: "在 Mac 上一次為整個資料夾的截圖套上統一的手機、平板或瀏覽器外框。輸出透明 PNG，或搭配自訂背景，用於 App Store 產品頁面和版本公告。",
     cta: "下載 Mac 版",
     meta: "免費開源 · macOS 14 以上 · Apple 晶片",
     devices: "手機、平板和 Safari 視窗的輸出圖",
   },
   compare: {
-    title: ["看看加框後的樣子"],
-    body: "拖曳看看有什麼不同",
+    title: ["比較截圖套框前後"],
+    body: "拖曳滑桿，比較 App 原始截圖與套上手機外框後的效果。",
     original: "原圖",
     framed: "加框後",
     label: "比較原圖與加框後的截圖",
   },
   canvases: {
-    title: ["自訂畫布，由你決定"],
+    title: ["自訂畫布與透明 PNG"],
     body: "你可以把裝置放到預設畫布上，自訂背景，也可以只輸出裝置，保留透明背景。",
     group: "畫布比例",
     none: "無",
@@ -54,6 +54,22 @@ export const zhHant: Dictionary = {
   },
   closing: {
     title: [["外框、畫布、輸出，"], ["一個 Mac App", "就夠了。"]],
+  },
+  guide: {
+    link: "App Store 截圖製作指南",
+    title: "如何在 Mac 上批次為 App Store 截圖套框",
+    intro: "用 Fralo 將整個資料夾的 App 截圖做成風格一致的裝置展示圖。外框和版面只需設定一次，預覽整組效果後，每張截圖會各自輸出。",
+    originalAlt: "套框前的 Field Notes App 截圖",
+    framedAlt: "套上手機外框後的同一張 Field Notes 截圖",
+    caption: "左側是 App 原始截圖，右側是 Fralo 套框後的效果。",
+    steps: [
+      ["擷取要展示的 App 畫面", "使用 App 的實際畫面，依裝置類型分別準備橫向或直向截圖。將主要功能放在第一張，並確認縮成縮圖後仍看得清楚。"],
+      ["為整組截圖套上同款外框", "將截圖或整個資料夾拖入 Fralo。選擇手機或平板外框，設定畫布、背景和位置。輸出前在即時預覽中逐張確認效果。"],
+      ["依用途輸出", "需要可直接使用的成品時，選擇含背景的畫布。要在設計軟體中繼續排版時，輸出透明 PNG。Fralo 會把成品存到新資料夾，並保留原圖。"],
+    ],
+    uploadTitle: "上傳到 App Store Connect 前",
+    uploadBody: "逐張確認輸出尺寸符合 Apple 對目標裝置的要求，畫面也須呈現 App 的實際使用情境。如果輸出尺寸不符，可使用原始截圖，或在編輯器中完成最後排版。",
+    specs: "Apple 截圖規格",
   },
   inspector: {
     label: "Fralo 檢查器（作用於本頁）",

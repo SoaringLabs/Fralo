@@ -155,14 +155,20 @@ let left: CGFloat = 64, column: CGFloat = 450
 withShadow(0.18, blur: 10, y: 3) { draw(image("icon.png"), NSRect(x: left - 5, y: 56, width: 52, height: 52)) }
 paragraph(["Fralo"], x: left + 55, y: 67, attributes(26, .semibold, ink, tracking: -0.3))
 
-// Headline: each dictionary line stays whole when it fits; a long one splits once at the most even
-// word boundary. The size then shrinks until every line fits the column.
-var size: CGFloat = 70
+// Keep dictionary phrases whole when possible, leaving room below for the subtitle and footer.
 func headlineAttributes(_ s: CGFloat) -> [NSAttributedString.Key: Any] {
     attributes(s, .bold, ink, tracking: copy.lang == "en" ? -s * 0.023 : 0, lineHeight: 1.06)
 }
-let headline = copy.headline.flatMap { width($0, headlineAttributes(size)) > column ? balanced($0, headlineAttributes(size)) : [$0] }
-while size > 48, headline.contains(where: { width($0, headlineAttributes(size)) > column }) { size -= 2 }
+func headlineLines(_ size: CGFloat) -> [String] {
+    let attributes = headlineAttributes(size)
+    return copy.headline.flatMap { width($0, attributes) > column ? balanced($0, attributes) : [$0] }
+}
+var size: CGFloat = 70
+var headline = headlineLines(size)
+while size > 48, headline.count > 3 || headline.contains(where: { width($0, headlineAttributes(size)) > column }) {
+    size -= 2
+    headline = headlineLines(size)
+}
 var y: CGFloat = 190 + (70 - size) * 0.5
 y += paragraph(headline, x: left, y: y, headlineAttributes(size))
 

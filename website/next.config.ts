@@ -15,6 +15,7 @@ const nextConfig: NextConfig = {
       beforeFiles: [
         { source: "/", destination: "/en" },
         { source: "/privacy", destination: "/en/privacy" },
+        { source: "/app-store-screenshots", destination: "/en/app-store-screenshots" },
       ],
     }
   },

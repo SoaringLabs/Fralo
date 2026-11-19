@@ -21,9 +21,9 @@ export default async function PrivacyPage({ params }: PageProps<"/[lang]/privacy
   const analyticsEnabled = Boolean(websiteAnalyticsConfig())
 
   return (
-    <div className="privacy-page min-h-dvh bg-background text-foreground">
+    <div className="document-page min-h-dvh bg-background text-foreground">
       <main className="mx-auto max-w-[720px] px-5 py-9 sm:px-8 sm:py-16">
-        <a href={pathFor(lang)} className="privacy-link text-sm">← {privacy.home}</a>
+        <a href={pathFor(lang)} className="document-link text-sm">← {privacy.home}</a>
         <h1 className="mt-6 text-start text-3xl font-bold sm:text-4xl">{privacy.link}</h1>
         <p className="mt-3 leading-relaxed text-muted-foreground">{privacy.intro}</p>
         <section aria-labelledby="app-privacy" className="mt-8">
@@ -40,7 +40,7 @@ export default async function PrivacyPage({ params }: PageProps<"/[lang]/privacy
                 <h3 className="text-start font-semibold">{privacy.analyticsTitle}</h3>
                 <p className="mt-2 leading-relaxed text-muted-foreground">
                   {privacy.analyticsDetails}{" "}
-                  <a href="https://posthog.com/privacy" className="privacy-link">{privacy.analyticsPolicy}</a>
+                  <a href="https://posthog.com/privacy" className="document-link">{privacy.analyticsPolicy}</a>
                 </p>
               </section>
             )}
